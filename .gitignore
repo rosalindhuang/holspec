@@ -14,5 +14,10 @@ __pycache__/
 .DS_Store
 
 # Data and model artifacts
-data/
-models/
+data/*
+!data/.gitkeep
+
+outputs/*
+!outputs/.gitkeep
+
+archive/
