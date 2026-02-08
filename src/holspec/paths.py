@@ -1,0 +1,216 @@
+"""
+Project paths and directory utilities.
+"""
+from pathlib import Path
+import shutil
+from functools import lru_cache
+
+#%% Project paths
+
+@lru_cache(maxsize=1)
+def get_project_root(start: Path | None = None, root_markers = ("pyproject.toml", ".git")) -> Path:
+    """
+    Resolve the project root directory by searching upward for common project markers.
+    Walks upward from `start` (defaults to this file's location) until it finds a directory
+    containing one of the root marker files.
+
+    Raises
+    ------
+    RuntimeError if no root marker is found.
+    """
+    p = (start or Path(__file__)).resolve()
+    for parent in (p, *p.parents):
+        if any((parent / m).exists() for m in root_markers):
+            return parent
+    raise RuntimeError(f"Could not find project root from {p} based on root markers {root_markers}.")
+
+# Project root
+PROJECT_ROOT = get_project_root()
+
+# Other directories
+CONFIGS_DIR = PROJECT_ROOT / "configs"
+
+DATA_DIR = PROJECT_ROOT / "data"
+DATA_RAW_DIR = DATA_DIR / "raw"
+DATA_INTERIM_DIR = DATA_DIR / "interim"
+DATA_PROCESSED_DIR = DATA_DIR / "processed"
+
+NOTEBOOKS_DIR = PROJECT_ROOT / "notebooks"
+OUTPUTS_DIR = PROJECT_ROOT / "outputs"
+
+SRC_DIR = PROJECT_ROOT / "src"
+
+
+
+#%% Utilities for directory management
+
+def prepare_directory(path: Path, clear_existing: bool = False, verbose: bool = True) -> None:
+    """
+    Ensure a directory exists, creating it if necessary, and optionally clearing its contents.
+
+    Parameters
+    ----------
+    path : Path
+        Directory path to prepare.
+    clear_existing : bool, default=False
+        If True, remove all existing files and subdirectories.
+    verbose : bool, default=True
+        If True, print status messages.
+
+    Returns
+    -------
+    None
+    """
+    if path is None:
+        return
+    
+    if path.exists() and path.is_dir():
+        if verbose:
+            print(f"Directory exists: {path}")
+        if clear_existing:
+            items = list(path.iterdir())
+            if not items:
+                return
+            
+            if verbose:
+                print(f"Clearing directory: {path}")
+            
+            files = [item for item in items if item.is_file()]
+            dirs = [item for item in items if item.is_dir()]
+            
+            for item in files:
+                item.unlink()
+            for item in dirs:
+                shutil.rmtree(item, ignore_errors=True)
+            
+            if verbose:
+                if files:
+                    print(f"  Removed {len(files)} file(s): {[f.name for f in files]}")
+                if dirs:
+                    print(f"  Removed {len(dirs)} dir(s): {[d.name for d in dirs]}")
+                print()
+    else:
+        if verbose:
+            print(f"Creating directory: {path}")
+        path.mkdir(parents=True, exist_ok=True)
+
+def print_directory_tree(root_path, include_files=True, ignore_dotfiles=True, 
+                         ignore_patterns=None, ignore_exact=None, _prefix="", _is_last=True):
+    """
+    Print directory structure in tree format with filtering options.
+
+    Parameters
+    ----------
+    root_path : str or Path
+        Root directory to start from.
+    include_files : bool, default=True
+        If True, include files in output; if False, show only directories.
+    ignore_dotfiles : bool, default=True
+        If True, ignore items starting with '.'.
+    ignore_patterns : list of str, optional
+        Ignore items containing any of these substrings.
+    ignore_exact : list of str, optional
+        Ignore items with names exactly matching these values.
+    _prefix : str, optional
+        Internal parameter for formatting indentation (do not use).
+    _is_last : bool, optional
+        Internal parameter for formatting tree connectors (do not use).
+
+    Returns
+    -------
+    None
+    """
+    root_path = Path(root_path)
+    
+    # Set defaults for ignore lists
+    if ignore_patterns is None:
+        ignore_patterns = []
+    if ignore_exact is None:
+        ignore_exact = []
+    
+    if not root_path.exists():
+        print(f"Error: Path '{root_path}' does not exist")
+        return
+    
+    if not root_path.is_dir():
+        print(f"Error: Path '{root_path}' is not a directory")
+        return
+    
+    def should_ignore(item_name):
+        """Check if an item should be ignored based on ignore rules."""
+        # Check dotfiles
+        if ignore_dotfiles and item_name.startswith('.'):
+            return True
+        
+        # Check exact matches
+        if item_name in ignore_exact:
+            return True
+        
+        # Check patterns (substring matching)
+        for pattern in ignore_patterns:
+            if pattern in item_name:
+                return True
+        
+        return False
+    
+    # Print the root directory name
+    if _prefix == "":
+        print(f"{root_path.name}/")
+    
+    try:
+        # Get all items in the directory
+        items = list(root_path.iterdir())
+        
+        # Filter out ignored items
+        items = [item for item in items if not should_ignore(item.name)]
+        
+        # Filter based on include_files parameter
+        if include_files:
+            # Sort: directories first, then files, both alphabetically
+            directories = sorted([item for item in items if item.is_dir()])
+            files = sorted([item for item in items if item.is_file()])
+            all_items = directories + files
+        else:
+            # Only directories
+            all_items = sorted([item for item in items if item.is_dir()])
+        
+        # Print each item
+        for i, item in enumerate(all_items):
+            is_last_item = (i == len(all_items) - 1)
+            
+            # Determine the connector character
+            if is_last_item:
+                connector = "└── "
+                next_prefix = _prefix + "    "
+            else:
+                connector = "├── "
+                next_prefix = _prefix + "│   "
+            
+            # Print the item
+            if item.is_dir():
+                print(f"{_prefix}{connector}{item.name}/")
+                # Recursively print subdirectory with same ignore rules
+                print_directory_tree(item, include_files, ignore_dotfiles, 
+                                   ignore_patterns, ignore_exact, next_prefix, is_last_item)
+            else:
+                print(f"{_prefix}{connector}{item.name}")
+                
+    except PermissionError:
+        print(f"{_prefix}[Permission Denied]")
+    except Exception as e:
+        print(f"{_prefix}[Error: {e}]")
+
+
+#%% Test code
+if __name__ == "__main__":
+    print("Project paths:")
+    print("  PROJECT_ROOT:".ljust(15), PROJECT_ROOT)
+    print("  CONFIGS_DIR:".ljust(15), CONFIGS_DIR)
+    print("  DATA_DIR:".ljust(15), DATA_DIR)
+    print("  NOTEBOOKS_DIR:".ljust(15), NOTEBOOKS_DIR)
+    print("  OUTPUTS_DIR:".ljust(15), OUTPUTS_DIR)
+    print("  SRC_DIR:".ljust(15), SRC_DIR)
+    
+    print()
+    print("Project directory tree:")
+    print_directory_tree(PROJECT_ROOT)

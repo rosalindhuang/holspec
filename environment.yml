@@ -1,0 +1,51 @@
+name: holspec
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12.*
+  - pip
+
+  # Scientific Computing
+  - numpy
+  - scipy
+  - pandas
+  - xarray
+  - sympy
+
+  # Visualization
+  - matplotlib
+  - seaborn
+
+  # Data I/O
+  - h5py
+  - pyarrow
+  - openpyxl
+  - requests
+  - pyyaml
+
+  # Machine Learning
+  - scikit-learn
+  - statsmodels
+  - scikit-image
+
+  # Utilities
+  - natsort
+  - tqdm
+  - rich
+  - pytables
+  - typer
+  - loguru
+
+  # Jupyter
+  - jupyterlab
+  - ipykernel
+  - ipywidgets
+  - ipympl
+
+  # Development Tools
+  - pytest
+  - ruff
+  - pre-commit
+  
+  # Pip packages
+  - pip: []
