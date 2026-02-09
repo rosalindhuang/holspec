@@ -20,4 +20,5 @@ data/*
 outputs/*
 !outputs/.gitkeep
 
-archive/
+archive/*
+!archive/old_repo/
