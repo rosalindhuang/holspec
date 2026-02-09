@@ -18,6 +18,7 @@ import textwrap
 import re
 import nbformat
 import subprocess
+import hashlib
 
 
 # %% Print utilities
@@ -317,3 +318,13 @@ def timed(fun, args, repeats=1) -> float:
     for _ in range(repeats):
         fun(*args)
     return (time.time() - start) / repeats
+
+def compute_content_hash(data: np.ndarray, length: int = 12) -> str:
+    """
+    Compute SHA256 hash of array data.
+    Uses data.tobytes() for deterministic, platform-independent hashing.
+    """
+    data_bytes = np.asarray(data).tobytes()
+    hash_full = hashlib.sha256(data_bytes).hexdigest()
+    return hash_full[:length]
+

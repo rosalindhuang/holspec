@@ -14,11 +14,11 @@ from natsort import natsorted
 
 # %% Saving and reading to HDF5
 def save_h5(
-    file_path: str | Path,
+    filepath: str | Path,
     datasets: Optional[dict[str, Any]] = None,
     attributes: Optional[dict[str, Any]] = None,
     group: Optional[str] = None,
-    mode: str = 'update',
+    mode: str = 'replace',
     hdf5_options: Optional[dict] = None
 ):
     """
@@ -26,7 +26,7 @@ def save_h5(
     
     Parameters
     ----------
-    file_path : str or Path
+    filepath : str or Path
         Path to the HDF5 file.
     datasets : dict[str, array-like], optional
         Dictionary of (name: data) pairs to save as datasets.
@@ -35,7 +35,7 @@ def save_h5(
     group : str, optional
         If specified, datasets and attributes are saved under this group.
         If None, saved at root level.
-    mode : {'update', 'create', 'replace'}, default 'update'
+    mode : {'update', 'create', 'replace'}, default 'replace'
         How to handle existing groups:
         - 'update': Merge with existing group (overwrite conflicting datasets/attributes)
         - 'create': Raise error if group already exists
@@ -73,7 +73,7 @@ def save_h5(
     if 'compression' in hdf5_options and 'chunks' not in hdf5_options:
         hdf5_options['chunks'] = True
     
-    with h5py.File(str(file_path), 'a') as f:
+    with h5py.File(str(filepath), 'a') as f:
         
         # Determine target location (root or group)
         if group is None:
@@ -84,7 +84,7 @@ def save_h5(
             if mode == 'create':
                 if group_exists:
                     raise FileExistsError(
-                        f"Group '{group}' already exists in {file_path}. "
+                        f"Group '{group}' already exists in {filepath}. "
                         f"Use mode='update' to merge or mode='replace' to overwrite."
                     )
                 target = f.create_group(group)
@@ -114,7 +114,7 @@ def save_h5(
 
 
 def read_h5(
-    file_path: str | Path,
+    filepath: str | Path,
     group: Optional[str] = None,
     dataset_names: Optional[list[str]] = None
 ) -> tuple[dict[str, np.ndarray], dict[str, Any]]:
@@ -123,7 +123,7 @@ def read_h5(
     
     Parameters
     ----------
-    file_path : str or Path
+    filepath : str or Path
         Path to the HDF5 file.
     group : str, optional
         If specified, reads from this group. If None, reads from root level.
@@ -156,17 +156,17 @@ def read_h5(
     >>> # Read only specific datasets
     >>> datasets, attrs = read_h5('data.h5', group='experiment1', dataset_names=['x', 'y'])
     """
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"HDF5 file not found: {file_path}")
+    if not os.path.exists(filepath):
+        raise FileNotFoundError(f"HDF5 file not found: {filepath}")
     
-    with h5py.File(str(file_path), 'r') as f:
+    with h5py.File(str(filepath), 'r') as f:
         
         # Navigate to target location (root or group)
         if group is None:
             source = f
         else:
             if group not in f:
-                raise KeyError(f"Group '{group}' not found in {file_path}")
+                raise KeyError(f"Group '{group}' not found in {filepath}")
             source = f[group]
         
         # Load datasets
@@ -252,7 +252,7 @@ def get_keys_h5(
         return natsorted(keys) if sort else keys
 
 
-def inspect_h5(file_path: str | Path) -> None:
+def inspect_h5(filepath: str | Path) -> None:
     """Print the structure and attributes of an HDF5 file."""
     def summarize_attr(value):
         if isinstance(value, (str, bytes)):
@@ -281,8 +281,8 @@ def inspect_h5(file_path: str | Path) -> None:
             print(f"{prefix}{name} (shape={obj.shape}, dtype={obj.dtype})")
             print_attrs(obj, prefix + "    ")
     
-    with h5py.File(file_path, 'r') as f:
-        print(f"{file_path}/")
+    with h5py.File(filepath, 'r') as f:
+        print(f"{filepath}/")
         print_attrs(f, prefix="    ")
         for key in f:
             print_h5_structure(key, f[key], prefix="    ")

@@ -353,3 +353,15 @@ def add_random_perturbation(
         raise ValueError(f"Unknown mode: {mode}")
     
     return positions + displacement
+
+
+GENERATOR_MAP = {
+    'trilatthex': generate_triangular_lattice_hex,
+    'trilattrect': generate_triangular_lattice_rect,
+    'sqrlatt': generate_square_lattice,
+    'bcclatt': generate_bcc_lattice,
+    'randunif': generate_random_uniform,
+    'regpoly': generate_regular_polygon,
+    'tetrahedron': generate_tetrahedron,
+    'cubevert': generate_cube_vertices,
+}
