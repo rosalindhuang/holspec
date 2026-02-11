@@ -22,13 +22,18 @@ def format_axis(
     # Axis limits and scales
     xlims: Optional[Tuple[float, float]] = None,
     ylims: Optional[Tuple[float, float]] = None,
+    zlims: Optional[Tuple[float, float]] = None,
     xscale: Optional[str] = None,
     yscale: Optional[str] = None,
+    zscale: Optional[str] = None,
     aspect: Optional[str] = None,
-    margins: Optional[Tuple[float, float]] = None,
+    margins: Optional[Tuple[float, ...]] = None,
+    # View angles (3D only)
+    view_angles: Optional[Tuple[float, float]] = None,
     # Labels and title
     xlabel: Optional[str] = None,
     ylabel: Optional[str] = None,
+    zlabel: Optional[str] = None,
     title: Optional[str] = None,
     title_fontsize: int = 11,
     # Grid
@@ -41,30 +46,41 @@ def format_axis(
     legend_kwargs: Optional[Dict[str, Any]] = None
 ) -> None:
     """
-    Apply formatting to a matplotlib axis.
+    Apply formatting to a matplotlib axis (2D or 3D).
     
     Parameters
     ----------
     ax : Axes
-        The matplotlib axis to format.
+        The matplotlib axis to format (2D or 3D).
     figsize : tuple of float, optional
         Figure size as (width, height) in inches.
     xlims : tuple of float, optional
         x-axis limits as (min, max).
     ylims : tuple of float, optional
         y-axis limits as (min, max).
+    zlims : tuple of float, optional
+        z-axis limits as (min, max). Only for 3D axes.
     xscale : str, optional
         Scale for x-axis (e.g., 'linear', 'log').
     yscale : str, optional
         Scale for y-axis (e.g., 'linear', 'log').
+    zscale : str, optional
+        Scale for z-axis (e.g., 'linear', 'log'). Only for 3D axes.
     aspect : str, optional
         Aspect ratio (e.g., 'equal', 'auto').
+        For 3D: 'equal' is implemented manually due to matplotlib limitations.
     margins : tuple of float, optional
-        Margins as (x_margin, y_margin).
+        Margins as (x_margin, y_margin) for 2D or (x_margin, y_margin, z_margin) for 3D.
+    view_angles : tuple of float, optional
+        View angles as (elevation, azimuth) in degrees. Only for 3D axes.
+        Elevation is the angle above the horizontal plane (typically 0-90).
+        Azimuth is the rotation angle around the z-axis (0-360).
     xlabel : str, optional
         Label for x-axis.
     ylabel : str, optional
         Label for y-axis.
+    zlabel : str, optional
+        Label for z-axis. Only for 3D axes.
     title : str, optional
         Title for the plot.
     title_fontsize : int, default 11
@@ -79,159 +95,33 @@ def format_axis(
         Which axis to apply scientific notation ('x', 'y', or 'both').
     legend_kwargs : dict, optional
         Keyword arguments to pass to ax.legend().
-    """
-    # Figure size
-    if figsize is not None:
-        fig: Figure = ax.get_figure()
-        fig.set_size_inches(figsize)
-    
-    # Axis limits
-    if xlims is not None:
-        ax.set_xlim(xlims)
-    if ylims is not None:
-        ax.set_ylim(ylims)
-    
-    # Axis scales
-    if xscale is not None:
-        ax.set_xscale(xscale)
-    if yscale is not None:
-        ax.set_yscale(yscale)
-    
-    # Aspect ratio and margins
-    if aspect is not None:
-        ax.set_aspect(aspect)
-    if margins is not None:
-        ax.margins(*margins)
-    
-    # Labels and title
-    if xlabel is not None:
-        ax.set_xlabel(xlabel)
-    if ylabel is not None:
-        ax.set_ylabel(ylabel)
-    if title is not None:
-        ax.set_title(title, fontsize=title_fontsize)
-    
-    # Grid
-    if grid:
-        ax.grid(alpha=grid_alpha)
-    
-    # Scientific notation
-    if scilimits is not None:
-        ax.ticklabel_format(style='sci', axis=sci_axis, scilimits=scilimits)
-    
-    # Legend
-    if legend_kwargs is not None:
-        ax.legend(**legend_kwargs)
-
-
-def format_axis_3d(
-    ax: Axes,
-    # Figure properties
-    figsize: Optional[Tuple[float, float]] = None,
-    # Axis limits and scales
-    xlims: Optional[Tuple[float, float]] = None,
-    ylims: Optional[Tuple[float, float]] = None,
-    zlims: Optional[Tuple[float, float]] = None,
-    xscale: Optional[str] = None,
-    yscale: Optional[str] = None,
-    zscale: Optional[str] = None,
-    equal_aspect: bool = False,
-    # Labels and title
-    xlabel: Optional[str] = None,
-    ylabel: Optional[str] = None,
-    zlabel: Optional[str] = None,
-    title: Optional[str] = None,
-    title_fontsize: int = 11,
-    # Grid
-    grid: bool = False,
-    grid_alpha: float = 0.5,
-    # Scientific notation
-    scilimits: Optional[Tuple[int, int]] = None,
-    # Legend
-    legend_kwargs: Optional[Dict[str, Any]] = None
-) -> None:
-    """
-    Apply formatting to a matplotlib 3D axis.
-    
-    Parameters
-    ----------
-    ax : Axes
-        The matplotlib 3D axis to format (must have projection='3d').
-    figsize : tuple of float, optional
-        Figure size as (width, height) in inches.
-    xlims : tuple of float, optional
-        x-axis limits as (min, max).
-    ylims : tuple of float, optional
-        y-axis limits as (min, max).
-    zlims : tuple of float, optional
-        z-axis limits as (min, max).
-    xscale : str, optional
-        Scale for x-axis (e.g., 'linear', 'log').
-    yscale : str, optional
-        Scale for y-axis (e.g., 'linear', 'log').
-    zscale : str, optional
-        Scale for z-axis (e.g., 'linear', 'log').
-    equal_aspect : bool, default False
-        Whether to set equal aspect ratio for all three axes.
-        If True, all axes will have the same range centered on the data.
-    xlabel : str, optional
-        Label for x-axis.
-    ylabel : str, optional
-        Label for y-axis.
-    zlabel : str, optional
-        Label for z-axis.
-    title : str, optional
-        Title for the plot.
-    title_fontsize : int, default 11
-        Font size for the title.
-    grid : bool, default False
-        Whether to display grid lines.
-    grid_alpha : float, default 0.5
-        Transparency of grid lines (0=transparent, 1=opaque).
-    scilimits : tuple of int, optional
-        Power limits for scientific notation as (min_exp, max_exp).
-    legend_kwargs : dict, optional
-        Keyword arguments to pass to ax.legend().
     
     Notes
     -----
-    The equal_aspect option sets all axes to the same range, centered on the data.
-    This provides an approximate equal aspect ratio for 3D plots.
+    The function automatically detects whether the axis is 2D or 3D.
+    For 3D axes with aspect='equal', all axes are set to the same range, centered 
+    on the data, providing an approximate equal aspect ratio.
     """
+    # Detect if 3D axis
+    is_3d = hasattr(ax, 'zaxis')
+    
     # Figure size
     if figsize is not None:
         fig: Figure = ax.get_figure()
         fig.set_size_inches(figsize)
     
-    # Equal aspect ratio (must be set before individual limits)
-    if equal_aspect:
-        # Get current axis limits if they exist
-        xlims_current = ax.get_xlim() if xlims is None else xlims
-        ylims_current = ax.get_ylim() if ylims is None else ylims
-        zlims_current = ax.get_zlim() if zlims is None else zlims
-        
-        # Calculate ranges
-        x_range = xlims_current[1] - xlims_current[0]
-        y_range = ylims_current[1] - ylims_current[0]
-        z_range = zlims_current[1] - zlims_current[0]
-        max_range = max(x_range, y_range, z_range)
-        
-        # Calculate centers
-        x_center = (xlims_current[1] + xlims_current[0]) / 2
-        y_center = (ylims_current[1] + ylims_current[0]) / 2
-        z_center = (zlims_current[1] + zlims_current[0]) / 2
-        
-        # Set equal limits
-        xlims = (x_center - max_range / 2, x_center + max_range / 2)
-        ylims = (y_center - max_range / 2, y_center + max_range / 2)
-        zlims = (z_center - max_range / 2, z_center + max_range / 2)
+    # Handle aspect ratio (3D equal aspect needs special handling)
+    if aspect == 'equal' and is_3d:
+        xlims, ylims, zlims = _set_equal_aspect_3d(ax, xlims, ylims, zlims)
+    elif aspect is not None and not is_3d:
+        ax.set_aspect(aspect)
     
     # Axis limits
     if xlims is not None:
         ax.set_xlim(xlims)
     if ylims is not None:
         ax.set_ylim(ylims)
-    if zlims is not None:
+    if zlims is not None and is_3d:
         ax.set_zlim(zlims)
     
     # Axis scales
@@ -239,15 +129,27 @@ def format_axis_3d(
         ax.set_xscale(xscale)
     if yscale is not None:
         ax.set_yscale(yscale)
-    if zscale is not None:
+    if zscale is not None and is_3d:
         ax.set_zscale(zscale)
+    
+    # Margins
+    if margins is not None:
+        if is_3d:
+            # 3D doesn't support margins() method, ignore for now
+            pass
+        else:
+            ax.margins(*margins)
+    
+    # View angles (3D only)
+    if view_angles is not None and is_3d:
+        ax.view_init(elev=view_angles[0], azim=view_angles[1])
     
     # Labels and title
     if xlabel is not None:
         ax.set_xlabel(xlabel)
     if ylabel is not None:
         ax.set_ylabel(ylabel)
-    if zlabel is not None:
+    if zlabel is not None and is_3d:
         ax.set_zlabel(zlabel)
     if title is not None:
         ax.set_title(title, fontsize=title_fontsize)
@@ -258,11 +160,63 @@ def format_axis_3d(
     
     # Scientific notation
     if scilimits is not None:
-        ax.ticklabel_format(style='sci', scilimits=scilimits)
+        if is_3d:
+            ax.ticklabel_format(style='sci', scilimits=scilimits)
+        else:
+            ax.ticklabel_format(style='sci', axis=sci_axis, scilimits=scilimits)
     
     # Legend
     if legend_kwargs is not None:
         ax.legend(**legend_kwargs)
+
+
+def _set_equal_aspect_3d(
+    ax: Axes,
+    xlims: Optional[Tuple[float, float]],
+    ylims: Optional[Tuple[float, float]],
+    zlims: Optional[Tuple[float, float]]
+) -> Tuple[Tuple[float, float], Tuple[float, float], Tuple[float, float]]:
+    """
+    Calculate equal aspect ratio limits for 3D axes.
+    
+    Parameters
+    ----------
+    ax : Axes
+        3D matplotlib axis.
+    xlims : tuple of float, optional
+        Desired x-axis limits, or None to use current limits.
+    ylims : tuple of float, optional
+        Desired y-axis limits, or None to use current limits.
+    zlims : tuple of float, optional
+        Desired z-axis limits, or None to use current limits.
+    
+    Returns
+    -------
+    tuple
+        (xlims, ylims, zlims) with equal ranges centered on data.
+    """
+    # Get current axis limits if not provided
+    xlims_current = ax.get_xlim() if xlims is None else xlims
+    ylims_current = ax.get_ylim() if ylims is None else ylims
+    zlims_current = ax.get_zlim() if zlims is None else zlims
+    
+    # Calculate ranges
+    x_range = xlims_current[1] - xlims_current[0]
+    y_range = ylims_current[1] - ylims_current[0]
+    z_range = zlims_current[1] - zlims_current[0]
+    max_range = max(x_range, y_range, z_range)
+    
+    # Calculate centers
+    x_center = (xlims_current[1] + xlims_current[0]) / 2
+    y_center = (ylims_current[1] + ylims_current[0]) / 2
+    z_center = (zlims_current[1] + zlims_current[0]) / 2
+    
+    # Set equal limits
+    xlims = (x_center - max_range / 2, x_center + max_range / 2)
+    ylims = (y_center - max_range / 2, y_center + max_range / 2)
+    zlims = (z_center - max_range / 2, z_center + max_range / 2)
+    
+    return xlims, ylims, zlims
 
 
 def format_cbar(

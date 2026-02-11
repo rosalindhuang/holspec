@@ -10,7 +10,6 @@ __all__ = [
     # From helpers.py
     'format_axis',
     'format_cbar',
-    'save_figure',
     'animate_3d_turn',
     'make_movie',
 

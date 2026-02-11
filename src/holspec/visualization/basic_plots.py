@@ -311,7 +311,6 @@ def plot_circles(
     circle_props: Optional[Union[Dict[str, Any], List[Dict[str, Any]]]] = None,
     # Figure properties
     ax: Optional[Axes] = None,
-    figsize: Tuple[float, float] = (6, 6),
     **kwargs
 ) -> Tuple[Figure, Axes]:
     """
@@ -331,8 +330,6 @@ def plot_circles(
         - list of dicts: individual properties for each circle
     ax : Axes, optional
         Axes to plot on. If None, creates new figure.
-    figsize : tuple of float, default (6, 6)
-        Figure size as (width, height) in inches.
     **kwargs
         Additional keyword arguments passed to matplotlib Circle patches.
         These serve as additional defaults that can be overridden by circle_props.
@@ -350,7 +347,7 @@ def plot_circles(
     """
     # Create figure if needed
     if ax is None:
-        fig, ax = plt.subplots(figsize=figsize)
+        fig, ax = plt.subplots()
     else:
         fig = ax.figure
     
@@ -411,7 +408,6 @@ def plot_spheres(
     sphere_props: Optional[Union[Dict[str, Any], List[Dict[str, Any]]]] = None,
     # Figure properties
     ax: Optional[Axes] = None,
-    figsize: Tuple[float, float] = (6, 6),
     # Sphere rendering
     size_scale: float = 100.0,
     **kwargs
@@ -433,8 +429,6 @@ def plot_spheres(
         - list of dicts: individual properties for each sphere
     ax : Axes, optional
         3D axes to plot on (must have projection='3d'). If None, creates new figure.
-    figsize : tuple of float, default (6, 6)
-        Figure size as (width, height) in inches.
     size_scale : float, default 100.0
         Scaling factor for sphere sizes. The scatter size is calculated as (radius * size_scale)^2.
         Adjust this if spheres appear too large or too small.
@@ -461,7 +455,7 @@ def plot_spheres(
     
     # Create figure and axes if not provided
     if ax is None:
-        fig = plt.figure(figsize=figsize)
+        fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
     else:
         fig = ax.figure
