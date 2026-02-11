@@ -3,6 +3,7 @@ Module containing visualization utilities.
 """
 from .helpers import *
 from .basic_plots import *
+from .framework_objects import *
 
 
 # Define public API of the module
@@ -16,4 +17,7 @@ __all__ = [
     # From basic_plots.py
     'plot_circles',
     'plot_spheres',
+
+    # From framework_objects.py
+    'plot_point_data',
 ]

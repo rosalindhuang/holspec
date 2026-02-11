@@ -85,6 +85,8 @@ def save_point_data(
     
     # Compute content hash
     content_hash = compute_content_hash(positions)
+
+    # Generate config label
     
     # Build metadata
     metadata = {
@@ -92,6 +94,7 @@ def save_point_data(
         'generator_params': json.dumps(config['params']),
         'shape': positions.shape,
         'content_hash': content_hash,
+        'config_label': create_config_label(config),
         'timestamp': datetime.now().isoformat(),
     }
     
@@ -161,9 +164,9 @@ def read_point_data(
     return positions, config, metadata
 
 
-def create_config_filename(config):
+def create_config_label(config):
     """
-    Create a unique filename from configuration.
+    Create a unique label from configuration.
     Format: generator_param1_param2_...
     """
     generator = config['generator']

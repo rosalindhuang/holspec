@@ -21,5 +21,5 @@ __all__ = [
     'generate_from_config',
     'save_point_data',
     'read_point_data',
-    'create_config_filename'
+    'create_config_label'
 ]

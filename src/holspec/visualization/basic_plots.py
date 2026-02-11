@@ -504,6 +504,11 @@ def plot_spheres(
     # Plot spheres using scatter with size proportional to radius squared
     for pos, r, props in zip(positions, radii, props_list):
         size = (r * size_scale) ** 2
+        
+        # Fix matplotlib warning: convert 'c' to 'color' if it's an RGBA tuple
+        if 'c' in props and isinstance(props['c'], (tuple, list)) and len(props['c']) in [3, 4]:
+            props['color'] = props.pop('c')
+        
         ax.scatter(pos[0], pos[1], pos[2], s=size, **props)
     
     return fig, ax

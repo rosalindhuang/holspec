@@ -51,6 +51,10 @@ def save_h5(
     FileExistsError
         If mode='create' and the group already exists.
     
+    Notes
+    -----
+    Parent directories are created automatically if they don't exist.
+    
     Examples
     --------
     >>> # Save to root level
@@ -66,6 +70,10 @@ def save_h5(
     valid_modes = {'update', 'create', 'replace'}
     if mode not in valid_modes:
         raise ValueError(f"mode must be one of {valid_modes}, got '{mode}'")
+    
+    # Ensure parent directory exists
+    filepath = Path(filepath)
+    filepath.parent.mkdir(parents=True, exist_ok=True)
     
     # Set default HDF5 options if not provided
     if hdf5_options is None: 
