@@ -13,7 +13,7 @@ import subprocess
 from typing import Optional, Tuple, Dict, Any, List, Union
 from pathlib import Path
 
-# %% Formatting and saving
+# %% Formatting
 
 def format_axis(
     ax: Axes,

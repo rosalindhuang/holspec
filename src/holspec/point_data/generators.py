@@ -365,3 +365,75 @@ GENERATOR_MAP = {
     'tetrahedron': generate_tetrahedron,
     'cubevert': generate_cube_vertices,
 }
+
+def generate_from_config(config: dict) -> np.ndarray:
+    """
+    Generate point data from configuration dictionary.
+
+    Parameters
+    ----------
+    config : dict
+        Must contain 'generator' (str) and 'params' (dict).
+
+    Returns
+    -------
+    positions : np.ndarray
+        Generated point positions.
+    """
+    # Validate config
+    if 'generator' not in config:
+        raise ValueError("Config must contain 'generator' key")
+    if 'params' not in config:
+        raise ValueError("Config must contain 'params' key")
+
+    generator_name = config['generator']
+    params = config['params']
+
+    # Get generator function
+    if generator_name not in GENERATOR_MAP:
+        raise ValueError(f"Unknown generator: {generator_name}")
+
+    generator_func = GENERATOR_MAP[generator_name]
+
+    # Generate positions
+    return generator_func(**params)
+
+
+def create_config_label(config):
+    """
+    Create a unique label from point data generation config.
+    Format: generator_param1_param2_...
+    """
+    # Validate config
+    if 'generator' not in config:
+        raise ValueError("Config must contain 'generator' key")
+    if 'params' not in config:
+        raise ValueError("Config must contain 'params' key")
+
+    generator_name = config['generator']
+    params = config['params']
+    
+    # Start with generator name
+    parts = [generator_name]
+    
+    # Iterate through parameters in original order
+    for key, value in params.items():
+        # Get abbreviated parameter name (first 2 letters, strip underscores)
+        param_abbr = key.replace('_', '')[:2]
+        
+        # Format value based on type
+        if isinstance(value, bool):
+            value_str = '1' if value else '0'
+        elif isinstance(value, float):
+            value_str = f"{value:.2f}".rstrip('0').rstrip('.').replace('.', 'p')
+        elif isinstance(value, str):
+            value_str = value[:4].lower().replace('_', '')
+        else:
+            # Handle int and other types
+            value_str = str(value).replace('.', 'p')
+        
+        parts.append(f"{param_abbr}{value_str}")
+    
+    return '_'.join(parts)
+
+

@@ -12,7 +12,7 @@ from pathlib import Path
 from scipy.spatial.distance import pdist, squareform
 
 from holspec.utilities import save_h5, read_h5, compute_content_hash
-from holspec.point_data.helpers import generate_from_config
+from .generators import generate_from_config
 
 class PointData:
     """
@@ -337,10 +337,10 @@ class PointData:
         """String representation of PointData object."""
         if self.has_positions:
             return (f"PointData(N={self.num_points}, d={self.dimension}, "
-                    f"hash={self.content_hash[:8]})")
+                    f"hash={self.content_hash})")
         else:
             return (f"PointData(N={self.num_points}, distances_only, "
-                    f"hash={self.content_hash[:8]})")
+                    f"hash={self.content_hash})")
     
     def __len__(self) -> int:
         """Return number of points."""
