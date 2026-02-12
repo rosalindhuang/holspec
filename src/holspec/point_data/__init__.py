@@ -1,12 +1,17 @@
 """
 Module for point data representation and generation.
 """
+
+from .base import PointData
 from .generators import *
 from .helpers import *
 
 # # Define public API of the module
 __all__ = [
-    # From generators.py
+    # base.py
+    'PointData',
+
+    # generators.py
     'generate_triangular_lattice_hex',
     'generate_triangular_lattice_rect',
     'generate_square_lattice',
@@ -17,7 +22,7 @@ __all__ = [
     'generate_cube_vertices',
     'add_random_perturbation',
 
-    # From helpers.py
+    # helpers.py
     'generate_from_config',
     'save_point_data',
     'read_point_data',

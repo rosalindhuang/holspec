@@ -30,8 +30,8 @@ def save_h5(
         Path to the HDF5 file.
     datasets : dict[str, array-like], optional
         Dictionary of (name: data) pairs to save as datasets.
-    attributes : dict[str, Any], optional
-        Dictionary of (name: value) pairs to save as attributes.
+    attributes : dict, optional
+        Dictionary of (name: value) pairs to save as HDF5 attributes. 
     group : str, optional
         If specified, datasets and attributes are saved under this group.
         If None, saved at root level.
@@ -53,7 +53,9 @@ def save_h5(
     
     Notes
     -----
-    Parent directories are created automatically if they don't exist.
+    - Parent directories are created automatically if they don't exist.
+    - For `attributes`, values must be HDF5-compatible types (str, int, float, bool, 
+      list, small numpy arrays). For dicts or complex structures, serialize with json.dumps() first.
     
     Examples
     --------
@@ -324,21 +326,50 @@ def repack_h5(
 
 
 def to_serializable(obj):
-    """Convert an object to a serializable format for JSON or HDF5 storage."""
-    if isinstance(obj, dict): 
-        return json.dumps({k: to_serializable(v) for k, v in obj.items()})
-    elif isinstance(obj, (list, tuple)):
-        return [to_serializable(v) for v in obj]
-    elif isinstance(obj, np.ndarray):
+    """
+    Convert object to HDF5-compatible attribute type.
+    
+    Handles numpy types and basic Python types. For complex structures
+    (dicts, nested objects), use json.dumps() before passing to save_h5().
+    
+    Parameters
+    ----------
+    obj : any
+        Object to convert.
+    
+    Returns
+    -------
+    serializable
+        HDF5-compatible representation.
+    
+    Raises
+    ------
+    TypeError
+        If object type is not supported.
+    """
+    if isinstance(obj, np.ndarray):
+        # Convert small arrays to lists, reject large ones
+        if obj.size > 100:
+            raise TypeError(
+                f"Large arrays ({obj.size} elements) should be datasets, not attributes"
+            )
         return obj.tolist()
-    elif isinstance(obj, np.integer):
-        return int(obj)
-    elif isinstance(obj, np.floating):
-        return float(obj)
-    elif isinstance(obj, np.bool_):
-        return bool(obj)
-    else:
+    elif isinstance(obj, (np.integer, np.floating)):
+        return obj.item()
+    elif isinstance(obj, (str, int, float, bool, type(None))):
         return obj
+    elif isinstance(obj, (list, tuple)):
+        return [to_serializable(item) for item in obj]
+    elif isinstance(obj, dict):
+        raise TypeError(
+            f"Dict attributes not supported. Use json.dumps() to serialize dicts as JSON strings."
+        )
+    else:
+        raise TypeError(
+            f"Attribute type {type(obj).__name__} not supported. "
+            f"Supported types: str, int, float, bool, list, numpy types. "
+            f"For complex objects, serialize with json.dumps()."
+        )
 
 
 # %% Test
