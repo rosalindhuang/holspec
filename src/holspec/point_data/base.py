@@ -35,7 +35,7 @@ class PointData:
     - Exactly one of positions or distances must be provided.
     - The object is immutable once created; data cannot be changed.
     - Metadata is auto-populated with 'creation_time' and may include 'config'
-      (if generated) plus any custom fields.
+      (if generated) plus any custom fields provided during initialization.
     """
     
     # =========================================================================
