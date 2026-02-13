@@ -3,12 +3,16 @@ Module for point data representation and generation.
 """
 
 from .base import PointData
+from .ensemble import PointDataEnsemble
 from .generators import *
 
 # # Define public API of the module
 __all__ = [
     # base.py
     'PointData',
+
+    # ensemble.py
+    'PointDataEnsemble',
 
     # generators.py
     'generate_triangular_lattice_hex',
@@ -20,8 +24,6 @@ __all__ = [
     'generate_tetrahedron',
     'generate_cube_vertices',
 
-    'add_random_perturbation',
-    
     'GENERATOR_MAP',
     'generate_from_config',
     'create_config_label'

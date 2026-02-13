@@ -297,7 +297,7 @@ class PointData:
             if 'content_hash' not in attributes:
                 print(f"Warning: No 'content_hash' in attributes for {filepath}, skipping validation")
             else:
-                stored_hash = attributes['content_hash']
+                stored_hash = str(attributes['content_hash'])
                 computed_hash = compute_content_hash(data_array, length=len(stored_hash))
                 if computed_hash != stored_hash:
                     raise ValueError(
@@ -330,7 +330,7 @@ class PointData:
 
     
     # =========================================================================
-    # Special Methods
+    # Utilities and Protocols
     # =========================================================================
     
     def __repr__(self) -> str:

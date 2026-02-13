@@ -217,29 +217,41 @@ def initialize_h5(
     path: str | Path, 
     overwrite: bool = False, 
     verbose: bool = True
-) -> None:
+) -> Path:
     """
-    Initialize an HDF5 file at the given path.
-    If `overwrite` = True, any existing file will be cleared.
+    Initialize an HDF5 file, creating parent directories if needed.
+    
+    Parameters
+    ----------
+    path : str or Path
+        Path to the HDF5 file.
+    overwrite : bool, default False
+        If True and file exists, clear all contents. If False, open for appending.
+    verbose : bool, default True
+        If True, print file operation message.
+    
+    Returns
+    -------
+    Path
+        Resolved path to the initialized file.
     """
     path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
     
-    if path.exists():
-        if overwrite:
-            if verbose:
-                print(f'Writing to file (overwrite): {path}\n')
-            with h5py.File(path, 'w'):
-                pass
+    mode = 'w' if overwrite else 'a'
+    
+    if verbose:
+        if path.exists() and overwrite:
+            print(f'Initializing HDF5 file (overwrite): {path}')
+        elif path.exists():
+            print(f'Initializing HDF5 file (append): {path}')
         else:
-            if verbose:
-                print(f'Writing to file (append): {path}\n')
-            with h5py.File(path, 'a'):
-                pass
-    else:
-        if verbose:
-            print(f'Writing to file: {path}\n')
-        with h5py.File(path, 'a'):
-            pass
+            print(f'Creating HDF5 file: {path}')
+    
+    with h5py.File(path, mode):
+        pass
+    
+    return path
 
 
 def get_keys_h5(

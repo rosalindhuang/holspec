@@ -1,8 +1,9 @@
 """
 Module containing utilities.
 """
-from .io import save_h5, read_h5, initialize_h5, get_keys_h5, repack_h5, inspect_h5
-from .helpers import natsorted, inspect_dict, format_text, export_notebook_outputs, convert_notebook, timed, compute_content_hash
+from .io import *
+from .numerical import *
+from .helpers import *
 
 # Define public API of the module
 __all__ = [
@@ -14,12 +15,16 @@ __all__ = [
     'repack_h5',
     'inspect_h5',
 
+    # From numerical.py
+    'compute_content_hash',
+    'add_noise',
+    'create_noise_label'
+
     # From helpers.py
     'natsorted',
     'inspect_dict',
     'format_text',
     'export_notebook_outputs',
     'convert_notebook',
-    'timed',
-    'compute_content_hash'
+    'timed'
 ]

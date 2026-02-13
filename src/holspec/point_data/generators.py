@@ -316,45 +316,6 @@ def generate_cube_vertices(
 
 # %% Utilities
 
-def add_random_perturbation(
-    positions: np.ndarray,
-    amplitude: float,
-    mode: str = 'uniform',
-    seed: int | None = None
-) -> np.ndarray:
-    """
-    Add random displacement to point positions.
-    
-    Parameters
-    ----------
-    positions : (N, d) ndarray
-        Original particle positions.
-    amplitude : float
-        Displacement scale.
-    mode : {'uniform', 'normal'}, default='uniform'
-        Distribution type:
-        - 'uniform': displacement in [-amplitude/2, amplitude/2]
-        - 'normal': Gaussian with std=amplitude
-    seed : int, optional
-        Random seed for reproducibility.
-    
-    Returns
-    -------
-    positions_perturbed : (N, d) ndarray
-        Perturbed particle positions.
-    """
-    rng = np.random.default_rng(seed)
-    
-    if mode == 'uniform':
-        displacement = amplitude * (rng.random(positions.shape) - 0.5)
-    elif mode == 'normal':
-        displacement = amplitude * rng.standard_normal(positions.shape)
-    else:
-        raise ValueError(f"Unknown mode: {mode}")
-    
-    return positions + displacement
-
-
 GENERATOR_MAP = {
     'trilatthex': generate_triangular_lattice_hex,
     'trilattrect': generate_triangular_lattice_rect,
@@ -365,6 +326,7 @@ GENERATOR_MAP = {
     'tetrahedron': generate_tetrahedron,
     'cubevert': generate_cube_vertices,
 }
+
 
 def generate_from_config(config: dict) -> np.ndarray:
     """
@@ -399,10 +361,29 @@ def generate_from_config(config: dict) -> np.ndarray:
     return generator_func(**params)
 
 
-def create_config_label(config):
+def create_config_label(config: dict, dimension: int | None = None) -> str:
     """
     Create a unique label from point data generation config.
-    Format: generator_param1_param2_...
+    
+    Parameters
+    ----------
+    config : dict
+        Configuration with 'generator' and 'params' keys.
+    dimension : int, optional
+        Spatial dimension. If provided, prepends '{d}D_' to label.
+    
+    Returns
+    -------
+    label : str
+        Descriptive label. Format: [dimension_]generator_param1_param2...
+    
+    Examples
+    --------
+    >>> config = {'generator': 'trilatthex', 'params': {'n_rings': 4, 'spacing': 1.0}}
+    >>> create_config_label(config)
+    'trilatthex_nr4_sp1'
+    >>> create_config_label(config, dimension=2)
+    '2D_trilatthex_nr4_sp1'
     """
     # Validate config
     if 'generator' not in config:
@@ -418,6 +399,10 @@ def create_config_label(config):
     
     # Iterate through parameters in original order
     for key, value in params.items():
+        # Skip 'dimension' if present in params
+        if dimension is not None and key == 'dimension':
+            continue
+        
         # Get abbreviated parameter name (first 2 letters, strip underscores)
         param_abbr = key.replace('_', '')[:2]
         
@@ -425,7 +410,7 @@ def create_config_label(config):
         if isinstance(value, bool):
             value_str = '1' if value else '0'
         elif isinstance(value, float):
-            value_str = f"{value:.2f}".rstrip('0').rstrip('.').replace('.', 'p')
+            value_str = f"{value:g}".replace('.', 'p')
         elif isinstance(value, str):
             value_str = value[:4].lower().replace('_', '')
         else:
@@ -434,6 +419,12 @@ def create_config_label(config):
         
         parts.append(f"{param_abbr}{value_str}")
     
-    return '_'.join(parts)
+    base_label = '_'.join(parts)
+    
+    # Prepend dimension if provided
+    if dimension is not None:
+        return f"{dimension}d_{base_label}"
+    
+    return base_label
 
 

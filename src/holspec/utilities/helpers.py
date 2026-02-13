@@ -3,6 +3,7 @@ Helper functions including:
 - Inspecting dictionary structures
 - Exporting Jupyter notebook outputs and converting notebooks to other formats
 - Formatting text for printing
+- Timing function execution
 """
 
 import numpy as np
@@ -18,7 +19,6 @@ import textwrap
 import re
 import nbformat
 import subprocess
-import hashlib
 
 
 # %% Print utilities
@@ -89,6 +89,7 @@ def inspect_dict(data_dict, dict_name="dict", max_depth=None, _current_depth=0, 
             # Regular value
             summary = summarize_value(value)
             print(f"{_prefix}    {key} {summary}")
+
 
 def format_text(text: str, max_width: int = 80, preserve_paragraphs: bool = True) -> str:
     """
@@ -195,6 +196,7 @@ def format_text(text: str, max_width: int = 80, preserve_paragraphs: bool = True
     
     return '\n'.join(formatted_lines)
 
+
 # %% Notebook utilities
 
 def export_notebook_outputs(notebook_name: str, output_filename: str = None):
@@ -230,6 +232,7 @@ def export_notebook_outputs(notebook_name: str, output_filename: str = None):
                     elif output.output_type == "error":
                         out.write("\n".join(output["traceback"]) + "\n")
     print(f"Notebook outputs from {notebook_name} exported to {output_filename}")
+
 
 def convert_notebook(notebook_name, output_format='html', exclude=('input',), output_name=None):
     """
@@ -295,7 +298,8 @@ def convert_notebook(notebook_name, output_format='html', exclude=('input',), ou
         print(f"Command error: {e.stderr}")
         return None
 
-# %% Misc utilities
+
+# %% Timing utilities
 def timed(fun, args, repeats=1) -> float:
     """
     Time the execution of a function.
@@ -318,13 +322,3 @@ def timed(fun, args, repeats=1) -> float:
     for _ in range(repeats):
         fun(*args)
     return (time.time() - start) / repeats
-
-def compute_content_hash(data: np.ndarray, length: int = 12) -> str:
-    """
-    Compute SHA256 hash of array data.
-    Uses data.tobytes() for deterministic, platform-independent hashing.
-    """
-    data_bytes = np.asarray(data).tobytes()
-    hash_full = hashlib.sha256(data_bytes).hexdigest()
-    return hash_full[:length]
-
