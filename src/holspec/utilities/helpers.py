@@ -21,74 +21,42 @@ import nbformat
 import subprocess
 
 
-# %% Print utilities
-def inspect_dict(data_dict, dict_name="dict", max_depth=None, _current_depth=0, _prefix=""):
-    """
-    Print the structure and contents of a nested dictionary.
+# %% String utilities
 
+def format_float_str(value: float, fmt: str = 'g') -> str:
+    """
+    Format a float for use in labels with trailing zeros removed and dots replaced.
+    
     Parameters
     ----------
-    data_dict : dict
-        Dictionary to inspect.
-    dict_name : str, default="dict"
-        Name to display for the root dictionary.
-    max_depth : int, optional
-        Maximum depth to traverse. If None, traverse all levels.
-    _current_depth : int, optional
-        Internal parameter for tracking recursion depth (do not use).
-    _prefix : str, optional
-        Internal parameter for indentation (do not use).
-
+    value : float
+        The float value to format.
+    fmt : str, optional
+        Format specifier (e.g., 'g', '.2e', '.0e', '.3f'). Default is 'g'.
+    
     Returns
     -------
-    None
+    str
+        Formatted string with trailing zeros removed and '.' replaced by 'p'.
     """
+    # Format the value
+    formatted = f"{value:{fmt}}"
     
-    def summarize_value(value):
-        """Summarize the type and properties of a value."""
-        if isinstance(value, dict):
-            return f"(type=dict, keys={len(value)})"
-        elif isinstance(value, np.ndarray):
-            return f"(type=ndarray, shape={value.shape}, dtype={value.dtype})"
-        elif isinstance(value, list):
-            return f"(type=list, len={len(value)})"
-        elif isinstance(value, tuple):
-            return f"(type=tuple, len={len(value)})"
-        elif isinstance(value, str):
-            return f"(type=str, len={len(value)})"
-        elif isinstance(value, (int, float, bool)):
-            return f"(type={type(value).__name__}, value={value})"
-        elif hasattr(value, 'shape'):
-            return f"(type={type(value).__name__}, shape={value.shape})"
-        elif hasattr(value, '__len__'):
-            return f"(type={type(value).__name__}, len={len(value)})"
+    # Remove trailing zeros after decimal point
+    if '.' in formatted:
+        if 'e' in formatted.lower():
+            # Handle scientific notation: split at 'e', trim mantissa, rejoin
+            parts = formatted.lower().split('e')
+            parts[0] = parts[0].rstrip('0').rstrip('.')
+            formatted = 'e'.join(parts)
         else:
-            return f"(type={type(value).__name__})"
+            # Handle regular decimal
+            formatted = formatted.rstrip('0').rstrip('.')
     
-    # Print current level
-    if _current_depth == 0:
-        print(f"{dict_name}/")
-
-    # Check depth limit
-    if max_depth is not None and _current_depth >= max_depth:
-        print(f"{_prefix}    ... (max depth reached)")
-        return
+    # Replacements decimal point with 'p'
+    formatted = formatted.replace('.', 'p')
     
-    # Iterate through dictionary items
-    for key, value in data_dict.items():
-        if isinstance(value, dict):
-            # Nested dictionary
-            print(f"{_prefix}    {key}/")
-            inspect_dict(
-                value, 
-                dict_name=key,
-                _current_depth=_current_depth + 1,
-                _prefix=_prefix + "    "
-            )
-        else:
-            # Regular value
-            summary = summarize_value(value)
-            print(f"{_prefix}    {key} {summary}")
+    return formatted
 
 
 def format_text(text: str, max_width: int = 80, preserve_paragraphs: bool = True) -> str:
@@ -197,6 +165,103 @@ def format_text(text: str, max_width: int = 80, preserve_paragraphs: bool = True
     return '\n'.join(formatted_lines)
 
 
+#%% Printing utilities
+
+def inspect_dict(data_dict, dict_name="dict", max_depth=None, _current_depth=0, _prefix=""):
+    """
+    Print the structure and contents of a nested dictionary.
+
+    Parameters
+    ----------
+    data_dict : dict
+        Dictionary to inspect.
+    dict_name : str, default="dict"
+        Name to display for the root dictionary.
+    max_depth : int, optional
+        Maximum depth to traverse. If None, traverse all levels.
+    _current_depth : int, optional
+        Internal parameter for tracking recursion depth (do not use).
+    _prefix : str, optional
+        Internal parameter for indentation (do not use).
+
+    Returns
+    -------
+    None
+    """
+    
+    def summarize_value(value):
+        """Summarize the type and properties of a value."""
+        if isinstance(value, dict):
+            return f"(type=dict, keys={len(value)})"
+        elif isinstance(value, np.ndarray):
+            return f"(type=ndarray, shape={value.shape}, dtype={value.dtype})"
+        elif isinstance(value, list):
+            return f"(type=list, len={len(value)})"
+        elif isinstance(value, tuple):
+            return f"(type=tuple, len={len(value)})"
+        elif isinstance(value, str):
+            return f"(type=str, len={len(value)})"
+        elif isinstance(value, (int, float, bool)):
+            return f"(type={type(value).__name__}, value={value})"
+        elif hasattr(value, 'shape'):
+            return f"(type={type(value).__name__}, shape={value.shape})"
+        elif hasattr(value, '__len__'):
+            return f"(type={type(value).__name__}, len={len(value)})"
+        else:
+            return f"(type={type(value).__name__})"
+    
+    # Print current level
+    if _current_depth == 0:
+        print(f"{dict_name}/")
+
+    # Check depth limit
+    if max_depth is not None and _current_depth >= max_depth:
+        print(f"{_prefix}    ... (max depth reached)")
+        return
+    
+    # Iterate through dictionary items
+    for key, value in data_dict.items():
+        if isinstance(value, dict):
+            # Nested dictionary
+            print(f"{_prefix}    {key}/")
+            inspect_dict(
+                value, 
+                dict_name=key,
+                _current_depth=_current_depth + 1,
+                _prefix=_prefix + "    "
+            )
+        else:
+            # Regular value
+            summary = summarize_value(value)
+            print(f"{_prefix}    {key} {summary}")
+
+
+# %% Timing utilities
+
+def timed(fun, args, repeats=1) -> float:
+    """
+    Time the execution of a function.
+
+    Parameters
+    ----------
+    fun : callable
+        Function to time.
+    args : tuple
+        Arguments to pass to the function.
+    repeats : int, default=1
+        Number of times to repeat the function call.
+
+    Returns
+    -------
+    float
+        Execution time in seconds, averaged over repeats.
+    """
+    start = time.time()
+    for _ in range(repeats):
+        fun(*args)
+    return (time.time() - start) / repeats
+
+
 # %% Notebook utilities
 
 def export_notebook_outputs(notebook_name: str, output_filename: str = None):
@@ -298,27 +363,3 @@ def convert_notebook(notebook_name, output_format='html', exclude=('input',), ou
         print(f"Command error: {e.stderr}")
         return None
 
-
-# %% Timing utilities
-def timed(fun, args, repeats=1) -> float:
-    """
-    Time the execution of a function.
-
-    Parameters
-    ----------
-    fun : callable
-        Function to time.
-    args : tuple
-        Arguments to pass to the function.
-    repeats : int, default=1
-        Number of times to repeat the function call.
-
-    Returns
-    -------
-    float
-        Execution time in seconds, averaged over repeats.
-    """
-    start = time.time()
-    for _ in range(repeats):
-        fun(*args)
-    return (time.time() - start) / repeats

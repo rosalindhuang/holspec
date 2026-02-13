@@ -7,6 +7,7 @@ distributions, and simple shapes in 2D and 3D.
 
 import numpy as np
 
+from holspec.utilities import format_float_str
 
 # %% 2D Lattice Generators
 
@@ -361,7 +362,7 @@ def generate_from_config(config: dict) -> np.ndarray:
     return generator_func(**params)
 
 
-def create_config_label(config: dict, dimension: int | None = None) -> str:
+def create_config_label(config: dict, dimension: int | None = None, float_fmt: str = 'g') -> str:
     """
     Create a unique label from point data generation config.
     
@@ -371,6 +372,8 @@ def create_config_label(config: dict, dimension: int | None = None) -> str:
         Configuration with 'generator' and 'params' keys.
     dimension : int, optional
         Spatial dimension. If provided, prepends '{d}D_' to label.
+    float_fmt : str, optional
+        Format specifier for floats (e.g., 'g', '.2e', '.0e', '.3f'). Default is 'g'.
     
     Returns
     -------
@@ -384,6 +387,8 @@ def create_config_label(config: dict, dimension: int | None = None) -> str:
     'trilatthex_nr4_sp1'
     >>> create_config_label(config, dimension=2)
     '2D_trilatthex_nr4_sp1'
+    >>> create_config_label(config, dimension=2, float_fmt='.2f')
+    '2D_trilatthex_nr4_sp1p00'
     """
     # Validate config
     if 'generator' not in config:
@@ -410,7 +415,7 @@ def create_config_label(config: dict, dimension: int | None = None) -> str:
         if isinstance(value, bool):
             value_str = '1' if value else '0'
         elif isinstance(value, float):
-            value_str = f"{value:g}".replace('.', 'p')
+            value_str = format_float_str(value, float_fmt)
         elif isinstance(value, str):
             value_str = value[:4].lower().replace('_', '')
         else:

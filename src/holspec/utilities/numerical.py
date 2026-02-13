@@ -5,6 +5,8 @@ Core numerical utilities including hashing and noise generation.
 import numpy as np
 import hashlib
 
+from .helpers import format_float_str
+
 
 def compute_content_hash(data: np.ndarray, length: int = 12) -> str:
     """
@@ -87,7 +89,8 @@ def add_noise(
     
     return array + noise
 
-def create_noise_label(noise_config: dict, num_realizations: int) -> str:
+
+def create_noise_label(noise_config: dict, num_realizations: int, float_fmt: str = 'g') -> str:
     """
     Create a unique label from noise configuration.
     
@@ -97,6 +100,8 @@ def create_noise_label(noise_config: dict, num_realizations: int) -> str:
         Noise configuration with 'scale' and optional 'distribution' keys.
     num_realizations : int
         Number of ensemble members.
+    float_fmt : str, optional
+        Format specifier for floats (e.g., 'g', '.2e', '.0e', '.3f'). Default is 'g'.
     
     Returns
     -------
@@ -106,17 +111,19 @@ def create_noise_label(noise_config: dict, num_realizations: int) -> str:
     Examples
     --------
     >>> create_noise_label({'scale': 0.1, 'distribution': 'uniform'}, 50)
-    'unif_s0p1_N50'
-    >>> create_noise_label({'scale': 0.02, 'distribution': 'normal'}, 100)
-    'norm_s0p02_N100'
+    'noise_unif_s0p1_N50'
+    >>> create_noise_label({'scale': 0.01, 'distribution': 'normal'}, 100, float_fmt='.0e')
+    'noise_norm_s1e-02_N100'
     """
     # Validate noise_config
     if 'scale' not in noise_config:
         raise ValueError("noise_config must contain 'scale' key")
     
+    # Format scale for label
     scale = noise_config['scale']
-    scale_str = f"{scale:g}".replace('.', 'p')
+    scale_str = format_float_str(scale, float_fmt)
 
+    # Format distribution for label
     dist = noise_config.get('distribution', 'uniform')
     dist_str = dist[:4]
     

@@ -22,9 +22,10 @@ __all__ = [
 
     # From helpers.py
     'natsorted',
-    'inspect_dict',
+    'format_float_str',
     'format_text',
+    'inspect_dict',
+    'timed'
     'export_notebook_outputs',
     'convert_notebook',
-    'timed'
 ]
