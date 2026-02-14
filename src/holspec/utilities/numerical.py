@@ -90,7 +90,10 @@ def add_noise(
     return array + noise
 
 
-def create_noise_label(noise_config: dict, num_realizations: int, float_fmt: str = 'g') -> str:
+def create_noise_label(
+    noise_config: dict, 
+    float_fmt: str | None = 'g'
+) -> str:
     """
     Create a unique label from noise configuration.
     
@@ -98,22 +101,21 @@ def create_noise_label(noise_config: dict, num_realizations: int, float_fmt: str
     ----------
     noise_config : dict
         Noise configuration with 'scale' and optional 'distribution' keys.
-    num_realizations : int
-        Number of ensemble members.
-    float_fmt : str, optional
+    float_fmt : str or None, optional
         Format specifier for floats (e.g., 'g', '.2e', '.0e', '.3f'). Default is 'g'.
+        If None, defaults to 'g'.
     
     Returns
     -------
     label : str
-        Descriptive label. Format: {dist}_s{scale}_N{num}
+        Descriptive label. Format: noise_{dist}_s{scale}
     
     Examples
     --------
-    >>> create_noise_label({'scale': 0.1, 'distribution': 'uniform'}, 50)
-    'noise_unif_s0p1_N50'
-    >>> create_noise_label({'scale': 0.01, 'distribution': 'normal'}, 100, float_fmt='.0e')
-    'noise_norm_s1e-02_N100'
+    >>> create_noise_label({'scale': 0.1, 'distribution': 'uniform'})
+    'noise_unif_s0p1'
+    >>> create_noise_label({'scale': 0.01, 'distribution': 'normal'}, float_fmt='.0e')
+    'noise_norm_s1e-02'
     """
     # Validate noise_config
     if 'scale' not in noise_config:
@@ -127,4 +129,4 @@ def create_noise_label(noise_config: dict, num_realizations: int, float_fmt: str
     dist = noise_config.get('distribution', 'uniform')
     dist_str = dist[:4]
     
-    return f"noise_{dist_str}_s{scale_str}_N{num_realizations}"
+    return f"noise_{dist_str}_s{scale_str}"

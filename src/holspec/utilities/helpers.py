@@ -23,7 +23,7 @@ import subprocess
 
 # %% String utilities
 
-def format_float_str(value: float, fmt: str = 'g') -> str:
+def format_float_str(value: float, fmt: str | None = 'g') -> str:
     """
     Format a float for use in labels with trailing zeros removed and dots replaced.
     
@@ -31,14 +31,19 @@ def format_float_str(value: float, fmt: str = 'g') -> str:
     ----------
     value : float
         The float value to format.
-    fmt : str, optional
+    fmt : str or None, optional
         Format specifier (e.g., 'g', '.2e', '.0e', '.3f'). Default is 'g'.
+        If None, defaults to 'g'.
     
     Returns
     -------
     str
         Formatted string with trailing zeros removed and '.' replaced by 'p'.
     """
+    # Handle None fmt
+    if fmt is None:
+        fmt = 'g'
+    
     # Format the value
     formatted = f"{value:{fmt}}"
     
