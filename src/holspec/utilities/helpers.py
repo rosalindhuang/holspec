@@ -170,6 +170,57 @@ def format_text(text: str, max_width: int = 80, preserve_paragraphs: bool = True
     return '\n'.join(formatted_lines)
 
 
+# %% JSON utilities
+
+def convert_numpy_types(obj):
+    """
+    Recursively convert numpy types to native Python types for JSON serialization.
+    
+    Parameters
+    ----------
+    obj : any
+        Object to convert. Can be a dict, list, numpy array, numpy scalar, or any other type.
+    
+    Returns
+    -------
+    any
+        Object with all numpy types converted to native Python types.
+    
+    Notes
+    -----
+    - numpy integers → int
+    - numpy floats → float
+    - numpy bool → bool
+    - numpy arrays → list (recursively)
+    - dict values → recursively converted
+    - list items → recursively converted
+    - other types → unchanged
+    
+    Examples
+    --------
+    >>> import numpy as np
+    >>> config = {'n': np.int64(100), 'value': np.float32(1.5)}
+    >>> convert_numpy_types(config)
+    {'n': 100, 'value': 1.5}
+    """
+    if isinstance(obj, dict):
+        return {key: convert_numpy_types(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_numpy_types(item) for item in obj]
+    elif isinstance(obj, tuple):
+        return tuple(convert_numpy_types(item) for item in obj)
+    elif isinstance(obj, np.ndarray):
+        return convert_numpy_types(obj.tolist())
+    elif isinstance(obj, (np.integer, np.int64, np.int32, np.int16, np.int8)):
+        return int(obj)
+    elif isinstance(obj, (np.floating, np.float64, np.float32, np.float16)):
+        return float(obj)
+    elif isinstance(obj, np.bool_):
+        return bool(obj)
+    else:
+        return obj
+
+
 #%% Printing utilities
 
 def inspect_dict(data_dict, dict_name="dict", max_depth=None, _current_depth=0, _prefix=""):
@@ -221,7 +272,7 @@ def inspect_dict(data_dict, dict_name="dict", max_depth=None, _current_depth=0, 
 
     # Check depth limit
     if max_depth is not None and _current_depth >= max_depth:
-        print(f"{_prefix}    ... (max depth reached)")
+        # print(f"{_prefix}    ...")
         return
     
     # Iterate through dictionary items
@@ -232,6 +283,7 @@ def inspect_dict(data_dict, dict_name="dict", max_depth=None, _current_depth=0, 
             inspect_dict(
                 value, 
                 dict_name=key,
+                max_depth=max_depth,
                 _current_depth=_current_depth + 1,
                 _prefix=_prefix + "    "
             )
@@ -367,4 +419,5 @@ def convert_notebook(notebook_name, output_format='html', exclude=('input',), ou
         print(f"Command output: {e.stdout}")
         print(f"Command error: {e.stderr}")
         return None
+
 

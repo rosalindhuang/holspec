@@ -126,7 +126,9 @@ def create_noise_label(
     scale_str = format_float_str(scale, float_fmt)
 
     # Format distribution for label
-    dist = noise_config.get('distribution', 'uniform')
-    dist_str = dist[:4]
+    dist = noise_config.get('distribution')
+    if dist is None:
+        return f"noise_s{scale_str}"
+    dist_str = dist[:1]
     
     return f"noise_{dist_str}_s{scale_str}"

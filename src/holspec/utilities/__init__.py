@@ -18,14 +18,15 @@ __all__ = [
     # From numerical.py
     'compute_content_hash',
     'add_noise',
-    'create_noise_label'
+    'create_noise_label',
 
     # From helpers.py
     'natsorted',
     'format_float_str',
     'format_text',
+    'convert_numpy_types',
     'inspect_dict',
-    'timed'
+    'timed',
     'export_notebook_outputs',
     'convert_notebook',
 ]
