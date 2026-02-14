@@ -256,7 +256,7 @@ class PointDataEnsemble:
             # Create PointData with comprehensive metadata
             metadata = {
                 'base_config': base_config,
-                'noise': noise_config,
+                'noise_config': noise_config,
                 'seed': seed,
                 'realization_index': i
             }

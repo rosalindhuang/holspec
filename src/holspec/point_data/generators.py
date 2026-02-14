@@ -362,7 +362,7 @@ def generate_from_config(config: dict) -> np.ndarray:
     return generator_func(**params)
 
 
-def create_config_label(config: dict, dimension: int | None = None, float_fmt: str = 'g') -> str:
+def create_config_label(config: dict, dimension: int | None = None, float_fmt: str | None = 'g') -> str:
     """
     Create a unique label from point data generation config.
     
@@ -372,8 +372,9 @@ def create_config_label(config: dict, dimension: int | None = None, float_fmt: s
         Configuration with 'generator' and 'params' keys.
     dimension : int, optional
         Spatial dimension. If provided, prepends '{d}D_' to label.
-    float_fmt : str, optional
+    float_fmt : str or None, optional
         Format specifier for floats (e.g., 'g', '.2e', '.0e', '.3f'). Default is 'g'.
+        If None, defaults to 'g'.
     
     Returns
     -------

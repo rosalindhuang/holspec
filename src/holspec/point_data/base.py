@@ -11,8 +11,9 @@ import json
 from pathlib import Path
 from scipy.spatial.distance import pdist, squareform
 
-from holspec.utilities import save_h5, read_h5, compute_content_hash
 from .generators import generate_from_config
+from holspec.utilities import save_h5, read_h5, compute_content_hash, add_noise
+
 
 class PointData:
     """
@@ -311,22 +312,57 @@ class PointData:
         return cls(positions=positions, distances=distances, metadata=metadata)
 
     @classmethod
-    def from_config(cls, config: dict) -> 'PointData':
+    def from_config(
+        cls, 
+        config: dict,
+        noise_config: dict | None = None,
+        seed: int = 42
+    ) -> 'PointData':
         """
-        Generate point data from configuration.
+        Generate point data from configuration, optionally with noise.
         
         Parameters
         ----------
         config : dict
             Configuration dictionary with 'generator' and 'params' keys.
+        noise_config : dict, optional
+            Noise parameters. Must include 'scale'.
+            Optional: 'distribution' (default 'uniform').
+        seed : int, default=42
+            Random seed for noise generation (only used if noise_config provided).
         
         Returns
         -------
         point_data : PointData
             Generated PointData object with config stored in metadata.
+            If noise is applied, metadata includes 'noise_config' and 'seed' fields.
         """
+        # Generate positions
         positions = generate_from_config(config)
-        return cls(positions=positions, metadata={'config': config})
+        
+        # Apply noise if requested
+        if noise_config is not None:
+            if 'scale' not in noise_config:
+                raise ValueError("noise_config must include 'scale'")
+            
+            positions = add_noise(
+                positions,
+                scale=noise_config['scale'],
+                distribution=noise_config.get('distribution', 'uniform'),
+                seed=seed
+            )
+            
+            # Metadata with noise information
+            metadata = {
+                'config': config,
+                'noise_config': noise_config,
+                'seed': seed
+            }
+        else:
+            # No noise - just config
+            metadata = {'config': config}
+        
+        return cls(positions=positions, metadata=metadata)
 
     
     # =========================================================================
