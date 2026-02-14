@@ -44,7 +44,7 @@ SRC_DIR = PROJECT_ROOT / "src"
 
 #%% Utilities for directory management
 
-def prepare_directory(path: Path, clear_existing: bool = False, verbose: bool = True) -> None:
+def prepare_directory(path: Path, clear_mode: str | bool | None = None, verbose: bool = True) -> None:
     """
     Ensure a directory exists, creating it if necessary, and optionally clearing its contents.
 
@@ -52,8 +52,12 @@ def prepare_directory(path: Path, clear_existing: bool = False, verbose: bool = 
     ----------
     path : Path
         Directory path to prepare.
-    clear_existing : bool, default=False
-        If True, remove all existing files and subdirectories.
+    clear_mode : {'all', 'files', 'dirs'}, bool, or None, default=None
+        What to clear if directory exists:
+        - None or False: Don't clear anything
+        - True or 'all': Remove all files and subdirectories
+        - 'files': Remove only files, keep subdirectories
+        - 'dirs': Remove only subdirectories, keep files
     verbose : bool, default=True
         If True, print status messages.
 
@@ -64,35 +68,52 @@ def prepare_directory(path: Path, clear_existing: bool = False, verbose: bool = 
     if path is None:
         return
     
+    # Normalize boolean to string
+    if clear_mode is True:
+        clear_mode = 'all'
+    elif clear_mode is False:
+        clear_mode = None
+    
+    # Validate clear_mode
+    valid_modes = {None, 'all', 'files', 'dirs'}
+    if clear_mode not in valid_modes:
+        raise ValueError(f"clear_mode must be one of {valid_modes} or a boolean, got '{clear_mode}'")
+    
     if path.exists() and path.is_dir():
         if verbose:
             print(f"Directory exists: {path}")
-        if clear_existing:
+        
+        if clear_mode is not None:
             items = list(path.iterdir())
             if not items:
                 return
             
             if verbose:
-                print(f"Clearing directory: {path}")
+                print(f"Clearing directory ({clear_mode}): {path}")
             
             files = [item for item in items if item.is_file()]
             dirs = [item for item in items if item.is_dir()]
             
-            for item in files:
-                item.unlink()
-            for item in dirs:
-                shutil.rmtree(item, ignore_errors=True)
+            # Clear based on mode
+            if clear_mode in ('all', 'files'):
+                for item in files:
+                    item.unlink()
+                if verbose and files:
+                    print(f"  Removed {len(files)} file(s): {[f.name for f in files]}")
+            
+            if clear_mode in ('all', 'dirs'):
+                for item in dirs:
+                    shutil.rmtree(item, ignore_errors=True)
+                if verbose and dirs:
+                    print(f"  Removed {len(dirs)} dir(s): {[d.name for d in dirs]}")
             
             if verbose:
-                if files:
-                    print(f"  Removed {len(files)} file(s): {[f.name for f in files]}")
-                if dirs:
-                    print(f"  Removed {len(dirs)} dir(s): {[d.name for d in dirs]}")
                 print()
     else:
         if verbose:
             print(f"Creating directory: {path}")
         path.mkdir(parents=True, exist_ok=True)
+
 
 def print_directory_tree(root_path, include_files=True, ignore_dotfiles=True, 
                          ignore_patterns=None, ignore_exact=None, _prefix="", _is_last=True):
