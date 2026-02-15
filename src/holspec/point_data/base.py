@@ -154,6 +154,7 @@ class PointData:
             raise ValueError("Position data not available")
         return self._positions
     
+
     def get_distances(self) -> np.ndarray:
         """
         Return or compute pairwise distance matrix (N, N).
@@ -175,10 +176,12 @@ class PointData:
             self._distances_cache = self._compute_distances()
         return self._distances_cache
     
+
     def _compute_distances(self) -> np.ndarray:
         """Compute pairwise Euclidean distances from positions."""
         return squareform(pdist(self._positions, metric='euclidean'))
 
+    
     # =========================================================================
     # I/O and Factory Methods
     # =========================================================================
