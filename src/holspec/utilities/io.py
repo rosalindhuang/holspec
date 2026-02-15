@@ -11,6 +11,8 @@ from typing import Any, Optional
 import shutil
 from natsort import natsorted
 
+from holspec.utilities.helpers import convert_numpy_to_python
+
 
 # %% Saving and reading to HDF5
 def save_h5(
@@ -54,8 +56,8 @@ def save_h5(
     Notes
     -----
     - Parent directories are created automatically if they don't exist.
-    - For `attributes`, values must be HDF5-compatible types (str, int, float, bool, 
-      list, small numpy arrays). For dicts or complex structures, serialize with json.dumps() first.
+    - For `attributes`, values are automatically converted to HDF5-compatible types.
+      Dicts are automatically serialized to JSON strings. Numpy types are converted to native Python types.
     
     Examples
     --------
@@ -120,7 +122,7 @@ def save_h5(
         # Save each attribute (always overwrite existing attributes)
         if attributes is not None:
             for key, value in attributes.items():
-                target.attrs[key] = to_serializable(value)
+                target.attrs[key] = to_h5_attribute(value)
 
 
 def read_h5(
@@ -337,12 +339,12 @@ def repack_h5(
         raise
 
 
-def to_serializable(obj):
+def to_h5_attribute(obj):
     """
     Convert object to HDF5-compatible attribute type.
     
-    Handles numpy types and basic Python types. For complex structures
-    (dicts, nested objects), use json.dumps() before passing to save_h5().
+    HDF5 attributes have limitations compared to datasets. This function handles
+    conversion of Python/numpy types to HDF5-storable attributes.
     
     Parameters
     ----------
@@ -352,38 +354,171 @@ def to_serializable(obj):
     Returns
     -------
     serializable
-        HDF5-compatible representation.
+        HDF5-compatible representation. Dicts become JSON strings, numpy types
+        become native Python types.
     
     Raises
     ------
     TypeError
         If object type is not supported.
+    
+    Notes
+    -----
+    - Dicts are serialized to JSON strings (can be parsed back with json.loads)
+    - Numpy types are converted to native Python types
+    - Lists/tuples are recursively processed
+    - On read, json.loads() is automatically applied to string attributes in read_h5()
+    
+    See Also
+    --------
+    convert_numpy_to_python : Recursively converts numpy types without JSON serialization
     """
-    if isinstance(obj, np.ndarray):
-        # Convert small arrays to lists, reject large ones
-        if obj.size > 100:
-            raise TypeError(
-                f"Large arrays ({obj.size} elements) should be datasets, not attributes"
-            )
+    if isinstance(obj, dict): # Dicts must be serialized as JSON strings for HDF5
+        return json.dumps(convert_numpy_to_python(obj))
+    elif isinstance(obj, np.ndarray):
         return obj.tolist()
     elif isinstance(obj, (np.integer, np.floating)):
         return obj.item()
+    elif isinstance(obj, np.bool_):
+        return bool(obj)
     elif isinstance(obj, (str, int, float, bool, type(None))):
         return obj
     elif isinstance(obj, (list, tuple)):
-        return [to_serializable(item) for item in obj]
-    elif isinstance(obj, dict):
-        raise TypeError(
-            f"Dict attributes not supported. Use json.dumps() to serialize dicts as JSON strings."
-        )
+        return [to_h5_attribute(item) for item in obj]
     else:
         raise TypeError(
-            f"Attribute type {type(obj).__name__} not supported. "
-            f"Supported types: str, int, float, bool, list, numpy types. "
-            f"For complex objects, serialize with json.dumps()."
+            f"{type(obj).__name__} not supported for HDF5 attributes. "
+            f"Supported types: str, int, float, bool, list, dict (as JSON), numpy types."
         )
 
 
 # %% Test
 if __name__ == "__main__":
-    pass
+    import tempfile
+    
+    print("Testing nested dict serialization with HDF5 attributes")
+    print("=" * 60)
+    
+    # Create a test dict with nested structures and numpy types
+    original_dict = {
+        'simple_int': 42,
+        'numpy_int': np.int64(100),
+        'numpy_float': np.float32(3.14),
+        'numpy_bool': np.bool_(True),
+        'nested': {
+            'level2_int': np.int32(50),
+            'level2_str': 'hello',
+            'level2_list': [1, 2, np.int64(3)],
+            'deeply_nested': {
+                'level3_value': np.float64(2.718),
+                'level3_array': np.array([1, 2, 3])
+            }
+        },
+        'list_with_numpy': [np.int64(10), np.float32(20.5), 'text'],
+    }
+    
+    print("\nOriginal dict:")
+    print(original_dict)
+    print(f"\nType of nested dict: {type(original_dict['nested'])}")
+    
+    # Test serialization
+    print("\n" + "-" * 60)
+    print("Testing to_h5_attribute()...")
+    serialized = to_h5_attribute(original_dict)
+    print(f"Serialized: {serialized}")
+    print(f"Type of serialized: {type(serialized)}")
+    if isinstance(serialized, str):
+        print("✓ Dict was converted to JSON string (as expected for HDF5)")
+    
+    # Test HDF5 round-trip
+    print("\n" + "-" * 60)
+    print("Testing HDF5 save/load round-trip...")
+    
+    with tempfile.NamedTemporaryFile(suffix='.h5', delete=False) as tmp:
+        tmp_path = tmp.name
+    
+    try:
+        # Save to HDF5
+        save_h5(
+            tmp_path,
+            attributes={'test_dict': original_dict}
+        )
+        print(f"Saved to {tmp_path}")
+        
+        # Load from HDF5
+        datasets, attributes = read_h5(tmp_path)
+        loaded_dict = attributes['test_dict']
+        
+        print(f"\nLoaded dict: {loaded_dict}")
+        print(f"Type of loaded dict: {type(loaded_dict)}")
+        print(f"Type of loaded nested: {type(loaded_dict.get('nested', 'MISSING'))}")
+        
+        # Compare
+        print("\n" + "-" * 60)
+        print("Comparison:")
+        
+        def compare_values(orig, loaded, path=""):
+            """Recursively compare values."""
+            if type(orig) != type(loaded):
+                # Allow numpy types to match Python types
+                if isinstance(orig, (np.integer, np.int64, np.int32)) and isinstance(loaded, int):
+                    if int(orig) != loaded:
+                        print(f"  ❌ {path}: values differ: {orig} != {loaded}")
+                    else:
+                        print(f"  ✓ {path}: {orig} == {loaded} (type conversion ok)")
+                elif isinstance(orig, (np.floating, np.float32, np.float64)) and isinstance(loaded, float):
+                    if not np.isclose(float(orig), loaded):
+                        print(f"  ❌ {path}: values differ: {orig} != {loaded}")
+                    else:
+                        print(f"  ✓ {path}: {orig} ≈ {loaded} (type conversion ok)")
+                elif isinstance(orig, np.bool_) and isinstance(loaded, bool):
+                    if bool(orig) != loaded:
+                        print(f"  ❌ {path}: values differ: {orig} != {loaded}")
+                    else:
+                        print(f"  ✓ {path}: {orig} == {loaded} (type conversion ok)")
+                elif isinstance(orig, np.ndarray) and isinstance(loaded, list):
+                    if not np.array_equal(orig, loaded):
+                        print(f"  ❌ {path}: array/list differ")
+                    else:
+                        print(f"  ✓ {path}: array matches list (type conversion ok)")
+                else:
+                    print(f"  ❌ {path}: type mismatch: {type(orig).__name__} != {type(loaded).__name__}")
+                return
+            
+            if isinstance(orig, dict):
+                if set(orig.keys()) != set(loaded.keys()):
+                    print(f"  ❌ {path}: keys differ")
+                    print(f"      Original: {set(orig.keys())}")
+                    print(f"      Loaded: {set(loaded.keys())}")
+                else:
+                    print(f"  ✓ {path}: dict keys match")
+                    for key in orig.keys():
+                        compare_values(orig[key], loaded[key], f"{path}.{key}" if path else key)
+            elif isinstance(orig, (list, tuple)):
+                if len(orig) != len(loaded):
+                    print(f"  ❌ {path}: length differs")
+                else:
+                    for i, (o, l) in enumerate(zip(orig, loaded)):
+                        compare_values(o, l, f"{path}[{i}]")
+            elif isinstance(orig, np.ndarray):
+                if not np.array_equal(orig, loaded):
+                    print(f"  ❌ {path}: arrays differ")
+                else:
+                    print(f"  ✓ {path}: arrays match")
+            else:
+                if orig != loaded:
+                    print(f"  ❌ {path}: {orig} != {loaded}")
+                else:
+                    print(f"  ✓ {path}: {orig} == {loaded}")
+        
+        compare_values(original_dict, loaded_dict, "test_dict")
+        
+    finally:
+        # Cleanup
+        import os
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+            print(f"\nCleaned up {tmp_path}")
+    
+    print("\n" + "=" * 60)
+    print("Test complete!")

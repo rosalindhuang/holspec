@@ -11,9 +11,9 @@ import json
 from datetime import datetime
 import h5py
 
-from .base import PointData
-from .generators import generate_from_config
-from holspec.utilities import save_h5, read_h5, initialize_h5, add_noise, convert_numpy_types
+from holspec.point_data.base import PointData
+from holspec.point_data.generators import generate_from_config
+from holspec.utilities import save_h5, read_h5, initialize_h5, add_noise
 
 
 class PointDataEnsemble:
@@ -124,13 +124,13 @@ class PointDataEnsemble:
         }
         
         if self.base_config is not None:
-            attributes['base_config'] = json.dumps(convert_numpy_types(self.base_config))
+            attributes['base_config'] = self.base_config
         
         if self.noise_config is not None:
-            attributes['noise_config'] = json.dumps(convert_numpy_types(self.noise_config))
+            attributes['noise_config'] = self.noise_config
         
         if self.metadata:
-            attributes['metadata'] = json.dumps(convert_numpy_types(self.metadata))
+            attributes['metadata'] = self.metadata
         
         # Save root-level attributes using utility
         save_h5(filepath, attributes=attributes)

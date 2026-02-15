@@ -11,8 +11,8 @@ import json
 from pathlib import Path
 from scipy.spatial.distance import pdist, squareform
 
-from .generators import generate_from_config
-from holspec.utilities import save_h5, read_h5, compute_content_hash, add_noise, convert_numpy_types
+from holspec.point_data.generators import generate_from_config
+from holspec.utilities import save_h5, read_h5, compute_content_hash, add_noise
 
 
 class PointData:
@@ -226,7 +226,7 @@ class PointData:
         
         # Include instance metadata (creation_time, config, user fields)
         if self.metadata:
-            attributes['metadata'] = json.dumps(convert_numpy_types(self.metadata))
+            attributes['metadata'] = self.metadata
         
         # Save using utility
         save_h5(

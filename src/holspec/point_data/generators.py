@@ -70,14 +70,15 @@ def generate_triangular_lattice_rect(
         Particle positions, centered at origin.
     
     """
-    a1 = spacing * np.array([1.0, 0.0])
-    a2 = spacing * np.array([0.5, np.sqrt(3) / 2])
+    row_spacing = spacing * np.sqrt(3) / 2
     
     positions = []
-    for i in range(nx):
-        for j in range(ny):
-            pos = i * a1 + j * a2
-            positions.append(pos)
+    for j in range(ny):
+        y = j * row_spacing
+        offset = (j % 2) * spacing / 2
+        for i in range(nx):
+            x = i * spacing + offset
+            positions.append([x, y])
     
     positions = np.array(positions)
     center = np.mean(positions, axis=0)
