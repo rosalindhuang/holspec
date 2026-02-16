@@ -514,6 +514,456 @@ def plot_spheres(
     return fig, ax
 
 
+# %% Simplicial complex primitives (2D)
+
+def plot_vertices_2d(
+    vertices: List[Tuple],
+    positions: np.ndarray,
+    color: str = 'C0',
+    radius: Optional[float] = None,
+    ax: Optional[Axes] = None,
+    **kwargs
+) -> Tuple[Figure, Axes]:
+    """
+    Plot 0-simplices (vertices) as circles in 2D.
+    
+    Parameters
+    ----------
+    vertices : List[Tuple]
+        List of vertex simplices, each a tuple with 1 int index.
+    positions : np.ndarray
+        Array of shape (N, 2) with (x, y) vertex coordinates.
+    color : str, default='C0'
+        Fill color for vertices.
+    radius : float, optional
+        Radius of circles. If None, auto-computed from data range.
+    ax : Axes, optional
+        Axes to plot on. If None, creates new figure.
+    **kwargs
+        Additional keyword arguments passed to plot_circles().
+        Can override circle_props, e.g., edgecolor='black'.
+    
+    Returns
+    -------
+    fig : Figure
+        The matplotlib figure object.
+    ax : Axes
+        The matplotlib axes object.
+    
+    Examples
+    --------
+    >>> vertices = [(0,), (1,), (2,)]
+    >>> positions = np.array([[0, 0], [1, 0], [0.5, 0.866]])
+    >>> fig, ax = plot_vertices_2d(vertices, positions, color='red', radius=0.1)
+    
+    >>> # With edge styling
+    >>> fig, ax = plot_vertices_2d(
+    ...     vertices, positions, 
+    ...     color='blue', 
+    ...     circle_props={'edgecolor': 'black', 'linewidth': 2}
+    ... )
+    """
+    # Create figure if needed
+    if ax is None:
+        fig, ax = plt.subplots()
+    else:
+        fig = ax.figure
+    
+    # Extract vertex indices and get their positions
+    vertex_indices = [v[0] for v in vertices]
+    vertex_positions = positions[vertex_indices]
+    
+    # Auto-compute radius if not provided
+    if radius is None:
+        data_range = np.ptp(positions, axis=0).max()
+        radius = 0.02 * data_range if data_range > 0 else 0.05
+    
+    # Set up circle properties
+    default_circle_props = {
+        'facecolor': color,
+        'edgecolor': 'black',
+        'linewidth': 1,
+        'alpha': 1
+    }
+    
+    # Merge with user-provided circle_props if present
+    if 'circle_props' in kwargs:
+        user_props = kwargs.pop('circle_props')
+        if isinstance(user_props, dict):
+            default_circle_props.update(user_props)
+        else:
+            # If user provided list, use it directly
+            kwargs['circle_props'] = user_props
+            return plot_circles(vertex_positions, radius, ax=ax, **kwargs)
+    
+    # Plot using plot_circles
+    fig, ax = plot_circles(
+        vertex_positions,
+        radius,
+        circle_props=default_circle_props,
+        ax=ax,
+        **kwargs
+    )
+    
+    return fig, ax
+
+
+def plot_edges_2d(
+    edges: List[Tuple],
+    positions: np.ndarray,
+    color: str = 'C1',
+    linewidth: float = 1.5,
+    ax: Optional[Axes] = None,
+    **kwargs
+) -> Tuple[Figure, Axes]:
+    """
+    Plot 1-simplices (edges) as line segments in 2D.
+    
+    Parameters
+    ----------
+    edges : List[Tuple]
+        List of edge simplices, each a tuple of 2 vertex indices.
+    positions : np.ndarray
+        Array of shape (N, 2) with (x, y) vertex coordinates.
+    color : str, default='C1'
+        Line color for all edges.
+    linewidth : float, default=1.5
+        Line width for edges.
+    ax : Axes, optional
+        Axes to plot on. If None, creates new figure.
+    **kwargs
+        Additional keyword arguments passed to ax.plot().
+    
+    Returns
+    -------
+    fig : Figure
+        The matplotlib figure object.
+    ax : Axes
+        The matplotlib axes object.
+    
+    Examples
+    --------
+    >>> edges = [(0, 1), (1, 2), (0, 2)]
+    >>> positions = np.array([[0, 0], [1, 0], [0.5, 0.866]])
+    >>> fig, ax = plot_edges_2d(edges, positions, color='blue', linewidth=2)
+    """
+    # Create figure if needed
+    if ax is None:
+        fig, ax = plt.subplots()
+    else:
+        fig = ax.figure
+    
+    # Validate positions
+    positions = np.asarray(positions)
+    if positions.ndim != 2 or positions.shape[1] != 2:
+        raise ValueError(f"positions must be shape (N, 2), got {positions.shape}")
+    
+    # Plot each edge
+    for edge in edges:
+        edge_positions = positions[list(edge)]
+        x, y = edge_positions.T
+        ax.plot(x, y, color=color, linewidth=linewidth, alpha=1, **kwargs)
+    
+    return fig, ax
+
+
+def plot_triangles_2d(
+    triangles: List[Tuple],
+    positions: np.ndarray,
+    color: str = 'C2',
+    alpha: float = 0.4,
+    edgecolor: str = 'none',
+    ax: Optional[Axes] = None,
+    **kwargs
+) -> Tuple[Figure, Axes]:
+    """
+    Plot 2-simplices (triangles) as filled polygons in 2D.
+    
+    Parameters
+    ----------
+    triangles : List[Tuple]
+        List of triangle simplices, each a tuple of 3 vertex indices.
+    positions : np.ndarray
+        Array of shape (N, 2) with (x, y) vertex coordinates.
+    color : str, default='C2'
+        Fill color for all triangles.
+    alpha : float, default=0.4
+        Transparency for triangles (0=transparent, 1=opaque).
+    edgecolor : str, default='none'
+        Edge color for triangle outlines.
+    ax : Axes, optional
+        Axes to plot on. If None, creates new figure.
+    **kwargs
+        Additional keyword arguments passed to Polygon patches.
+    
+    Returns
+    -------
+    fig : Figure
+        The matplotlib figure object.
+    ax : Axes
+        The matplotlib axes object.
+    
+    Examples
+    --------
+    >>> triangles = [(0, 1, 2)]
+    >>> positions = np.array([[0, 0], [1, 0], [0.5, 0.866]])
+    >>> fig, ax = plot_triangles_2d(triangles, positions)
+    """
+    from matplotlib.patches import Polygon as PolygonPatch
+    
+    # Create figure if needed
+    if ax is None:
+        fig, ax = plt.subplots()
+    else:
+        fig = ax.figure
+    
+    # Validate positions
+    positions = np.asarray(positions)
+    if positions.ndim != 2 or positions.shape[1] != 2:
+        raise ValueError(f"positions must be shape (N, 2), got {positions.shape}")
+    
+    # Plot each triangle
+    for triangle in triangles:
+        tri_positions = positions[list(triangle)]
+        polygon = PolygonPatch(
+            tri_positions, 
+            closed=True,
+            facecolor=color,
+            edgecolor=edgecolor,
+            alpha=alpha,
+            **kwargs
+        )
+        ax.add_patch(polygon)
+    
+    return fig, ax
+
+
+def add_edge_arrows_2d(
+    edges: List[Tuple],
+    positions: np.ndarray,
+    color: str = 'C1',
+    scale: float = 0.02,
+    ax: Optional[Axes] = None
+) -> None:
+    """
+    Add orientation arrows to edges in 2D.
+    
+    Draws an arrow at the midpoint of each edge pointing from the first
+    vertex to the second vertex, indicating edge orientation.
+    
+    Parameters
+    ----------
+    edges : List[Tuple]
+        List of edge simplices, each a tuple of 2 vertex indices.
+    positions : np.ndarray
+        Array of shape (N, 2) with (x, y) vertex coordinates.
+    color : str, default='C1'
+        Arrow color.
+    scale : float, default=0.02
+        Arrow size as a fraction of the axis range.
+    ax : Axes
+        Axes to draw arrows on. Must be provided.
+    
+    Examples
+    --------
+    >>> edges = [(0, 1), (1, 2), (0, 2)]
+    >>> positions = np.array([[0, 0], [1, 0], [0.5, 0.866]])
+    >>> fig, ax = plt.subplots()
+    >>> plot_edges_2d(edges, positions, ax=ax)
+    >>> add_edge_arrows_2d(edges, positions, ax=ax)
+    """
+    if ax is None:
+        raise ValueError("ax parameter is required for add_edge_arrows_2d")
+    
+    # Get axis range for scaling
+    xlim, ylim = ax.get_xlim(), ax.get_ylim()
+    axis_scale = max(np.ptp(xlim), np.ptp(ylim))
+    arrow_scale = scale * axis_scale
+    
+    # Add arrow to each edge
+    for edge in edges:
+        p0 = positions[edge[0]]
+        p1 = positions[edge[1]]
+        
+        # Compute direction
+        vec = p1 - p0
+        vec_norm = np.linalg.norm(vec)
+        if vec_norm > 0:
+            direction = vec / vec_norm
+        else:
+            continue
+        
+        # Position arrow at midpoint
+        midpoint = 0.5 * (p0 + p1)
+        arrow_start = midpoint - arrow_scale * direction
+        arrow_dxdy = 2 * arrow_scale * direction
+        
+        # Draw arrow
+        ax.arrow(
+            arrow_start[0], arrow_start[1],
+            arrow_dxdy[0], arrow_dxdy[1],
+            head_width=arrow_scale,
+            head_length=arrow_scale * 1.3,
+            fc=color,
+            ec=color,
+            length_includes_head=True,
+            zorder=12,
+            alpha=1
+        )
+
+
+def add_triangle_orientation_2d(
+    triangles: List[Tuple],
+    positions: np.ndarray,
+    color: str = 'C2',
+    fontsize: int = 10,
+    ax: Optional[Axes] = None
+) -> None:
+    """
+    Add orientation signs (+/−) to triangles in 2D.
+    
+    Uses signed area to determine winding order. Positive gets '+', negative '−'.
+    
+    Parameters
+    ----------
+    triangles : List[Tuple]
+        List of triangle simplices, each a tuple of 3 vertex indices.
+    positions : np.ndarray
+        Array of shape (N, 2) with (x, y) vertex coordinates.
+    color : str, default='C2'
+        Color for symbols and circles.
+    fontsize : int, default=10
+        Font size for orientation symbols.
+    ax : Axes
+        Axes to draw on. Must be provided.
+    
+    Examples
+    --------
+    >>> triangles = [(0, 1, 2)]
+    >>> positions = np.array([[0, 0], [1, 0], [0.5, 0.866]])
+    >>> fig, ax = plt.subplots()
+    >>> plot_triangles_2d(triangles, positions, ax=ax)
+    >>> add_triangle_orientation_2d(triangles, positions, ax=ax)
+    """
+    if ax is None:
+        raise ValueError("ax parameter is required for add_triangle_orientation_2d")
+    
+    # Get axis range for scaling
+    xlim, ylim = ax.get_xlim(), ax.get_ylim()
+    axis_scale = max(np.ptp(xlim), np.ptp(ylim))
+    circle_radius = 0.02 * axis_scale
+    
+    # Add orientation sign to each triangle
+    for triangle in triangles:
+        # Get triangle vertices
+        v0, v1, v2 = positions[list(triangle)]
+        
+        # Compute signed area (determinant)
+        det = (v1[0] - v0[0]) * (v2[1] - v0[1]) - (v2[0] - v0[0]) * (v1[1] - v0[1])
+        sign = np.sign(det).astype(int)
+        
+        if sign != 0:
+            centroid = np.mean(positions[list(triangle)], axis=0)
+            symbol = '+' if sign > 0 else '−'
+            
+            # Add text symbol
+            ax.text(
+                *centroid, symbol,
+                fontsize=fontsize,
+                weight='bold',
+                ha='center',
+                va='center',
+                color=color,
+                zorder=15
+            )
+            
+            # Add circle around symbol
+            circle = plt.Circle(
+                centroid,
+                radius=circle_radius,
+                color='none',
+                ec=color,
+                lw=1.2,
+                zorder=14
+            )
+            ax.add_patch(circle)
+
+
+def add_simplex_labels_2d(
+    simplices: Dict[int, List[Tuple]],
+    positions: np.ndarray,
+    dims: List[int],
+    colors: Optional[Dict[int, str]] = None,
+    fontsize: int = 9,
+    ax: Optional[Axes] = None
+) -> None:
+    """
+    Add index labels to simplices in 2D.
+    
+    Labels are placed at the centroid of each simplex (vertex position for
+    0-simplices, edge midpoint for 1-simplices, triangle centroid for
+    2-simplices).
+    
+    Parameters
+    ----------
+    simplices : Dict[int, List[Tuple]]
+        Dictionary mapping dimension to list of simplices.
+    positions : np.ndarray
+        Array of shape (N, 2) with (x, y) vertex coordinates.
+    dims : List[int]
+        Which dimensions to label (e.g., [0, 1, 2]).
+    colors : Dict[int, str], optional
+        Colors per dimension. If None, uses {0: 'C0', 1: 'C1', 2: 'C2'}.
+    fontsize : int, default=9
+        Font size for labels.
+    ax : Axes
+        Axes to draw labels on. Must be provided.
+    
+    Examples
+    --------
+    >>> simplices = {0: [(0,), (1,)], 1: [(0, 1)]}
+    >>> positions = np.array([[0, 0], [1, 0]])
+    >>> fig, ax = plt.subplots()
+    >>> add_simplex_labels_2d(simplices, positions, [0, 1], ax=ax)
+    """
+    if ax is None:
+        raise ValueError("ax parameter is required for add_simplex_labels_2d")
+    
+    # Default colors
+    if colors is None:
+        colors = {0: 'C0', 1: 'C1', 2: 'C2'}
+    
+    # Get axis range for offset scaling
+    xlim, ylim = ax.get_xlim(), ax.get_ylim()
+    axis_scale = max(np.ptp(xlim), np.ptp(ylim))
+    offset = 0.03 * axis_scale
+    
+    # Add labels for each requested dimension
+    for dim in dims:
+        if dim not in simplices or not simplices[dim]:
+            continue
+        
+        color = colors.get(dim, 'black')
+        
+        for i, simplex in enumerate(simplices[dim]):
+            # Compute centroid/position
+            simplex_positions = positions[list(simplex)]
+            centroid = np.mean(simplex_positions, axis=0)
+            
+            # Add vertical offset for all dimensions
+            label_pos = centroid + np.array([0, offset])
+            
+            # Add text label
+            ax.text(
+                *label_pos, str(i),
+                fontsize=fontsize,
+                ha='center',
+                va='center',
+                color=color,
+                zorder=20
+            )
+
+
 # %% Helper functions
 
 def _extend_list(lst: List, target_length: int, default_value) -> List:

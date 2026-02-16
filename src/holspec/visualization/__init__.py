@@ -17,7 +17,14 @@ __all__ = [
     # From basic_plots.py
     'plot_circles',
     'plot_spheres',
+    'plot_vertices_2d',
+    'plot_edges_2d',
+    'plot_triangles_2d',
+    'add_edge_arrows_2d',
+    'add_triangle_orientation_2d',
+    'add_simplex_labels_2d',
 
     # From framework_objects.py
     'plot_point_data',
+    'plot_simplicial_complex_2d',
 ]
