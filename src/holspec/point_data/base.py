@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 from scipy.spatial.distance import pdist, squareform
 
-from holspec.point_data.generators import generate_from_config
+from holspec.point_data.point_generators import generate_from_config
 from holspec.utilities import save_h5, read_h5, compute_content_hash, add_noise
 
 

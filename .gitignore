@@ -24,3 +24,5 @@ outputs/*
 archive/
 archive/*
 !archive/old_repo/
+
+*claude*

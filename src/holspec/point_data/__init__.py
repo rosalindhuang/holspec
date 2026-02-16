@@ -11,7 +11,7 @@ Utilities (for data creation/loading):
 
 from .base import PointData
 from .ensemble import PointDataEnsemble
-from .generators import *
+from .point_generators import *
 from .loaders import *
 
 

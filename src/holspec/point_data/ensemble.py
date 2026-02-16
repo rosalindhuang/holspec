@@ -12,7 +12,7 @@ from datetime import datetime
 import h5py
 
 from holspec.point_data.base import PointData
-from holspec.point_data.generators import generate_from_config
+from holspec.point_data.point_generators import generate_from_config
 from holspec.utilities import save_h5, read_h5, initialize_h5, add_noise
 
 
