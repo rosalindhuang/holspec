@@ -1,3 +1,4 @@
+# holspec/paths.py
 """
 Project paths and directory utilities.
 """

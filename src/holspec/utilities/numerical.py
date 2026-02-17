@@ -1,3 +1,4 @@
+# holspec/utilities/numerical.py
 """
 Core numerical utilities including hashing and noise generation.
 """

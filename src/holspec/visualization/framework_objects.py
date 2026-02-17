@@ -1,3 +1,4 @@
+# holspec/visualization/framework_objects.py
 """
 Visualization functions for objects in the holspec framework:
 1. Point data (2D/3D)

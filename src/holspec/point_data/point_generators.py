@@ -1,3 +1,4 @@
+# holspec/point_data/point_generators.py
 """
 Point data generation functions.
 

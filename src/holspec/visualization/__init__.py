@@ -1,3 +1,4 @@
+# holspec/visualization/__init__.py
 """
 Module containing visualization utilities.
 """

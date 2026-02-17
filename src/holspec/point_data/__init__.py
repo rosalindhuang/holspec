@@ -1,3 +1,4 @@
+# holspec/point_data/__init__.py
 """
 Point cloud data containers and utilities.
 

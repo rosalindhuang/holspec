@@ -1,5 +1,6 @@
+# holspec/simplicial/__init__.py
 """
-Simplicial complexes.
+Simplicial complex construction and representation.
 """
 
 from .base import SimplicialComplex
