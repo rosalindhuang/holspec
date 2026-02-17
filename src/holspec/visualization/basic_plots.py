@@ -8,6 +8,7 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.colorbar import Colorbar
 from typing import Optional, Tuple, List, Union, Dict, Any
+from itertools import combinations
 
 # %% Line plots
 
@@ -552,11 +553,6 @@ def plot_vertices_2d(
     
     Examples
     --------
-    >>> vertices = [(0,), (1,), (2,)]
-    >>> positions = np.array([[0, 0], [1, 0], [0.5, 0.866]])
-    >>> fig, ax = plot_vertices_2d(vertices, positions, color='red', radius=0.1)
-    
-    >>> # With edge styling
     >>> fig, ax = plot_vertices_2d(
     ...     vertices, positions, 
     ...     color='blue', 
@@ -643,8 +639,6 @@ def plot_edges_2d(
     
     Examples
     --------
-    >>> edges = [(0, 1), (1, 2), (0, 2)]
-    >>> positions = np.array([[0, 0], [1, 0], [0.5, 0.866]])
     >>> fig, ax = plot_edges_2d(edges, positions, color='blue', linewidth=2)
     """
     # Create figure if needed
@@ -705,8 +699,6 @@ def plot_triangles_2d(
     
     Examples
     --------
-    >>> triangles = [(0, 1, 2)]
-    >>> positions = np.array([[0, 0], [1, 0], [0.5, 0.866]])
     >>> fig, ax = plot_triangles_2d(triangles, positions)
     """
     from matplotlib.patches import Polygon as PolygonPatch
@@ -738,155 +730,401 @@ def plot_triangles_2d(
     return fig, ax
 
 
-def add_edge_arrows_2d(
+# %% Simplicial complex primitives (3D)
+
+def plot_vertices_3d(
+    vertices: List[Tuple],
+    positions: np.ndarray,
+    color: str = 'C0',
+    radius: Optional[float] = None,
+    ax: Optional[Axes] = None,
+    **kwargs
+) -> Tuple[Figure, Axes]:
+    """
+    Plot 0-simplices (vertices) as spheres in 3D.
+    
+    Parameters
+    ----------
+    vertices : List[Tuple]
+        List of vertex simplices, each a tuple with 1 int index.
+    positions : np.ndarray
+        Array of shape (N, 3) with (x, y, z) coordinates.
+    color : str, default='C0'
+        Fill color for vertices.
+    radius : float, optional
+        Radius of spheres. If None, auto-computed from data range.
+    ax : Axes, optional
+        3D axes to plot on. If None, creates new figure.
+    **kwargs
+        Passed to plot_spheres(). Can override sphere_props.
+    
+    Returns
+    -------
+    fig, ax : Figure, Axes
+    """
+    # Create 3D figure if needed
+    if ax is None:
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+    else:
+        fig = ax.figure
+    
+    # Extract vertex indices and get their positions
+    vertex_indices = [v[0] for v in vertices]
+    vertex_positions = positions[vertex_indices]
+    
+    # Auto-compute radius if not provided
+    if radius is None:
+        data_range = np.ptp(positions, axis=0).max()
+        radius = 0.06 * data_range if data_range > 0 else 0.05
+    
+    # Set up sphere properties
+    default_sphere_props = {
+        'c': color,
+        'edgecolors': 'black',
+        'linewidths': 1,
+        'alpha': 1
+    }
+    
+    # Merge with user-provided sphere_props if present
+    if 'sphere_props' in kwargs:
+        user_props = kwargs.pop('sphere_props')
+        if isinstance(user_props, dict):
+            default_sphere_props.update(user_props)
+        else:
+            # If user provided list, use it directly
+            kwargs['sphere_props'] = user_props
+            return plot_spheres(vertex_positions, radius, ax=ax, **kwargs)
+    
+    # Plot using plot_spheres
+    fig, ax = plot_spheres(
+        vertex_positions,
+        radius,
+        sphere_props=default_sphere_props,
+        ax=ax,
+        **kwargs
+    )
+    
+    return fig, ax
+
+
+def plot_edges_3d(
     edges: List[Tuple],
     positions: np.ndarray,
     color: str = 'C1',
-    scale: float = 0.02,
-    ax: Optional[Axes] = None
-) -> None:
+    linewidth: float = 2.0,
+    ax: Optional[Axes] = None,
+    **kwargs
+) -> Tuple[Figure, Axes]:
     """
-    Add orientation arrows to edges in 2D.
-    
-    Draws an arrow at the midpoint of each edge pointing from the first
-    vertex to the second vertex, indicating edge orientation.
+    Plot 1-simplices (edges) as line segments in 3D.
     
     Parameters
     ----------
     edges : List[Tuple]
         List of edge simplices, each a tuple of 2 vertex indices.
     positions : np.ndarray
-        Array of shape (N, 2) with (x, y) vertex coordinates.
+        Array of shape (N, 3) with (x, y, z) coordinates.
     color : str, default='C1'
-        Arrow color.
-    scale : float, default=0.02
-        Arrow size as a fraction of the axis range.
-    ax : Axes
-        Axes to draw arrows on. Must be provided.
+        Line color.
+    linewidth : float, default=2.0
+        Line width.
+    ax : Axes, optional
+        3D axes to plot on. If None, creates new figure.
+    **kwargs
+        Passed to ax.plot().
     
-    Examples
-    --------
-    >>> edges = [(0, 1), (1, 2), (0, 2)]
-    >>> positions = np.array([[0, 0], [1, 0], [0.5, 0.866]])
-    >>> fig, ax = plt.subplots()
-    >>> plot_edges_2d(edges, positions, ax=ax)
-    >>> add_edge_arrows_2d(edges, positions, ax=ax)
+    Returns
+    -------
+    fig, ax : Figure, Axes
     """
+    # Create 3D figure if needed
     if ax is None:
-        raise ValueError("ax parameter is required for add_edge_arrows_2d")
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+    else:
+        fig = ax.figure
     
-    # Get axis range for scaling
-    xlim, ylim = ax.get_xlim(), ax.get_ylim()
-    axis_scale = max(np.ptp(xlim), np.ptp(ylim))
-    arrow_scale = scale * axis_scale
+    # Validate positions
+    positions = np.asarray(positions)
+    if positions.ndim != 2 or positions.shape[1] != 3:
+        raise ValueError(f"positions must be shape (N, 3), got {positions.shape}")
     
-    # Add arrow to each edge
+    # Plot each edge
     for edge in edges:
         p0 = positions[edge[0]]
         p1 = positions[edge[1]]
-        
-        # Compute direction
-        vec = p1 - p0
-        vec_norm = np.linalg.norm(vec)
-        if vec_norm > 0:
-            direction = vec / vec_norm
-        else:
-            continue
-        
-        # Position arrow at midpoint
-        midpoint = 0.5 * (p0 + p1)
-        arrow_start = midpoint - arrow_scale * direction
-        arrow_dxdy = 2 * arrow_scale * direction
-        
-        # Draw arrow
-        ax.arrow(
-            arrow_start[0], arrow_start[1],
-            arrow_dxdy[0], arrow_dxdy[1],
-            head_width=arrow_scale,
-            head_length=arrow_scale * 1.3,
-            fc=color,
-            ec=color,
-            length_includes_head=True,
-            zorder=12,
-            alpha=1
+        ax.plot(
+            [p0[0], p1[0]], 
+            [p0[1], p1[1]], 
+            [p0[2], p1[2]],
+            color=color, 
+            linewidth=linewidth, 
+            alpha=1,
+            zorder=-10,
+            **kwargs
         )
+    
+    return fig, ax
 
 
-def add_triangle_orientation_2d(
+def plot_triangles_3d(
     triangles: List[Tuple],
     positions: np.ndarray,
     color: str = 'C2',
-    fontsize: int = 10,
-    ax: Optional[Axes] = None
-) -> None:
+    alpha: float = 0.4,
+    edgecolor: str = 'none',
+    ax: Optional[Axes] = None,
+    **kwargs
+) -> Tuple[Figure, Axes]:
     """
-    Add orientation signs (+/−) to triangles in 2D.
-    
-    Uses signed area to determine winding order. Positive gets '+', negative '−'.
+    Plot 2-simplices (triangles) as filled polygons in 3D.
     
     Parameters
     ----------
     triangles : List[Tuple]
         List of triangle simplices, each a tuple of 3 vertex indices.
     positions : np.ndarray
-        Array of shape (N, 2) with (x, y) vertex coordinates.
+        Array of shape (N, 3) with (x, y, z) coordinates.
     color : str, default='C2'
-        Color for symbols and circles.
+        Fill color.
+    alpha : float, default=0.4
+        Transparency (0=transparent, 1=opaque).
+    edgecolor : str, default='none'
+        Edge color for outlines.
+    ax : Axes, optional
+        3D axes to plot on. If None, creates new figure.
+    **kwargs
+        Passed to Poly3DCollection.
+    
+    Returns
+    -------
+    fig, ax : Figure, Axes
+    """
+    from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+    
+    # Create 3D figure if needed
+    if ax is None:
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+    else:
+        fig = ax.figure
+    
+    # Validate positions
+    positions = np.asarray(positions)
+    if positions.ndim != 2 or positions.shape[1] != 3:
+        raise ValueError(f"positions must be shape (N, 3), got {positions.shape}")
+    
+    # Plot each triangle
+    for triangle in triangles:
+        tri_positions = positions[list(triangle)]
+        poly = Poly3DCollection(
+            [tri_positions],
+            facecolor=color,
+            edgecolor=edgecolor,
+            alpha=alpha,
+            zorder=-20,
+            **kwargs
+        )
+        ax.add_collection3d(poly)
+    
+    return fig, ax
+
+
+def plot_tetrahedra_3d(
+    tetrahedra: List[Tuple],
+    positions: np.ndarray,
+    color: str = 'C3',
+    alpha: float = 0.2,
+    edgecolor: str = 'none',
+    ax: Optional[Axes] = None,
+    **kwargs
+) -> Tuple[Figure, Axes]:
+    """
+    Plot 3-simplices (tetrahedra) as collections of triangular facets in 3D.
+    
+    Each tetrahedron is rendered as 4 triangular faces. Very low alpha recommended.
+    
+    Parameters
+    ----------
+    tetrahedra : List[Tuple]
+        List of tetrahedron simplices, each a tuple of 4 vertex indices.
+    positions : np.ndarray
+        Array of shape (N, 3) with (x, y, z) coordinates.
+    color : str, default='C3'
+        Fill color.
+    alpha : float, default=0.2
+        Transparency (much lower than triangles for visibility).
+    edgecolor : str, default='none'
+        Edge color for facet outlines.
+    ax : Axes, optional
+        3D axes to plot on. If None, creates new figure.
+    **kwargs
+        Passed to Poly3DCollection.
+    
+    Returns
+    -------
+    fig, ax : Figure, Axes
+    """
+    from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+    
+    # Create 3D figure if needed
+    if ax is None:
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+    else:
+        fig = ax.figure
+    
+    # Validate positions
+    positions = np.asarray(positions)
+    if positions.ndim != 2 or positions.shape[1] != 3:
+        raise ValueError(f"positions must be shape (N, 3), got {positions.shape}")
+    
+    # Plot each tetrahedron as 4 triangular facets
+    for tet in tetrahedra:
+        # Generate all 4 facets (combinations of 3 vertices from 4)
+        facets = list(combinations(tet, 3))
+        for facet in facets:
+            facet_positions = positions[list(facet)]
+            poly = Poly3DCollection(
+                [facet_positions],
+                facecolor=color,
+                edgecolor=edgecolor,
+                alpha=alpha,
+                zorder=-30,
+                **kwargs
+            )
+            ax.add_collection3d(poly)
+    
+    return fig, ax
+
+
+def add_simplex_orientation_2d(
+    simplices: Dict[int, List[Tuple]],
+    positions: np.ndarray,
+    dims: List[int],
+    colors: Optional[Dict[int, str]] = None,
+    arrow_scale: float = 0.02,
+    fontsize: int = 10,
+    ax: Optional[Axes] = None
+) -> None:
+    """
+    Add orientation markers to simplices in 2D.
+    
+    For edges (dim 1): draws arrows at midpoints.
+    For triangles (dim 2): draws +/− signs based on winding order.
+    
+    Parameters
+    ----------
+    simplices : Dict[int, List[Tuple]]
+        Dictionary mapping dimension to list of simplices.
+    positions : np.ndarray
+        Array of shape (N, 2) with (x, y) coordinates.
+    dims : List[int]
+        Which dimensions to add orientation (e.g., [1, 2]).
+    colors : Dict[int, str], optional
+        Colors per dimension. Default: {1: 'C1', 2: 'C2'}.
+    arrow_scale : float, default=0.02
+        Arrow size as fraction of axis range (for edges).
     fontsize : int, default=10
-        Font size for orientation symbols.
+        Font size for triangle orientation signs.
     ax : Axes
-        Axes to draw on. Must be provided.
+        Axes to draw on. Required.
     
     Examples
     --------
-    >>> triangles = [(0, 1, 2)]
+    >>> simplices = {1: [(0, 1), (1, 2)], 2: [(0, 1, 2)]}
     >>> positions = np.array([[0, 0], [1, 0], [0.5, 0.866]])
     >>> fig, ax = plt.subplots()
-    >>> plot_triangles_2d(triangles, positions, ax=ax)
-    >>> add_triangle_orientation_2d(triangles, positions, ax=ax)
+    >>> add_simplex_orientation_2d(simplices, positions, [1, 2], ax=ax)
     """
     if ax is None:
-        raise ValueError("ax parameter is required for add_triangle_orientation_2d")
+        raise ValueError("ax parameter is required for add_simplex_orientation_2d")
+    
+    # Default colors
+    if colors is None:
+        colors = {1: 'C1', 2: 'C2'}
     
     # Get axis range for scaling
     xlim, ylim = ax.get_xlim(), ax.get_ylim()
     axis_scale = max(np.ptp(xlim), np.ptp(ylim))
-    circle_radius = 0.02 * axis_scale
     
-    # Add orientation sign to each triangle
-    for triangle in triangles:
-        # Get triangle vertices
-        v0, v1, v2 = positions[list(triangle)]
+    # Add orientation for each requested dimension
+    for dim in dims:
+        if dim not in simplices or not simplices[dim]:
+            continue
         
-        # Compute signed area (determinant)
-        det = (v1[0] - v0[0]) * (v2[1] - v0[1]) - (v2[0] - v0[0]) * (v1[1] - v0[1])
-        sign = np.sign(det).astype(int)
+        color = colors.get(dim, 'black')
         
-        if sign != 0:
-            centroid = np.mean(positions[list(triangle)], axis=0)
-            symbol = '+' if sign > 0 else '−'
-            
-            # Add text symbol
-            ax.text(
-                *centroid, symbol,
-                fontsize=fontsize,
-                weight='bold',
-                ha='center',
-                va='center',
-                color=color,
-                zorder=15
-            )
-            
-            # Add circle around symbol
-            circle = plt.Circle(
-                centroid,
-                radius=circle_radius,
-                color='none',
-                ec=color,
-                lw=1.2,
-                zorder=14
-            )
-            ax.add_patch(circle)
+        if dim == 1:
+            # Add arrows to edges
+            arrow_size = arrow_scale * axis_scale
+            for edge in simplices[1]:
+                p0 = positions[edge[0]]
+                p1 = positions[edge[1]]
+                
+                # Compute direction
+                vec = p1 - p0
+                vec_norm = np.linalg.norm(vec)
+                if vec_norm > 0:
+                    direction = vec / vec_norm
+                else:
+                    continue
+                
+                # Position arrow at midpoint
+                midpoint = 0.5 * (p0 + p1)
+                arrow_start = midpoint - arrow_size * direction
+                arrow_dxdy = 2 * arrow_size * direction
+                
+                # Draw arrow
+                ax.arrow(
+                    arrow_start[0], arrow_start[1],
+                    arrow_dxdy[0], arrow_dxdy[1],
+                    head_width=arrow_size,
+                    head_length=arrow_size * 1.3,
+                    fc=color,
+                    ec=color,
+                    length_includes_head=True,
+                    zorder=12,
+                    alpha=1
+                )
+        
+        elif dim == 2:
+            # Add +/− signs to triangles
+            circle_radius = 0.02 * axis_scale
+            for triangle in simplices[2]:
+                # Get triangle vertices
+                v0, v1, v2 = positions[list(triangle)]
+                
+                # Compute signed area (determinant)
+                det = (v1[0] - v0[0]) * (v2[1] - v0[1]) - (v2[0] - v0[0]) * (v1[1] - v0[1])
+                sign = np.sign(det).astype(int)
+                
+                if sign != 0:
+                    centroid = np.mean(positions[list(triangle)], axis=0)
+                    symbol = '+' if sign > 0 else '−'
+                    
+                    # Add text symbol
+                    ax.text(
+                        *centroid, symbol,
+                        fontsize=fontsize,
+                        weight='bold',
+                        ha='center',
+                        va='center',
+                        color=color,
+                        zorder=15
+                    )
+                    
+                    # Add circle around symbol
+                    circle = plt.Circle(
+                        centroid,
+                        radius=circle_radius,
+                        color='none',
+                        ec=color,
+                        lw=1.2,
+                        zorder=14
+                    )
+                    ax.add_patch(circle)
 
 
 def add_simplex_labels_2d(
@@ -956,6 +1194,206 @@ def add_simplex_labels_2d(
             # Add text label
             ax.text(
                 *label_pos, str(i),
+                fontsize=fontsize,
+                ha='center',
+                va='center',
+                color=color,
+                zorder=20
+            )
+
+
+# %% Simplicial complex annotation (3D)
+
+def add_simplex_orientation_3d(
+    simplices: Dict[int, List[Tuple]],
+    positions: np.ndarray,
+    dims: List[int],
+    colors: Optional[Dict[int, str]] = None,
+    arrow_scale: float = 0.02,
+    fontsize: int = 10,
+    ax: Optional[Axes] = None
+) -> None:
+    """
+    Add orientation markers to simplices in 3D.
+    
+    For edges (dim 1): draws arrows along edge direction.
+    For triangles (dim 2): draws arrows along surface normal.
+    Dimensions 0 and 3 have no orientation visualization.
+    
+    Parameters
+    ----------
+    simplices : Dict[int, List[Tuple]]
+        Dictionary mapping dimension to list of simplices.
+    positions : np.ndarray
+        Array of shape (N, 3) with (x, y, z) coordinates.
+    dims : List[int]
+        Which dimensions to add orientation (e.g., [1, 2]).
+    colors : Dict[int, str], optional
+        Colors per dimension. Default: {1: 'C1', 2: 'C2'}.
+    arrow_scale : float, default=0.02
+        Arrow size as fraction of axis range.
+    fontsize : int, default=10
+        Font size (unused in 3D, kept for API consistency).
+    ax : Axes
+        3D axes to draw on. Required.
+    
+    Examples
+    --------
+    >>> simplices = {1: [(0, 1), (1, 2)], 2: [(0, 1, 2)]}
+    >>> positions = np.array([[0, 0, 0], [1, 0, 0], [0.5, 0.866, 0]])
+    >>> fig = plt.figure()
+    >>> ax = fig.add_subplot(111, projection='3d')
+    >>> add_simplex_orientation_3d(simplices, positions, [1, 2], ax=ax)
+    """
+    if ax is None:
+        raise ValueError("ax parameter is required for add_simplex_orientation_3d")
+    
+    # Default colors
+    if colors is None:
+        colors = {1: 'C1', 2: 'C2'}
+    
+    # Get axis range for scaling
+    data_range = np.ptp(positions, axis=0)
+    axis_scale = data_range.max()
+    
+    # Add orientation for each requested dimension
+    for dim in dims:
+        if dim not in simplices or not simplices[dim]:
+            continue
+        
+        color = colors.get(dim, 'black')
+        
+        if dim == 1:
+            # Add arrows to edges
+            arrow_size = arrow_scale * axis_scale
+            for edge in simplices[1]:
+                p0 = positions[edge[0]]
+                p1 = positions[edge[1]]
+                
+                # Compute direction
+                vec = p1 - p0
+                vec_norm = np.linalg.norm(vec)
+                if vec_norm > 0:
+                    direction = vec / vec_norm
+                else:
+                    continue
+                
+                # Position arrow at midpoint
+                midpoint = 0.5 * (p0 + p1)
+                arrow_length = arrow_size
+                
+                # Draw arrow using quiver
+                ax.quiver(
+                    midpoint[0], midpoint[1], midpoint[2],
+                    direction[0], direction[1], direction[2],
+                    length=arrow_length,
+                    normalize=True,
+                    arrow_length_ratio=0.3,
+                    color=color,
+                    linewidth=1.5,
+                    alpha=1
+                )
+        
+        elif dim == 2:
+            # Add normal arrows to triangles
+            arrow_size = 0.15 * axis_scale
+            for triangle in simplices[2]:
+                # Get triangle vertices
+                v0, v1, v2 = positions[list(triangle)]
+                
+                # Compute surface normal via cross product
+                edge1 = v1 - v0
+                edge2 = v2 - v0
+                normal = np.cross(edge1, edge2)
+                normal_norm = np.linalg.norm(normal)
+                
+                if normal_norm > 0:
+                    normal = normal / normal_norm
+                else:
+                    continue
+                
+                # Position arrow at centroid
+                centroid = np.mean(positions[list(triangle)], axis=0)
+                
+                # Draw normal arrow
+                ax.quiver(
+                    centroid[0], centroid[1], centroid[2],
+                    normal[0], normal[1], normal[2],
+                    length=arrow_size,
+                    normalize=True,
+                    arrow_length_ratio=0.3,
+                    color=color,
+                    linewidth=1.5,
+                    alpha=1
+                )
+
+
+def add_simplex_labels_3d(
+    simplices: Dict[int, List[Tuple]],
+    positions: np.ndarray,
+    dims: List[int],
+    colors: Optional[Dict[int, str]] = None,
+    fontsize: int = 8,
+    ax: Optional[Axes] = None
+) -> None:
+    """
+    Add index labels to simplices in 3D.
+    
+    Labels placed at simplex centroids with small offset for visibility.
+    
+    Parameters
+    ----------
+    simplices : Dict[int, List[Tuple]]
+        Dictionary mapping dimension to list of simplices.
+    positions : np.ndarray
+        Array of shape (N, 3) with (x, y, z) coordinates.
+    dims : List[int]
+        Which dimensions to label (e.g., [0, 1, 2, 3]).
+    colors : Dict[int, str], optional
+        Colors per dimension. Default: {0: 'C0', 1: 'C1', 2: 'C2', 3: 'C3'}.
+    fontsize : int, default=8
+        Font size.
+    ax : Axes
+        3D axes to draw on. Required.
+    
+    Examples
+    --------
+    >>> simplices = {0: [(0,), (1,)], 1: [(0, 1)]}
+    >>> positions = np.array([[0, 0, 0], [1, 0, 0]])
+    >>> fig = plt.figure()
+    >>> ax = fig.add_subplot(111, projection='3d')
+    >>> add_simplex_labels_3d(simplices, positions, [0, 1], ax=ax)
+    """
+    if ax is None:
+        raise ValueError("ax parameter is required for add_simplex_labels_3d")
+    
+    # Default colors
+    if colors is None:
+        colors = {0: 'C0', 1: 'C1', 2: 'C2', 3: 'C3'}
+    
+    # Get axis range for offset scaling
+    data_range = np.ptp(positions, axis=0)
+    axis_scale = data_range.max()
+    offset = 0.03 * axis_scale
+    
+    # Add labels for each requested dimension
+    for dim in dims:
+        if dim not in simplices or not simplices[dim]:
+            continue
+        
+        color = colors.get(dim, 'black')
+        
+        for i, simplex in enumerate(simplices[dim]):
+            # Compute centroid
+            simplex_positions = positions[list(simplex)]
+            centroid = np.mean(simplex_positions, axis=0)
+            
+            # Add offset for visibility
+            label_pos = centroid + np.array([offset, offset, offset])
+            
+            # Add text label using text3D
+            ax.text(
+                label_pos[0], label_pos[1], label_pos[2], str(i),
                 fontsize=fontsize,
                 ha='center',
                 va='center',

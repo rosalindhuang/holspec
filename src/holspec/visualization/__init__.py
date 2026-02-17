@@ -20,11 +20,17 @@ __all__ = [
     'plot_vertices_2d',
     'plot_edges_2d',
     'plot_triangles_2d',
-    'add_edge_arrows_2d',
-    'add_triangle_orientation_2d',
+    'add_simplex_orientation_2d',
     'add_simplex_labels_2d',
+    'plot_vertices_3d',
+    'plot_edges_3d',
+    'plot_triangles_3d',
+    'plot_tetrahedra_3d',
+    'add_simplex_orientation_3d',
+    'add_simplex_labels_3d',
 
     # From framework_objects.py
     'plot_point_data',
     'plot_simplicial_complex_2d',
+    'plot_simplicial_complex_3d',
 ]

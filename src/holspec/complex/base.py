@@ -394,19 +394,66 @@ class SimplicialComplex:
     def _get_faces(simplex: tuple, face_dim: int) -> list[tuple]:
         """
         Extract all face_dim-faces of simplex.
-
-        Returns faces in canonical (sorted) form.
+        
+        Parameters
+        ----------
+        simplex : tuple
+            A k-simplex (tuple of k+1 vertex indices in sorted order).
+        face_dim : int
+            Dimension of faces to extract (0 <= face_dim < k).
+        
+        Returns
+        -------
+        faces : list[tuple]
+            All face_dim-faces in canonical (sorted) form.
+            
+        Examples
+        --------
+        >>> SimplicialComplex._get_faces((0, 1, 2), 1)
+        [(0, 1), (0, 2), (1, 2)]
+        
+        >>> SimplicialComplex._get_faces((0, 1, 2, 3), 2)
+        [(0, 1, 2), (0, 1, 3), (0, 2, 3), (1, 2, 3)]
         """
-        pass
+        return [tuple(sorted(face)) for face in combinations(simplex, face_dim + 1)]
 
     @staticmethod
     def _compute_orientation_sign(face: tuple, parent: tuple) -> int:
         """
         Compute sign of face in boundary of parent.
-
-        Returns (-1)^j where j is position of omitted vertex.
+        
+        Parameters
+        ----------
+        face : tuple
+            The (k-1)-face in canonical (sorted) form.
+        parent : tuple
+            The k-simplex in canonical (sorted) form.
+        
+        Returns
+        -------
+        sign : int
+            +1 or -1
+            
+        Notes
+        -----
+        Sign is (-1)^j where j is the position of the omitted vertex in parent.
+        Assumes valid inputs (face is subset of parent with one vertex removed) 
+        for computational efficiency.
+        
+        Examples
+        --------
+        >>> SimplicialComplex._compute_orientation_sign((0, 1), (0, 1, 2))
+        1
+        
+        >>> SimplicialComplex._compute_orientation_sign((0, 2), (0, 1, 2))
+        -1
         """
-        pass
+        # Find which vertex was removed by comparing face to parent
+        for j, v in enumerate(parent):
+            if v not in face:
+                return (-1) ** j
+        
+        raise ValueError(f"Face {face} is not a boundary of parent {parent}")
 
     def _compute_content_hash(self) -> str:
         """

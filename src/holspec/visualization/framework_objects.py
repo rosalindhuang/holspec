@@ -17,9 +17,14 @@ from holspec.visualization import (
     plot_vertices_2d,
     plot_edges_2d,
     plot_triangles_2d,
-    add_edge_arrows_2d,
-    add_triangle_orientation_2d,
-    add_simplex_labels_2d
+    add_simplex_orientation_2d,
+    add_simplex_labels_2d,
+    plot_vertices_3d,
+    plot_edges_3d,
+    plot_triangles_3d,
+    plot_tetrahedra_3d,
+    add_simplex_orientation_3d,
+    add_simplex_labels_3d
 )
 
 # %% Point data
@@ -130,11 +135,48 @@ def plot_point_data(
 
 # %% Simplicial complex
 
+def _parse_feature_flags(flags: Union[bool, Dict[int, bool]], all_keys: List[int]) -> List[int]:
+    """
+    Helper: Convert bool or dict flags to list of enabled keys.
+        
+    Parameters
+    ----------
+    flags : bool or Dict[int, bool]
+        Feature flags specification:
+        - True: enable for all keys
+        - False/None: enable for no keys
+        - Dict: enable for keys where value is True
+    all_keys : List[int]
+        Complete list of valid keys.
+    
+    Returns
+    -------
+    List[int]
+        List of keys where feature is enabled.
+    
+    Examples
+    --------
+    >>> _parse_feature_flags(True, [0, 1, 2])
+    [0, 1, 2]
+    >>> _parse_feature_flags({0: True, 1: False, 2: True}, [0, 1, 2])
+    [0, 2]
+    >>> _parse_feature_flags(False, [0, 1, 2])
+    []
+    """
+    if flags is True:
+        return all_keys
+    elif isinstance(flags, dict):
+        return [k for k in all_keys if flags.get(k, False)]
+    return []
+
+
 def plot_simplicial_complex_2d(
     simplices: Dict[int, List[Tuple]],
     positions: np.ndarray,
     # Color control
-    colors: Optional[Dict[int, str]] = None,
+    simplex_colors: Optional[Dict[int, str]] = None,
+    # Styling per dimension
+    simplex_kwargs: Optional[Dict[int, Dict]] = None,
     # Labeling control
     show_labels: Optional[Union[bool, Dict[int, bool]]] = None,
     # Orientation control
@@ -154,9 +196,12 @@ def plot_simplicial_complex_2d(
         Each simplex is a tuple of vertex indices.
     positions : np.ndarray
         Array of shape (N, 2) with (x, y) vertex coordinates.
-    colors : Dict[int, str], optional
+    simplex_colors : Dict[int, str], optional
         Colors per dimension. Default: {0: 'C0', 1: 'C1', 2: 'C2'}.
         Example: {0: 'red', 1: 'blue', 2: 'green'}
+    simplex_kwargs : Dict[int, Dict], optional
+        Additional keyword arguments per dimension, passed to primitive functions.
+        Example: {0: {'radius': 0.1}, 1: {'linewidth': 2}, 2: {'alpha': 0.3}}
     show_labels : bool or Dict[int, bool], optional
         Control labeling by dimension.
         - None or False: no labels
@@ -171,7 +216,7 @@ def plot_simplicial_complex_2d(
     ax : Axes, optional
         Axes to plot on. If None, creates new figure.
     **kwargs
-        Additional styling arguments (advanced use).
+        Additional styling arguments applied to all dimensions.
     
     Returns
     -------
@@ -182,35 +227,14 @@ def plot_simplicial_complex_2d(
     
     Examples
     --------
-    >>> # Basic plot with default colors
-    >>> simplices = {
-    ...     0: [(0,), (1,), (2,)],
-    ...     1: [(0, 1), (0, 2), (1, 2)],
-    ...     2: [(0, 1, 2)]
-    ... }
-    >>> positions = np.array([[0, 0], [1, 0], [0.5, 0.866]])
-    >>> fig, ax = plot_simplicial_complex_2d(simplices, positions)
-    
-    >>> # Custom colors
     >>> fig, ax = plot_simplicial_complex_2d(
     ...     simplices, positions,
-    ...     colors={0: 'red', 1: 'blue', 2: 'yellow'}
-    ... )
-    
-    >>> # With labels and orientation
-    >>> fig, ax = plot_simplicial_complex_2d(
-    ...     simplices, positions,
-    ...     show_labels=True,
-    ...     show_orientation=True
-    ... )
-    
-    >>> # Selective labeling and orientation
-    >>> fig, ax = plot_simplicial_complex_2d(
-    ...     simplices, positions,
+    ...     simplex_colors={0: 'red', 1: 'blue', 2: 'yellow'},
+    ...     simplex_kwargs={0: {'radius': 0.08}, 1: {'linewidth': 3}, 2: {'alpha': 0.6}}
     ...     show_labels={0: True, 1: False, 2: True},
     ...     show_orientation={1: True, 2: False}
     ... )
-    
+
     Notes
     -----
     - For fine-grained control over styling, use the basic plotting
@@ -227,45 +251,161 @@ def plot_simplicial_complex_2d(
     
     # Set up default colors
     default_colors = {0: 'C0', 1: 'C1', 2: 'C2'}
-    color_map = {**default_colors, **(colors or {})}
+    color_map = {**default_colors, **(simplex_colors or {})}
     
-    # Plot simplices (triangles → edges → vertices for proper layering)
+    # Set up per-dimension kwargs
+    dim_kwargs = simplex_kwargs or {}
+    
+    # Plot simplices (triangles -> edges -> vertices for proper layering)
     if 2 in simplices and simplices[2]:
-        fig, ax = plot_triangles_2d(simplices[2], positions, color=color_map[2], ax=ax, zorder=1)
+        kw = {**kwargs, **dim_kwargs.get(2, {})}
+        fig, ax = plot_triangles_2d(simplices[2], positions, color=color_map[2], ax=ax, zorder=1, **kw)
     
     if 1 in simplices and simplices[1]:
-        fig, ax = plot_edges_2d(simplices[1], positions, color=color_map[1], ax=ax, zorder=2)
+        kw = {**kwargs, **dim_kwargs.get(1, {})}
+        fig, ax = plot_edges_2d(simplices[1], positions, color=color_map[1], ax=ax, zorder=2, **kw)
     
     if 0 in simplices and simplices[0]:
-        fig, ax = plot_vertices_2d(simplices[0], positions, color=color_map[0], ax=ax, zorder=3)
+        kw = {**kwargs, **dim_kwargs.get(0, {})}
+        fig, ax = plot_vertices_2d(simplices[0], positions, color=color_map[0], ax=ax, zorder=3, **kw)
     
     # Add labels if requested
     if show_labels:
-        # Parse bool or dict to list of dimensions
-        if show_labels is True:
-            dims_to_label = [0, 1, 2]
-        elif isinstance(show_labels, dict):
-            dims_to_label = [d for d in [0, 1, 2] if show_labels.get(d, False)]
-        else:
-            dims_to_label = []
-        
+        dims_to_label = _parse_feature_flags(show_labels, [0, 1, 2])
         if dims_to_label:
             add_simplex_labels_2d(simplices, positions, dims_to_label, color_map, ax=ax)
     
-    # Add orientation if requested (only for edges and triangles)
+    # Add orientation if requested
     if show_orientation:
-        # Parse bool or dict to list of dimensions
-        if show_orientation is True:
-            dims_to_orient = [1, 2]
-        elif isinstance(show_orientation, dict):
-            dims_to_orient = [d for d in [1, 2] if show_orientation.get(d, False)]
-        else:
-            dims_to_orient = []
-        
-        # Only call if dimension exists and is non-empty
-        if 1 in dims_to_orient and 1 in simplices and simplices[1]:
-            add_edge_arrows_2d(simplices[1], positions, color=color_map[1], ax=ax)
-        if 2 in dims_to_orient and 2 in simplices and simplices[2]:
-            add_triangle_orientation_2d(simplices[2], positions, color=color_map[2], ax=ax)
+        dims_to_orient = _parse_feature_flags(show_orientation, [1, 2])
+        if dims_to_orient:
+            add_simplex_orientation_2d(simplices, positions, dims_to_orient, color_map, ax=ax)
+    
+    return fig, ax
+
+
+def plot_simplicial_complex_3d(
+    simplices: Dict[int, List[Tuple]],
+    positions: np.ndarray,
+    # Color control
+    simplex_colors: Optional[Dict[int, str]] = None,
+    # Styling per dimension
+    simplex_kwargs: Optional[Dict[int, Dict]] = None,
+    # Labeling control
+    show_labels: Optional[Union[bool, Dict[int, bool]]] = None,
+    # Orientation control
+    show_orientation: Optional[Union[bool, Dict[int, bool]]] = None,
+    # Figure
+    ax: Optional[Axes] = None,
+    **kwargs
+) -> Tuple[Figure, Axes]:
+    """
+    Plot a 3D simplicial complex with vertices, edges, triangles, and tetrahedra.
+    
+    Parameters
+    ----------
+    simplices : Dict[int, List[Tuple]]
+        Dictionary mapping dimension to list of simplices.
+        Keys: 0 (vertices), 1 (edges), 2 (triangles), 3 (tetrahedra).
+        Each simplex is a tuple of vertex indices.
+    positions : np.ndarray
+        Array of shape (N, 3) with (x, y, z) vertex coordinates.
+    simplex_colors : Dict[int, str], optional
+        Colors per dimension. Default: {0: 'C0', 1: 'C1', 2: 'C2', 3: 'C3'}.
+        Example: {0: 'red', 1: 'blue', 2: 'green', 3: 'purple'}
+    simplex_kwargs : Dict[int, Dict], optional
+        Additional keyword arguments per dimension, passed to primitive functions.
+        Example: {0: {'radius': 0.05}, 1: {'linewidth': 2.5}, 2: {'alpha': 0.5}}
+    show_labels : bool or Dict[int, bool], optional
+        Control labeling by dimension.
+        - None or False: no labels
+        - True: label all dimensions
+        - {0: True, 1: False, 2: True, 3: False}: per-dimension control
+    show_orientation : bool or Dict[int, bool], optional
+        Control orientation markers by dimension.
+        - None or False: no orientation markers
+        - True: show for all applicable dimensions (1, 2)
+        - {1: True, 2: False}: per-dimension control
+        Note: Only dimensions 1 (arrows) and 2 (normals) have orientation.
+        Dimensions 0 (vertices) and 3 (tetrahedra) have no orientation visualization.
+    ax : Axes, optional
+        3D axes to plot on. If None, creates new figure.
+    **kwargs
+        Additional styling arguments applied to all dimensions.
+    
+    Returns
+    -------
+    fig : Figure
+        The matplotlib figure object.
+    ax : Axes
+        The matplotlib 3D axes object.
+    
+    Examples
+    --------
+    >>> fig, ax = plot_simplicial_complex_3d(
+    ...     simplices, positions,
+    ...     simplex_colors={0: 'red', 1: 'blue', 2: 'yellow', 3: 'purple'},
+    ...     simplex_kwargs={0: {'radius': 0.04}, 1: {'linewidth': 2}, 3: {'alpha': 0.05}},
+    ...     show_labels={0: True, 1: False, 2: True, 3: False},
+    ...     show_orientation={1: True, 2: False}
+    ... )    
+    
+    Notes
+    -----
+    - For fine-grained control over styling, use the basic plotting
+      functions directly: plot_tetrahedra_3d(), plot_triangles_3d(), 
+      plot_edges_3d(), plot_vertices_3d()
+    - Orientation only applies to dimensions 1 (edge arrows) and 2 (face normals)
+    - Tetrahedra rendered as 4 triangular facets with low alpha (0.1)
+    - Rendering order: back-to-front (tetrahedra -> triangles -> edges -> vertices)
+    - Labels show simplex indices in order of appearance in simplices dict
+    - Default colors use matplotlib's color cycle: C0, C1, C2, C3
+    - Equal aspect ratio automatically set based on data range
+    """
+    # Create 3D figure if needed
+    if ax is None:
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+    else:
+        fig = ax.figure
+    
+    # Set up default colors
+    default_colors = {0: 'C0', 1: 'C1', 2: 'C2', 3: 'C3'}
+    color_map = {**default_colors, **(simplex_colors or {})}
+    
+    # Set up per-dimension kwargs
+    dim_kwargs = simplex_kwargs or {}
+    
+    # Plot simplices (back-to-front: tetrahedra -> triangles -> edges -> vertices)
+    if 3 in simplices and simplices[3]:
+        kw = {**kwargs, **dim_kwargs.get(3, {})}
+        fig, ax = plot_tetrahedra_3d(simplices[3], positions, color=color_map[3], ax=ax, **kw)
+    
+    if 2 in simplices and simplices[2]:
+        kw = {**kwargs, **dim_kwargs.get(2, {})}
+        fig, ax = plot_triangles_3d(simplices[2], positions, color=color_map[2], ax=ax, **kw)
+    
+    if 1 in simplices and simplices[1]:
+        kw = {**kwargs, **dim_kwargs.get(1, {})}
+        fig, ax = plot_edges_3d(simplices[1], positions, color=color_map[1], ax=ax, **kw)
+    
+    if 0 in simplices and simplices[0]:
+        kw = {**kwargs, **dim_kwargs.get(0, {})}
+        fig, ax = plot_vertices_3d(simplices[0], positions, color=color_map[0], ax=ax, **kw)
+    
+    # Set equal aspect ratio
+    ax.set_box_aspect(np.ptp(positions, axis=0))
+    
+    # Add labels if requested
+    if show_labels:
+        dims_to_label = _parse_feature_flags(show_labels, [0, 1, 2, 3])
+        if dims_to_label:
+            add_simplex_labels_3d(simplices, positions, dims_to_label, color_map, ax=ax)
+    
+    # Add orientation if requested (only dims 1 and 2)
+    if show_orientation:
+        dims_to_orient = _parse_feature_flags(show_orientation, [1, 2])
+        if dims_to_orient:
+            add_simplex_orientation_3d(simplices, positions, dims_to_orient, color_map, ax=ax)
     
     return fig, ax
