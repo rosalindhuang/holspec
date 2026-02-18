@@ -34,7 +34,7 @@ class SimplicialComplex:
     simplices : dict[int, list[tuple]]
         The simplices at each dimension (read-only).
     metadata : dict
-        Construction metadata (read-only).
+        Construction metadata.
 
     Notes
     -----
@@ -54,15 +54,14 @@ class SimplicialComplex:
         metadata: dict | None = None,
         validate: bool = True
     ):
-        # Store simplices (defensive copy)
+        # Store simplices in native Python types (defensive copy)
         self._simplices = {k: list(simps) for k, simps in simplices.items()}
-        # Normalize numpy types to native Python types
         self._simplices = convert_numpy_to_python(self._simplices)
         
         # Initialize metadata
-        self._metadata = metadata if metadata is not None else {}
-        if 'creation_time' not in self._metadata:
-            self._metadata['creation_time'] = datetime.now().isoformat()
+        self.metadata = metadata if metadata is not None else {}
+        if 'creation_time' not in self.metadata:
+            self.metadata['creation_time'] = datetime.now().isoformat()
         
         # Initialize caches
         self._incidence_cache = {}
@@ -80,11 +79,6 @@ class SimplicialComplex:
     def simplices(self) -> dict[int, list[tuple]]:
         """Simplices at each dimension (read-only)."""
         return {k: list(simps) for k, simps in self._simplices.items()}
-
-    @property
-    def metadata(self) -> dict:
-        """Construction metadata (read-only)."""
-        return self._metadata
 
     @property
     def max_dim(self) -> int:
@@ -241,7 +235,7 @@ class SimplicialComplex:
     # =========================================================================
     # I/O Methods
     # =========================================================================
-
+    
     def save(
         self,
         filepath: str | Path,
@@ -276,7 +270,7 @@ class SimplicialComplex:
         Format
         ------
         - Root attributes: max_dim, f_vector, content_hash, has_incidence, metadata
-        - /simplices/k: subgroups containing k-simplices as datasets
+        - /simplices/{k}-simplices: datasets containing k-simplices as (n_k, k+1) arrays
         - /incidence/k/: subgroups with CSR components (if save_incidence=True)
         """
         filepath = Path(filepath)
@@ -289,7 +283,7 @@ class SimplicialComplex:
         def subgroup_path(subpath: str) -> str:
             return f"{group}/{subpath}" if group else subpath
         
-        # Save root-level attributes
+        # Prepare root-level attributes
         root_attributes = {
             'max_dim': self.max_dim,
             'f_vector': self.f_vector,
@@ -298,28 +292,21 @@ class SimplicialComplex:
             'metadata': self.metadata
         }
         
+        # Prepare simplices datasets with subgroup paths
+        simplices_datasets = {
+            f'simplices/{k}-simplices': np.array(simps, dtype=int)
+            for k, simps in self._simplices.items()
+        }
+        
+        # Save root attributes and simplices
         save_h5(
             filepath,
-            datasets=None,  # Only attributes at root
+            datasets=simplices_datasets,
             attributes=root_attributes,
             mode=mode,
             group=group,
             hdf5_options=hdf5_options
         )
-        
-        # Save simplices to subgroups
-        for k, simps in self._simplices.items():
-            # Convert list of tuples to (n_k, k+1) array
-            simplex_array = np.array(simps, dtype=int)
-            
-            save_h5(
-                filepath,
-                datasets={str(k): simplex_array},
-                attributes=None,
-                mode=mode,
-                group=subgroup_path(f'simplices/{k}'),
-                hdf5_options=hdf5_options
-            )
         
         # Save incidence matrices to subgroups (if requested)
         if save_incidence and self._incidence_cache:
@@ -391,26 +378,22 @@ class SimplicialComplex:
         # Read root-level attributes
         _, attributes = read_h5(filepath, group=group)
         
-        # Extract and validate metadata
+        # Extract metadata and max_dim
         metadata = attributes.get('metadata', {})
         
         if 'max_dim' not in attributes:
             raise ValueError(f"Missing 'max_dim' in {filepath}")
         max_dim = attributes['max_dim']
         
-        # Read simplices from subgroups
+        # Read all simplices from /simplices group
+        datasets, _ = read_h5(filepath, group=subgroup_path('simplices'))
+        
         simplices = {}
-        for k in range(max_dim + 1):
-            datasets, _ = read_h5(filepath, group=subgroup_path(f'simplices/{k}'))
-            
-            # Get simplices dataset (named str(k) in simplices/{k})
-            label = str(k)
-            if label not in datasets:
-                raise ValueError(f"Missing dataset '{k}' in simplices/{k} group")
-            data = datasets[label]
-
-            # Convert (n_k, k+1) array to list of tuples
-            simplices[k] = [tuple(row) for row in data]
+        for key, data in datasets.items():
+            if key.endswith('-simplices'):
+                k = int(key.split('-')[0])
+                # Convert (n_k, k+1) array to list of tuples
+                simplices[k] = [tuple(row) for row in data]
         
         if not simplices:
             raise ValueError(f"No simplices found in {filepath}")
@@ -454,17 +437,17 @@ class SimplicialComplex:
                     
                     # Validate shape matches expected dimensions
                     expected_shape = (len(complex._simplices.get(k-1, [])), 
-                                      len(complex._simplices.get(k, [])))
-                    # if k == 0:
-                    #     expected_shape = (0, len(complex._simplices[0]))
+                                    len(complex._simplices.get(k, [])))
                     
                     if shape != expected_shape:
                         print(f"Warning: Incidence matrix D_{k} shape mismatch. "
-                              f"Expected {expected_shape}, got {shape}. Skipping.")
+                            f"Expected {expected_shape}, got {shape}. Skipping.")
                         continue
                     
-                    # Reconstruct sparse matrix and store in cache
+                    # Reconstruct sparse matrix
                     D_k = sparse.csr_matrix((data, indices, indptr), shape=shape)
+                    
+                    # Store in cache
                     complex._incidence_cache[k] = D_k
                     
                 except (KeyError, OSError):
