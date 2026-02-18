@@ -190,7 +190,7 @@ class SimplicialComplex:
         -----
         - Called automatically on construction if validate=True.
         - Can be called manually after loading from file.
-        - Does NOT check boundary property (∂∂=0) as that requires
+        - Does NOT check boundary property (D_k @ D_{k+1} = 0) as that requires
           computing all incidence matrices (expensive).
         """
         from .validation import (
@@ -202,7 +202,7 @@ class SimplicialComplex:
 
     def check_boundary_property(self, tol: float = 1e-10) -> dict[int, bool]:
         """
-        Verify ∂∂ = 0 (D_k @ D_{k+1} = 0) for all k.
+        Verify D_k @ D_{k+1} = 0 for all k.
 
         Parameters
         ----------
@@ -220,9 +220,20 @@ class SimplicialComplex:
         - Computationally expensive: computes all incidence matrices.
         - Primarily useful for testing correctness of implementation.
         - NOT called during validate() due to computational cost.
+        - Pre-populates cache before validation to avoid redundant computation.
         """
         from .validation import check_boundary_property
-        return check_boundary_property(self._simplices, tol)
+        
+        # Pre-compute all incidence matrices to populate cache and pass to validation
+        for k in range(self.max_dim + 1):
+            _ = self.incidence_matrix(k)
+        
+        # Pass cache to validation function
+        return check_boundary_property(
+            self._simplices, 
+            tol,
+            incidence_matrices=self._incidence_cache
+        )
 
     def summary(self) -> str:
         """
@@ -237,19 +248,51 @@ class SimplicialComplex:
         -----
         Useful for debugging and quick inspection in notebooks.
         """
-        lines = [
-            f"SimplicialComplex (dim={self.max_dim})",
-            f"  f-vector: {self.f_vector}",
-            f"  Euler characteristic: {self.euler_characteristic}"
-        ]
-        if 'construction' in self.metadata:
-            lines.append(f"  Construction: {self.metadata['construction']}")
+        lines = [] 
+        
+        # Simplices summary
+        simplex_names = {
+            0: "vertices",
+            1: "edges",
+            2: "triangles",
+            3: "tetrahedra",
+        }
+        
+        lines.append('Simplices:')
+        lines.append("-" * 40)
+        lines.append(f"{'k':<4} {'k-simplex':<15} {'count':<10}")
+        lines.append("-" * 40)
+        
+        for k in range(self.max_dim + 1):
+            name = simplex_names.get(k, f"{k}-simplices")
+            count = len(self._simplices[k])
+            lines.append(f"{k:<4} {name:<15} {count:<10}")
+        
+        lines.append("-" * 40)
+
+        # Incidence matrix summary
+        lines.append('\nIncidence Matrices:')
+        lines.append("-" * 40)
+        lines.append(f"{'k':<4} {'D_k computed':<15} {'shape':<20}")
+        lines.append("-" * 40)
+        
+        for k in range(1, self.max_dim + 2):
+            computed = k in self._incidence_cache
+            if computed:
+                shape = self._incidence_cache[k].shape
+                lines.append(f"{k:<4} {str(computed):<15} {str(shape):<20}")
+            else:
+                lines.append(f"{k:<4} {str(computed):<15} {'':<20}")
+        
+        lines.append("-" * 40)
+        lines.append("")
+        
         return '\n'.join(lines)
 
     def __repr__(self) -> str:
         """Concise representation for debugging."""
         return (f"SimplicialComplex(dim={self.max_dim}, "
-                f"f_vector={self.f_vector}, χ={self.euler_characteristic})")
+                f"f_vector={self.f_vector}, χ={self.euler_characteristic}, hash={self.content_hash[:8]})")
     
     def __eq__(self, other: 'SimplicialComplex') -> bool:
         """
@@ -258,7 +301,19 @@ class SimplicialComplex:
         Two complexes are equal if they have the same simplices
         at each dimension (regardless of ordering or metadata).
         """
-        pass
+        if not isinstance(other, SimplicialComplex):
+            return False
+        
+        # Check if dimensions match
+        if self._simplices.keys() != other._simplices.keys():
+            return False
+        
+        # Check if simplices match at each dimension (order-independent)
+        for k in self._simplices.keys():
+            if set(self._simplices[k]) != set(other._simplices[k]):
+                return False
+        
+        return True
 
     def __hash__(self) -> int:
         """
@@ -272,7 +327,8 @@ class SimplicialComplex:
         - Can be expensive for large complexes.
         - Primarily intended for testing and small examples.
         """
-        pass
+        # Use first 16 hex digits (64 bits) of content hash
+        return int(self.content_hash[:16], 16)
 
     # =========================================================================
     # I/O Methods
@@ -342,4 +398,20 @@ class SimplicialComplex:
         Hash is based on canonical string representation of all simplices,
         ensuring consistency across different orderings.
         """
-        pass
+        import hashlib
+        
+        # Build canonical string representation
+        # Format: dimension -> sorted list of sorted simplices
+        hash_parts = []
+        
+        for k in sorted(self._simplices.keys()):
+            # Sort simplices at this dimension for canonical ordering
+            sorted_simplices = sorted(self._simplices[k])
+            # Convert to string representation
+            hash_parts.append(f"{k}:{sorted_simplices}")
+        
+        # Combine into single string
+        canonical_str = "|".join(hash_parts)
+        
+        # Compute SHA-256 hash
+        return hashlib.sha256(canonical_str.encode()).hexdigest()
