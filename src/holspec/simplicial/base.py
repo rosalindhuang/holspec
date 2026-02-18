@@ -10,6 +10,7 @@ from pathlib import Path
 import numpy as np
 from scipy import sparse
 
+from holspec.utilities import save_h5, read_h5, convert_numpy_to_python
 
 class SimplicialComplex:
     """
@@ -55,6 +56,8 @@ class SimplicialComplex:
     ):
         # Store simplices (defensive copy)
         self._simplices = {k: list(simps) for k, simps in simplices.items()}
+        # Normalize numpy types to native Python types
+        self._simplices = convert_numpy_to_python(self._simplices)
         
         # Initialize metadata
         self._metadata = metadata if metadata is not None else {}
@@ -76,7 +79,7 @@ class SimplicialComplex:
     @property
     def simplices(self) -> dict[int, list[tuple]]:
         """Simplices at each dimension (read-only)."""
-        return self._simplices
+        return {k: list(simps) for k, simps in self._simplices.items()}
 
     @property
     def metadata(self) -> dict:
@@ -174,7 +177,7 @@ class SimplicialComplex:
         return self.incidence_matrix(k)
 
     # =========================================================================
-    # Validation and Testing Utilities
+    # Validation
     # =========================================================================
 
     def validate(self) -> None:
@@ -235,6 +238,277 @@ class SimplicialComplex:
             incidence_matrices=self._incidence_cache
         )
 
+    # =========================================================================
+    # I/O Methods
+    # =========================================================================
+
+    def save(
+        self,
+        filepath: str | Path,
+        save_incidence: bool = False,
+        mode: str = 'replace',
+        group: str | None = None,
+        hdf5_options: dict | None = None
+    ) -> str:
+        """
+        Save complex to HDF5 file.
+
+        Parameters
+        ----------
+        filepath : str or Path
+            Output file path.
+        save_incidence : bool, default=False
+            Whether to save cached incidence matrices.
+            Only saves matrices that have been computed (in cache).
+        mode : {'replace', 'update', 'create'}, default='replace'
+            How to handle existing file/group (see save_h5 for details).
+        group : str, optional
+            HDF5 group path for the data. If None, saves at root level.
+        hdf5_options : dict, optional
+            Additional HDF5 options. Default: {'compression': 'gzip', 'compression_opts': 4}.
+            Pass {'compression': None} to disable compression.
+
+        Returns
+        -------
+        content_hash : str
+            Content hash of saved complex for verification.
+
+        Format
+        ------
+        - Root attributes: max_dim, f_vector, content_hash, has_incidence, metadata
+        - /simplices/k: subgroups containing k-simplices as datasets
+        - /incidence/k/: subgroups with CSR components (if save_incidence=True)
+        """
+        filepath = Path(filepath)
+        
+        # Set default compression if not specified
+        if hdf5_options is None:
+            hdf5_options = {'compression': 'gzip', 'compression_opts': 4}
+        
+        # Helper to construct subgroup paths
+        def subgroup_path(subpath: str) -> str:
+            return f"{group}/{subpath}" if group else subpath
+        
+        # Save root-level attributes
+        root_attributes = {
+            'max_dim': self.max_dim,
+            'f_vector': self.f_vector,
+            'content_hash': self.content_hash,
+            'has_incidence': save_incidence and bool(self._incidence_cache),
+            'metadata': self.metadata
+        }
+        
+        save_h5(
+            filepath,
+            datasets=None,  # Only attributes at root
+            attributes=root_attributes,
+            mode=mode,
+            group=group,
+            hdf5_options=hdf5_options
+        )
+        
+        # Save simplices to subgroups
+        for k, simps in self._simplices.items():
+            # Convert list of tuples to (n_k, k+1) array
+            simplex_array = np.array(simps, dtype=int)
+            
+            save_h5(
+                filepath,
+                datasets={str(k): simplex_array},
+                attributes=None,
+                mode=mode,
+                group=subgroup_path(f'simplices/{k}'),
+                hdf5_options=hdf5_options
+            )
+        
+        # Save incidence matrices to subgroups (if requested)
+        if save_incidence and self._incidence_cache:
+            for k, D_k in self._incidence_cache.items():
+                # Convert to CSR format
+                D_k_csr = D_k.tocsr()
+                
+                # Prepare datasets and attributes for this incidence matrix
+                inc_datasets = {
+                    'data': D_k_csr.data,
+                    'indices': D_k_csr.indices,
+                    'indptr': D_k_csr.indptr
+                }
+                inc_attributes = {
+                    'shape': D_k_csr.shape,
+                    'nnz': D_k_csr.nnz
+                }
+                
+                save_h5(
+                    filepath,
+                    datasets=inc_datasets,
+                    attributes=inc_attributes,
+                    mode=mode,
+                    group=subgroup_path(f'incidence/{k}'),
+                    hdf5_options=hdf5_options
+                )
+        
+        return self.content_hash
+
+    @classmethod
+    def load(
+        cls,
+        filepath: str | Path,
+        group: str | None = None,
+        validate_hash: bool = True,
+        load_incidence: bool = True
+    ) -> 'SimplicialComplex':
+        """
+        Load complex from HDF5 file.
+
+        Parameters
+        ----------
+        filepath : str or Path
+            Path to HDF5 file created by save().
+        group : str, optional
+            HDF5 group path for the data.
+        validate_hash : bool, default=True
+            Whether to verify content hash after loading.
+        load_incidence : bool, default=True
+            Whether to load and cache incidence matrices if available.
+            If False, incidence matrices are skipped and computed on demand.
+
+        Returns
+        -------
+        complex : SimplicialComplex
+            Loaded complex instance.
+
+        Raises
+        ------
+        ValueError
+            If file format is invalid or hash validation fails.
+        """
+        filepath = Path(filepath)
+        
+        # Helper to construct subgroup paths
+        def subgroup_path(subpath: str) -> str:
+            return f"{group}/{subpath}" if group else subpath
+        
+        # Read root-level attributes
+        _, attributes = read_h5(filepath, group=group)
+        
+        # Extract and validate metadata
+        metadata = attributes.get('metadata', {})
+        
+        if 'max_dim' not in attributes:
+            raise ValueError(f"Missing 'max_dim' in {filepath}")
+        max_dim = attributes['max_dim']
+        
+        # Read simplices from subgroups
+        simplices = {}
+        for k in range(max_dim + 1):
+            datasets, _ = read_h5(filepath, group=subgroup_path(f'simplices/{k}'))
+            
+            # Get simplices dataset (named str(k) in simplices/{k})
+            label = str(k)
+            if label not in datasets:
+                raise ValueError(f"Missing dataset '{k}' in simplices/{k} group")
+            data = datasets[label]
+
+            # Convert (n_k, k+1) array to list of tuples
+            simplices[k] = [tuple(row) for row in data]
+        
+        if not simplices:
+            raise ValueError(f"No simplices found in {filepath}")
+        
+        # Create complex without validation (data already validated when saved)
+        complex = cls(simplices, metadata=metadata, validate=False)
+        
+        # Validate content hash if requested
+        if validate_hash:
+            if 'content_hash' not in attributes:
+                print(f"Warning: No 'content_hash' in {filepath}, skipping validation")
+            else:
+                stored_hash = str(attributes['content_hash'])
+                computed_hash = complex.content_hash
+                if computed_hash != stored_hash:
+                    raise ValueError(
+                        f"Content hash mismatch in {filepath}: "
+                        f"expected {stored_hash}, got {computed_hash}"
+                    )
+        
+        # Load incidence matrices if available and requested
+        has_incidence = attributes.get('has_incidence', False)
+        if has_incidence and load_incidence:
+            # Try loading each possible incidence matrix
+            for k in range(max_dim + 1):
+                try:
+                    datasets, inc_attrs = read_h5(
+                        filepath, 
+                        group=subgroup_path(f'incidence/{k}')
+                    )
+                    
+                    # Extract CSR components
+                    if 'data' not in datasets or 'indices' not in datasets or 'indptr' not in datasets:
+                        print(f"Warning: Incomplete incidence matrix D_{k}, skipping")
+                        continue
+                    
+                    data = datasets['data']
+                    indices = datasets['indices']
+                    indptr = datasets['indptr']
+                    shape = tuple(inc_attrs['shape'])
+                    
+                    # Validate shape matches expected dimensions
+                    expected_shape = (len(complex._simplices.get(k-1, [])), 
+                                      len(complex._simplices.get(k, [])))
+                    # if k == 0:
+                    #     expected_shape = (0, len(complex._simplices[0]))
+                    
+                    if shape != expected_shape:
+                        print(f"Warning: Incidence matrix D_{k} shape mismatch. "
+                              f"Expected {expected_shape}, got {shape}. Skipping.")
+                        continue
+                    
+                    # Reconstruct sparse matrix and store in cache
+                    D_k = sparse.csr_matrix((data, indices, indptr), shape=shape)
+                    complex._incidence_cache[k] = D_k
+                    
+                except (KeyError, OSError):
+                    # Group doesn't exist - this is fine, not all k may have been saved
+                    continue
+        
+        return complex
+    
+    # =========================================================================
+    # Utilities and Protocols
+    # =========================================================================
+
+    def _compute_content_hash(self) -> str:
+        """
+        Compute SHA-256 hash of simplex structure.
+
+        Returns
+        -------
+        hash : str
+            Hexadecimal hash string.
+
+        Notes
+        -----
+        Hash is based on canonical string representation of all simplices,
+        ensuring consistency across different orderings.
+        """
+        import hashlib
+        
+        # Build canonical string representation
+        # Format: dimension -> sorted list of sorted simplices
+        hash_parts = []
+        
+        for k in sorted(self._simplices.keys()):
+            # Sort simplices at this dimension for canonical ordering
+            sorted_simplices = sorted(self._simplices[k])
+            # Convert to string representation
+            hash_parts.append(f"{k}:{sorted_simplices}")
+        
+        # Combine into single string
+        canonical_str = "|".join(hash_parts)
+        
+        # Compute SHA-256 hash
+        return hashlib.sha256(canonical_str.encode()).hexdigest()
+    
     def summary(self) -> str:
         """
         Generate human-readable summary of the complex.
@@ -276,7 +550,7 @@ class SimplicialComplex:
         lines.append(f"{'k':<4} {'D_k computed':<15} {'shape':<20}")
         lines.append("-" * 40)
         
-        for k in range(1, self.max_dim + 2):
+        for k in range(1, self.max_dim + 1):
             computed = k in self._incidence_cache
             if computed:
                 shape = self._incidence_cache[k].shape
@@ -329,89 +603,3 @@ class SimplicialComplex:
         """
         # Use first 16 hex digits (64 bits) of content hash
         return int(self.content_hash[:16], 16)
-
-    # =========================================================================
-    # I/O Methods
-    # =========================================================================
-
-    def save(self, filepath: str | Path) -> None:
-        """
-        Save complex to HDF5 file.
-
-        Parameters
-        ----------
-        filepath : str or Path
-            Output file path.
-
-        Format
-        ------
-        - /simplices/k: datasets containing k-simplices as (n_k, k+1) arrays
-        - /metadata: attributes containing metadata dict
-        - /f_vector: dataset with face counts
-        - /content_hash: attribute with structure hash
-        """
-        pass
-
-    @classmethod
-    def load(
-        cls,
-        filepath: str | Path,
-        validate_hash: bool = True
-    ) -> 'SimplicialComplex':
-        """
-        Load complex from HDF5 file.
-
-        Parameters
-        ----------
-        filepath : str or Path
-            Path to HDF5 file created by save().
-        validate_hash : bool, default=True
-            Whether to verify content hash after loading.
-
-        Returns
-        -------
-        complex : SimplicialComplex
-            Loaded complex instance.
-
-        Raises
-        ------
-        ValueError
-            If validate_hash=True and hash mismatch detected.
-        """
-        pass
-
-    # =========================================================================
-    # Private Utilities
-    # =========================================================================
-
-    def _compute_content_hash(self) -> str:
-        """
-        Compute SHA-256 hash of simplex structure.
-
-        Returns
-        -------
-        hash : str
-            Hexadecimal hash string.
-
-        Notes
-        -----
-        Hash is based on canonical string representation of all simplices,
-        ensuring consistency across different orderings.
-        """
-        import hashlib
-        
-        # Build canonical string representation
-        # Format: dimension -> sorted list of sorted simplices
-        hash_parts = []
-        
-        for k in sorted(self._simplices.keys()):
-            # Sort simplices at this dimension for canonical ordering
-            sorted_simplices = sorted(self._simplices[k])
-            # Convert to string representation
-            hash_parts.append(f"{k}:{sorted_simplices}")
-        
-        # Combine into single string
-        canonical_str = "|".join(hash_parts)
-        
-        # Compute SHA-256 hash
-        return hashlib.sha256(canonical_str.encode()).hexdigest()
