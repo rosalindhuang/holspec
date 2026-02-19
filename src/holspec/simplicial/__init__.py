@@ -29,6 +29,7 @@ __all__ = [
     # complex_builders.py
     'build_delaunay_complex',
     'build_alpha_complex',
+    'build_vr_complex',
 
     # validation.py
     'validate_simplices_structure',

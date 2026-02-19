@@ -11,7 +11,6 @@ from scipy.spatial import Delaunay
 from .base import SimplicialComplex
 from .simplex import compute_simplicial_closure, compute_circumradius
 from holspec.utilities.validation import validate_positions
-from holspec.utilities.numerical import compute_content_hash
 
 
 # =============================================================================
@@ -75,9 +74,6 @@ def build_delaunay_complex(
     N, d = positions.shape
     validate_positions(positions, min_points=d + 1)
     
-    # Compute input hash for provenance
-    input_hash = compute_content_hash(positions)
-    
     # Compute Delaunay triangulation
     delaunay = Delaunay(positions)
     
@@ -93,18 +89,16 @@ def build_delaunay_complex(
         simplices = {k: simps for k, simps in simplices.items() if k <= max_dim}
     
     # Build metadata
-    complex_metadata = metadata.copy() if metadata is not None else {}
-    complex_metadata.update({
+    meta = metadata.copy() if metadata is not None else {}
+    meta.update({
         'construction_method': 'delaunay',
-        'construction_config': {
-            'input_type': 'positions',
-            'input_shape': (N, d),
-        },
-        'input_hash': input_hash,
+        'num_input_points': N,
+        'ambient_dimension': d,
+        'max_dim': max_dim if max_dim is not None else d,
     })
     
     # Construct and return SimplicialComplex
-    return SimplicialComplex(simplices, metadata=complex_metadata, validate=validate)
+    return SimplicialComplex(simplices, metadata=meta, validate=validate)
 
 
 def build_alpha_complex(
