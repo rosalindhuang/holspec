@@ -1,11 +1,9 @@
 """
-Pure simplex operations.
-
-Functions for manipulating individual simplices without reference
-to the full complex structure.
+Operations and computations on simplices.
 """
 
 from itertools import combinations
+import numpy as np
 
 
 def get_faces(simplex: tuple, face_dim: int) -> list[tuple]:
@@ -104,6 +102,134 @@ def get_boundary(simplex: tuple) -> list[tuple[tuple, int]]:
     ]
 
 
+def compute_simplicial_closure(
+    simplices: list[tuple] | dict[int, list[tuple]]
+) -> dict[int, list[tuple]]:
+    """
+    Compute face closure of a set of simplices.
+    
+    Given an arbitrary collection of simplices, returns the smallest simplicial
+    complex containing all input simplices. This adds all faces of the input
+    simplices to satisfy the face closure property.
+    
+    Parameters
+    ----------
+    simplices : list[tuple] or dict[int, list[tuple]]
+        Input simplices. Can be either:
+        - A flat list of simplices as tuples (any dimensions mixed together)
+        - A dictionary mapping dimension k to list of k-simplices
+        
+    Returns
+    -------
+    closed_simplices : dict[int, list[tuple]]
+        Complete simplicial complex with face closure satisfied.
+        Dictionary maps dimension k to list of k-simplices as sorted tuples.
+        
+    Examples
+    --------
+    >>> # Single triangle
+    >>> simplices = [(0, 1, 2)]
+    >>> compute_simplicial_closure(simplices)
+    {0: [(0,), (1,), (2,)], 1: [(0,1), (0,2), (1,2)], 2: [(0,1,2)]}
+    
+    >>> # Mixed dimensions - automatically fills in missing faces
+    >>> simplices = {2: [(0, 1, 2)], 1: [(3, 4)]}
+    >>> compute_simplicial_closure(simplices)
+    {0: [(0,), (1,), (2,), (3,), (4,)], 1: [(0,1), (0,2), (1,2), (3,4)], 2: [(0,1,2)]}
+    
+    Notes
+    -----
+    - Vertices are automatically canonicalized (sorted within each simplex)
+    - Duplicates are automatically removed
+    - Empty input returns empty dictionary
+    """
+    # Handle empty input
+    if not simplices:
+        return {}
+    
+    # Normalize input to dictionary format with canonicalized simplices
+    if isinstance(simplices, list):
+        # Convert list to dict, grouping by dimension
+        simplices_dict = {}
+        for simplex in simplices:
+            # Canonicalize: sort vertices
+            canonical = tuple(sorted(simplex))
+            k = len(canonical) - 1
+            if k not in simplices_dict:
+                simplices_dict[k] = []
+            simplices_dict[k].append(canonical)
+    elif isinstance(simplices, dict):
+        # Canonicalize dict input
+        simplices_dict = {
+            k: [tuple(sorted(s)) for s in simps]
+            for k, simps in simplices.items()
+        }
+    else:
+        raise TypeError(
+            f"simplices must be a list or dict, got {type(simplices).__name__}"
+        )
+    
+    # Use sets to store simplices at each dimension (automatically handles duplicates)
+    simplex_sets = {k: set(simps) for k, simps in simplices_dict.items()}
+    
+    # Determine max dimension
+    max_dim = max(simplex_sets.keys())
+    
+    # Initialize sets for all dimensions (including those that might be empty initially)
+    for k in range(max_dim + 1):
+        if k not in simplex_sets:
+            simplex_sets[k] = set()
+    
+    # Extract faces iteratively from high to low dimension
+    for k in range(max_dim, 0, -1):  # k = max_dim down to 1
+        for simplex in simplex_sets[k]:
+            # Extract all (k-1)-faces and add to lower dimension set
+            faces = get_faces(simplex, k - 1)
+            simplex_sets[k - 1].update(faces)
+    
+    # Convert sets back to sorted lists, excluding empty dimensions
+    result = {
+        k: sorted(list(simplex_sets[k]))
+        for k in range(max_dim + 1)
+        if simplex_sets[k]  # Only include non-empty dimensions
+    }
+    
+    return result
+
+
+def compute_circumradius(simplex_vertices: np.ndarray) -> float:
+    """
+    Compute circumradius of a simplex.
+    
+    Parameters
+    ----------
+    simplex_vertices : np.ndarray, shape (k+1, d)
+        Vertex positions of a k-simplex in d-dimensional space.
+        
+    Returns
+    -------
+    radius : float
+        Circumradius of the simplex.
+        
+    Notes
+    -----
+    - For a d-simplex in d dimensions (full-dimensional), circumcenter is unique.
+    - For lower-dimensional simplices (k < d), computes circumradius in the
+      affine subspace spanned by the simplex.
+    - Uses stable numerical algorithm for degenerate or near-degenerate cases.
+    - For a single vertex (0-simplex), returns 0.
+    - For an edge (1-simplex), returns half the edge length.
+    
+    Examples
+    --------
+    >>> # Equilateral triangle with side length 2
+    >>> vertices = np.array([[0, 0], [2, 0], [1, np.sqrt(3)]])
+    >>> compute_circumradius(vertices)
+    1.1547...  # 2/sqrt(3)
+    """
+    pass
+
+
 #%% Combinatorial utilities
 
 def compute_permutation_sign(seq_a: tuple, seq_b: tuple) -> int:
@@ -177,14 +303,7 @@ if __name__ == "__main__":
     for j in range(k+1):
         faces = get_faces(simplex, j)
         num_faces = len(faces)
-        
-        if num_faces <= 10:
-            faces_str = str(faces)
-        else:
-            faces_preview = faces[:10]
-            faces_str = str(faces_preview)[:-1] + ", ...]"
-        
-        print(f"{j:<5} {num_faces:<8} {faces_str}")
+        print(f"{j:<5} {num_faces:<8} {faces}")
     print()
 
 
@@ -208,3 +327,11 @@ if __name__ == "__main__":
         sign_str = '+' if sign == 1 else '-'
         print(f"{sign_str:<6} {perm}")
     print()
+
+    # Simplicial closure
+    print(f"Simplicial closure:")
+    print(f"{'Dim':<5} {'Count':<8} {'Simplices'}")
+    print("-" * 60)
+    closed_simplices = compute_simplicial_closure([simplex])
+    for k, simplices in closed_simplices.items():
+        print(f"{k:<5} {len(simplices):<8} {simplices}")

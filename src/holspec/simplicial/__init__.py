@@ -19,13 +19,16 @@ __all__ = [
     'get_faces',
     'compute_orientation_sign',
     'get_boundary',
+    'compute_simplicial_closure',
+    'compute_circumradius',
     'compute_permutation_sign',
 
     # incidence.py
     'compute_incidence_matrix',
 
-    # Utilities
     # complex_builders.py
+    'build_delaunay_complex',
+    'build_alpha_complex',
 
     # validation.py
     'validate_simplices_structure',
