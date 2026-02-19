@@ -19,6 +19,7 @@ __all__ = [
     
     # validation.py
     'validate_positions',
+    'validate_distances',
 
     # numerical.py
     'compute_content_hash',

@@ -13,7 +13,7 @@ from pathlib import Path
 from scipy.spatial.distance import pdist, squareform
 
 from holspec.point_data.point_generators import generate_from_config
-from holspec.utilities import save_h5, read_h5, compute_content_hash, add_noise
+from holspec.utilities import save_h5, read_h5, compute_content_hash, add_noise, validate_positions, validate_distances
 
 
 class PointData:
@@ -56,11 +56,11 @@ class PointData:
         
         # Store and validate primary data
         if positions is not None:
-            self._validate_positions(positions)
+            validate_positions(positions, min_points=1)
             self._positions = positions
             self._distances = None
         else:
-            self._validate_distances(distances)
+            validate_distances(distances)
             self._positions = None
             self._distances = distances
         
@@ -74,32 +74,6 @@ class PointData:
         # Auto-set creation time if not already present
         if 'creation_time' not in self.metadata:
             self.metadata['creation_time'] = datetime.now().isoformat()
-    
-    @staticmethod
-    def _validate_positions(positions: np.ndarray) -> None:
-        """Validate position array."""
-        if positions.ndim != 2:
-            raise ValueError(f"Positions must be 2D array, got shape {positions.shape}")
-        if positions.shape[0] < 1:
-            raise ValueError("Must have at least 1 point")
-    
-    @staticmethod
-    def _validate_distances(distances: np.ndarray) -> None:
-        """Validate distance matrix."""
-        if distances.ndim != 2:
-            raise ValueError(f"Distances must be 2D array, got shape {distances.shape}")
-        
-        N = distances.shape[0]
-        if distances.shape[1] != N:
-            raise ValueError("Distance matrix must be square")
-        
-        # Use reasonable tolerance for floating point comparisons
-        if not np.allclose(distances, distances.T, rtol=1e-10, atol=1e-10):
-            raise ValueError("Distance matrix must be symmetric")
-        if not np.allclose(np.diag(distances), 0, atol=1e-10):
-            raise ValueError("Diagonal must be zero")
-        if np.any(distances < -1e-10):
-            raise ValueError("Distances must be non-negative")
     
     # =========================================================================
     # Properties
