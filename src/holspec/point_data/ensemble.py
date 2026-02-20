@@ -13,7 +13,7 @@ from datetime import datetime
 import h5py
 
 from holspec.point_data.base import PointData
-from holspec.point_data.point_generators import generate_from_config
+from holspec.point_data.point_generators import generate_points_from_config
 from holspec.utilities import save_h5, read_h5, initialize_h5, add_noise
 
 
@@ -239,7 +239,7 @@ class PointDataEnsemble:
             raise ValueError("noise_config must include 'scale'")
         
         # Generate base positions once
-        base_positions = generate_from_config(base_config)
+        base_positions = generate_points_from_config(base_config)
         
         # Generate noise realizations
         members = []

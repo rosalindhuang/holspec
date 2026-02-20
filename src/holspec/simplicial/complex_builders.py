@@ -13,6 +13,7 @@ from .base import SimplicialComplex
 from .simplex import compute_simplicial_closure
 from holspec.utilities.validation import validate_positions, validate_distances
 from holspec.utilities.numerical import compute_content_hash
+from holspec.utilities import format_float_str
 
 
 # =============================================================================
@@ -403,4 +404,159 @@ def _extract_simplices_from_gudhi_tree(
     
     # Return with dimensions and simplices in sorted order for determinism
     return {k: sorted(simplices[k]) for k in sorted(simplices)}
+
+
+# =============================================================================
+# Registry and Config-Driven Utilities
+# =============================================================================
+
+COMPLEX_BUILDER_REGISTRY: dict[str, callable] = {
+    'delaunay': build_delaunay_complex,
+    'alpha': build_alpha_complex,
+    'vietoris_rips': build_vr_complex,
+}
+
+COMPLEX_BUILDER_ABBREV: dict[str, str] = {
+    'delaunay': 'del',
+    'alpha': 'alp',
+    'vietoris_rips': 'vr',
+}
+
+
+def build_complex_from_config(
+    config: dict,
+    positions: np.ndarray | None = None,
+    distances: np.ndarray | None = None,
+    metadata: dict | None = None,
+    validate: bool = True,
+) -> SimplicialComplex:
+    """
+    Build a simplicial complex from a method config and input data.
+
+    Parameters
+    ----------
+    config : dict
+        Must contain 'method' (str) and 'params' (dict). E.g.:
+          {'method': 'delaunay', 'params': {'max_dim': 2}}
+          {'method': 'alpha', 'params': {'alpha': 1.5, 'max_dim': 2}}
+          {'method': 'vietoris_rips', 'params': {'epsilon': 1.2, 'max_dim': 2}}
+    positions : np.ndarray, shape (N, d), optional
+        Point positions. Required for 'delaunay' and 'alpha'.
+    distances : np.ndarray, shape (N, N), optional
+        Pairwise distance matrix. Only used with 'vietoris_rips'.
+    metadata : dict, optional
+        Additional metadata forwarded to the builder.
+    validate : bool, default=True
+        Whether to validate the resulting complex structure.
+
+    Returns
+    -------
+    complex : SimplicialComplex
+    """
+    # Validate config
+    if 'method' not in config:
+        raise ValueError("config must contain a 'method' key")
+    if 'params' not in config:
+        raise ValueError("config must contain a 'params' key")
+
+    method = config['method']
+    params = config['params']
+
+    if method not in COMPLEX_BUILDER_REGISTRY:
+        raise ValueError(
+            f"Unknown method '{method}'. "
+            f"Available methods: {list(COMPLEX_BUILDER_REGISTRY)}"
+        )
+
+    builder = COMPLEX_BUILDER_REGISTRY[method]
+
+    # vietoris_rips uses keyword-only positions/distances;
+    # delaunay and alpha take positions as a positional argument.
+    if method == 'vietoris_rips':
+        return builder(
+            positions=positions,
+            distances=distances,
+            metadata=metadata,
+            validate=validate,
+            **params,
+        )
+    else:
+        if positions is None:
+            raise ValueError(f"positions is required for method '{method}'")
+        return builder(
+            positions,
+            metadata=metadata,
+            validate=validate,
+            **params,
+        )
+
+
+def create_complex_builder_label(
+    config: dict,
+    float_fmt: str | None = 'g',
+) -> str:
+    """
+    Create a descriptive label from a complex builder config.
+
+    Label format: method_param1_param2...
+    Method names are abbreviated per COMPLEX_BUILDER_ABBREV ('del', 'alp', 'vr').
+    Parameter names are abbreviated to their first two non-underscore characters.
+    Floats are formatted with ``float_fmt``. None values are omitted.
+
+    Parameters
+    ----------
+    config : dict
+        Must contain 'method' (str) and 'params' (dict).
+    float_fmt : str or None, default='g'
+        Format specifier for float values (e.g. 'g', '.2e', '.3f').
+
+    Returns
+    -------
+    label : str
+
+    Examples
+    --------
+    >>> create_complex_builder_label({'method': 'delaunay', 'params': {'max_dim': 2}})
+    'del_md2'
+    >>> create_complex_builder_label({'method': 'alpha', 'params': {'alpha': 1.5, 'max_dim': 2}})
+    'alp_al1p5_md2'
+    >>> create_complex_builder_label({'method': 'vietoris_rips', 'params': {'epsilon': 1.2, 'max_dim': 2}})
+    'vr_ep1p2_md2'
+    """
+    # Validate config
+    if 'method' not in config:
+        raise ValueError("config must contain a 'method' key")
+    if 'params' not in config:
+        raise ValueError("config must contain a 'params' key")
+
+    method = config['method']
+    params = config['params']
+
+    if method not in COMPLEX_BUILDER_REGISTRY:
+        raise ValueError(
+            f"Unknown method '{method}'. "
+            f"Available methods: {list(COMPLEX_BUILDER_REGISTRY)}"
+        )
+
+    parts = [COMPLEX_BUILDER_ABBREV[method]]
+
+    for key, value in params.items():
+        # Skip None values — they represent 'use default / no constraint'
+        if value is None:
+            continue
+
+        param_abbr = key.replace('_', '')[:2]
+
+        if isinstance(value, bool):
+            value_str = '1' if value else '0'
+        elif isinstance(value, float):
+            value_str = format_float_str(value, float_fmt)
+        elif isinstance(value, str):
+            value_str = value[:4].lower().replace('_', '')
+        else:
+            value_str = str(value).replace('.', 'p')
+
+        parts.append(f"{param_abbr}{value_str}")
+
+    return '_'.join(parts)
 

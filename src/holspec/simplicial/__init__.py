@@ -30,6 +30,8 @@ __all__ = [
     'build_delaunay_complex',
     'build_alpha_complex',
     'build_vr_complex',
+    'build_complex_from_config',
+    'create_complex_builder_label',
 
     # validation.py
     'validate_simplices_structure',

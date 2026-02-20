@@ -319,7 +319,7 @@ def generate_cube_vertices(
 
 # %% Utilities
 
-GENERATOR_MAP = {
+POINT_GENERATOR_REGISTRY = {
     'trilatthex': generate_triangular_lattice_hex,
     'trilattrect': generate_triangular_lattice_rect,
     'sqrlatt': generate_square_lattice,
@@ -331,7 +331,7 @@ GENERATOR_MAP = {
 }
 
 
-def generate_from_config(config: dict) -> np.ndarray:
+def generate_points_from_config(config: dict) -> np.ndarray:
     """
     Generate point data from configuration dictionary.
 
@@ -343,7 +343,7 @@ def generate_from_config(config: dict) -> np.ndarray:
     Returns
     -------
     positions : np.ndarray
-        Generated point positions.
+        Generated point positions. (May later extend to distances.)
     """
     # Validate config
     if 'generator' not in config:
@@ -355,16 +355,16 @@ def generate_from_config(config: dict) -> np.ndarray:
     params = config['params']
 
     # Get generator function
-    if generator_name not in GENERATOR_MAP:
+    if generator_name not in POINT_GENERATOR_REGISTRY:
         raise ValueError(f"Unknown generator: {generator_name}")
 
-    generator_func = GENERATOR_MAP[generator_name]
+    generator_func = POINT_GENERATOR_REGISTRY[generator_name]
 
     # Generate positions
     return generator_func(**params)
 
 
-def create_config_label(config: dict, dimension: int | None = None, float_fmt: str | None = 'g') -> str:
+def create_point_generator_label(config: dict, dimension: int | None = None, float_fmt: str | None = 'g') -> str:
     """
     Create a unique label from point data generation config.
     
@@ -386,11 +386,11 @@ def create_config_label(config: dict, dimension: int | None = None, float_fmt: s
     Examples
     --------
     >>> config = {'generator': 'trilatthex', 'params': {'n_rings': 4, 'spacing': 1.0}}
-    >>> create_config_label(config)
+    >>> create_point_generator_label(config)
     'trilatthex_nr4_sp1'
-    >>> create_config_label(config, dimension=2)
+    >>> create_point_generator_label(config, dimension=2)
     '2D_trilatthex_nr4_sp1'
-    >>> create_config_label(config, dimension=2, float_fmt='.2f')
+    >>> create_point_generator_label(config, dimension=2, float_fmt='.2f')
     '2D_trilatthex_nr4_sp1p00'
     """
     # Validate config

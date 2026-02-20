@@ -862,7 +862,6 @@ def plot_edges_3d(
             color=color, 
             linewidth=linewidth, 
             alpha=1,
-            zorder=-10,
             **kwargs
         )
     
@@ -924,7 +923,6 @@ def plot_triangles_3d(
             facecolor=color,
             edgecolor=edgecolor,
             alpha=alpha,
-            zorder=-20,
             **kwargs
         )
         ax.add_collection3d(poly)
@@ -992,7 +990,6 @@ def plot_tetrahedra_3d(
                 facecolor=color,
                 edgecolor=edgecolor,
                 alpha=alpha,
-                zorder=-30,
                 **kwargs
             )
             ax.add_collection3d(poly)

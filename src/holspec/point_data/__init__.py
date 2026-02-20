@@ -33,9 +33,9 @@ __all__ = [
     'generate_tetrahedron',
     'generate_cube_vertices',
 
-    'GENERATOR_MAP',
-    'generate_from_config',
-    'create_config_label'
+    'POINT_GENERATOR_REGISTRY',
+    'generate_points_from_config',
+    'create_point_generator_label'
 
     # loaders.py
     # TODO: Add loader functions to __all__ when implemented

@@ -12,7 +12,7 @@ import json
 from pathlib import Path
 from scipy.spatial.distance import pdist, squareform
 
-from holspec.point_data.point_generators import generate_from_config
+from holspec.point_data.point_generators import generate_points_from_config
 from holspec.utilities import save_h5, read_h5, compute_content_hash, add_noise, validate_positions, validate_distances
 
 
@@ -316,7 +316,7 @@ class PointData:
             If noise is applied, metadata includes 'noise_config' and 'seed' fields.
         """
         # Generate positions
-        positions = generate_from_config(config)
+        positions = generate_points_from_config(config)
         
         # Apply noise if requested
         if noise_config is not None:
