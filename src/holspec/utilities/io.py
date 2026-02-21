@@ -277,8 +277,29 @@ def get_keys_h5(
         return natsorted(keys) if sort else keys
 
 
-def inspect_h5(filepath: str | Path) -> None:
-    """Print the structure and attributes of an HDF5 file."""
+def inspect_h5(
+    filepath: str | Path, 
+    relative_to: Optional[str | Path] = None,
+    prefix: str = ''
+) -> None:
+    """
+    Print the structure and attributes of an HDF5 file.
+
+    Recursively prints groups, datasets (shape/dtype), and attributes (@key).
+
+    Parameters
+    ----------
+    filepath : str or Path
+        Path to the HDF5 file.
+    relative_to : str or Path, optional
+        If given, the printed header shows the path relative to this directory
+        instead of the full path.
+    prefix : str, default ''
+        String prepended to every printed line (e.g., '    ' to indent the whole block).
+    """
+    filepath = Path(filepath)
+    display_path = filepath.relative_to(relative_to) if relative_to is not None else filepath
+
     def summarize_attr(value):
         if isinstance(value, (str, bytes)):
             return f'(type={type(value).__name__}, len={len(value)})'
@@ -291,26 +312,26 @@ def inspect_h5(filepath: str | Path) -> None:
         else:
             return f'(type={type(value).__name__})'
 
-    def print_attrs(obj, prefix):
+    def print_attrs(obj, indent):
         for key, val in obj.attrs.items():
             summary = summarize_attr(val)
-            print(f"{prefix}@{key} {summary}")
+            print(f"{prefix}{indent}@{key} {summary}")
 
-    def print_h5_structure(name, obj, prefix=""):
+    def print_h5_structure(name, obj, indent=""):
         if isinstance(obj, h5py.Group):
-            print(f"{prefix}{name}/")
-            print_attrs(obj, prefix + "    ")
+            print(f"{prefix}{indent}{name}/")
+            print_attrs(obj, indent + "    ")
             for key in obj:
-                print_h5_structure(key, obj[key], prefix + "    ")
+                print_h5_structure(key, obj[key], indent + "    ")
         elif isinstance(obj, h5py.Dataset):
-            print(f"{prefix}{name} (shape={obj.shape}, dtype={obj.dtype})")
-            print_attrs(obj, prefix + "    ")
+            print(f"{prefix}{indent}{name} (shape={obj.shape}, dtype={obj.dtype})")
+            print_attrs(obj, indent + "    ")
     
     with h5py.File(filepath, 'r') as f:
-        print(f"{filepath}/")
-        print_attrs(f, prefix="    ")
+        print(f"{prefix}{display_path}/")
+        print_attrs(f, indent="    ")
         for key in f:
-            print_h5_structure(key, f[key], prefix="    ")
+            print_h5_structure(key, f[key], indent="    ")
 
 
 def repack_h5(
