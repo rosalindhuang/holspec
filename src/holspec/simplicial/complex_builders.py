@@ -9,10 +9,8 @@ import numpy as np
 from scipy.spatial import Delaunay
 import gudhi
 
-from .base import SimplicialComplex
 from .simplex import compute_simplicial_closure
 from holspec.utilities.validation import validate_positions, validate_distances
-from holspec.utilities.numerical import compute_content_hash
 from holspec.utilities import format_float_str
 
 
@@ -23,9 +21,7 @@ from holspec.utilities import format_float_str
 def build_delaunay_complex(
     positions: np.ndarray,
     max_dim: int | None = None,
-    metadata: dict | None = None,
-    validate: bool = True
-) -> SimplicialComplex:
+) -> dict[int, list[tuple]]:
     """
     Construct Delaunay triangulation as a simplicial complex.
     
@@ -41,17 +37,12 @@ def build_delaunay_complex(
         Maximum simplex dimension to include. If None, includes all dimensions
         up to the ambient dimension d. Use this to truncate to lower-dimensional
         skeleton (e.g., max_dim=1 for just vertices and edges).
-    metadata : dict, optional
-        Additional metadata to store with the complex. Construction parameters
-        are added automatically.
-    validate : bool, default=True
-        Whether to validate the resulting complex structure. Recommended to
-        keep True unless you're certain the construction is valid.
         
     Returns
     -------
-    complex : SimplicialComplex
-        The Delaunay complex, closed under taking faces, up to max_dim.
+    simplices : dict[int, list[tuple]]
+        Dictionary mapping dimension k to list of k-simplices as sorted tuples,
+        closed under taking faces, up to max_dim.
         
     Raises
     ------
@@ -69,16 +60,13 @@ def build_delaunay_complex(
     Examples
     --------
     >>> positions = np.array([[0, 0], [1, 0], [0.5, 0.5]])
-    >>> complex = build_delaunay_complex(positions)
-    >>> complex.f_vector
+    >>> simplices = build_delaunay_complex(positions)
+    >>> [len(s) for s in simplices.values()]
     [3, 3, 1]  # 3 vertices, 3 edges, 1 triangle
     """
     # Validate input positions
     N, d = positions.shape
     validate_positions(positions, min_points=d + 1)
-    
-    # Compute input hash for provenance
-    input_hash = compute_content_hash(positions)
     
     # Compute Delaunay triangulation
     delaunay = Delaunay(positions)
@@ -94,29 +82,14 @@ def build_delaunay_complex(
     if max_dim is not None:
         simplices = {k: simps for k, simps in simplices.items() if k <= max_dim}
     
-    # Build metadata
-    complex_metadata = metadata.copy() if metadata is not None else {}
-    complex_metadata.update({
-        'construction_method': 'delaunay',
-        'construction_config': {
-            'input_type': 'positions',
-            'input_shape': (N, d),
-            'max_dim': max_dim,
-        },
-        'input_hash': input_hash,
-    })
-    
-    # Construct and return SimplicialComplex
-    return SimplicialComplex(simplices, metadata=complex_metadata, validate=validate)
+    return simplices
 
 
 def build_alpha_complex(
     positions: np.ndarray,
     alpha: float | None = None,
     max_dim: int | None = None,
-    metadata: dict | None = None,
-    validate: bool = True
-) -> SimplicialComplex:
+) -> dict[int, list[tuple]]:
     """
     Construct alpha complex from point data using GUDHI.
     
@@ -135,16 +108,12 @@ def build_alpha_complex(
     max_dim : int, optional
         Maximum simplex dimension to include. If None, includes all dimensions
         up to the ambient dimension d.
-    metadata : dict, optional
-        Additional metadata to store with the complex. Construction parameters
-        are added automatically.
-    validate : bool, default=True
-        Whether to validate the resulting complex structure.
         
     Returns
     -------
-    complex : SimplicialComplex
-        The alpha complex, closed under taking faces, up to max_dim.
+    simplices : dict[int, list[tuple]]
+        Dictionary mapping dimension k to list of k-simplices as sorted tuples,
+        closed under taking faces, up to max_dim.
         
     Raises
     ------
@@ -166,10 +135,10 @@ def build_alpha_complex(
     Examples
     --------
     >>> positions = np.array([[0, 0], [1, 0], [0.5, 0.866]])
-    >>> cx = build_alpha_complex(positions)          # full complex
-    >>> cx.f_vector
+    >>> simplices = build_alpha_complex(positions)          # full complex
+    >>> [len(s) for s in simplices.values()]
     [3, 3, 1]
-    >>> cx_small = build_alpha_complex(positions, alpha=0.5)  # restrict by scale
+    >>> simplices_small = build_alpha_complex(positions, alpha=0.5)  # restrict by scale
     """
     # Validate input positions
     N, d = positions.shape
@@ -178,9 +147,6 @@ def build_alpha_complex(
     # Validate alpha parameter
     if alpha is not None and alpha < 0:
         raise ValueError(f'alpha must be non-negative, got {alpha}')
-    
-    # Compute input hash for provenance
-    input_hash = compute_content_hash(positions)
     
     # Compute max filtration value
     # Note: GUDHI uses (circumradius)^2; alpha=inf means no threshold
@@ -197,21 +163,7 @@ def build_alpha_complex(
         max_dim=max_dim
     )
     
-    # Build metadata
-    complex_metadata = metadata.copy() if metadata is not None else {}
-    complex_metadata.update({
-        'construction_method': 'alpha',
-        'construction_config': {
-            'input_type': 'positions',
-            'input_shape': (N, d),
-            'alpha': alpha,
-            'max_dim': max_dim,
-        },
-        'input_hash': input_hash,
-    })
-    
-    # Construct and return SimplicialComplex
-    return SimplicialComplex(simplices, metadata=complex_metadata, validate=validate)
+    return simplices
 
 
 def build_vr_complex(
@@ -220,9 +172,7 @@ def build_vr_complex(
     distances: np.ndarray | None = None,
     epsilon: float | None = None,
     max_dim: int | None = None,
-    metadata: dict | None = None,
-    validate: bool = True
-) -> SimplicialComplex:
+) -> dict[int, list[tuple]]:
     """
     Construct Vietoris-Rips complex from positions or distance matrix.
     
@@ -247,16 +197,12 @@ def build_vr_complex(
         Maximum simplex dimension to include. If None, includes all dimensions
         up to N-1 (clique complex). For large N, always set an explicit max_dim 
         to avoid combinatorial explosion.
-    metadata : dict, optional
-        Additional metadata to store with the complex. Construction parameters
-        are added automatically.
-    validate : bool, default=True
-        Whether to validate the resulting complex structure.
         
     Returns
     -------
-    complex : SimplicialComplex
-        The Vietoris-Rips complex, closed under taking faces, up to max_dim.
+    simplices : dict[int, list[tuple]]
+        Dictionary mapping dimension k to list of k-simplices as sorted tuples,
+        closed under taking faces, up to max_dim.
         
     Raises
     ------
@@ -275,14 +221,14 @@ def build_vr_complex(
     Examples
     --------
     >>> positions = np.array([[0, 0], [1, 0], [0.5, 0.866]])
-    >>> cx = build_vr_complex(positions=positions, epsilon=1.1, max_dim=2)
-    >>> cx.f_vector
+    >>> simplices = build_vr_complex(positions=positions, epsilon=1.1, max_dim=2)
+    >>> [len(s) for s in simplices.values()]
     [3, 3, 1]
     >>> # Using a pre-computed distance matrix
     >>> from scipy.spatial.distance import cdist
     >>> D = cdist(positions, positions)
-    >>> cx2 = build_vr_complex(distances=D, epsilon=1.1, max_dim=2)
-    >>> cx == cx2
+    >>> simplices2 = build_vr_complex(distances=D, epsilon=1.1, max_dim=2)
+    >>> simplices == simplices2
     True
     """
     # Validate input combination
@@ -303,17 +249,11 @@ def build_vr_complex(
     # Build GUDHI Rips complex
     if positions is not None:
         validate_positions(positions)
-        N, d = positions.shape
-        input_type = 'positions'
-        input_shape = (N, d)
-        input_hash = compute_content_hash(positions)
+        N = positions.shape[0]
         rips = gudhi.RipsComplex(points=positions, max_edge_length=epsilon)
     else:
         validate_distances(distances)
         N = distances.shape[0]
-        input_type = 'distances'
-        input_shape = (N, N)
-        input_hash = compute_content_hash(distances)
         rips = gudhi.RipsComplex(distance_matrix=distances, max_edge_length=epsilon)
     
     simplex_tree = rips.create_simplex_tree(
@@ -327,21 +267,7 @@ def build_vr_complex(
         max_dim=max_dim
     )
     
-    # Build metadata
-    complex_metadata = metadata.copy() if metadata is not None else {}
-    complex_metadata.update({
-        'construction_method': 'vietoris_rips',
-        'construction_config': {
-            'input_type': input_type,
-            'input_shape': input_shape,
-            'epsilon': epsilon,
-            'max_dim': max_dim,
-        },
-        'input_hash': input_hash,
-    })
-    
-    # Construct and return SimplicialComplex
-    return SimplicialComplex(simplices, metadata=complex_metadata, validate=validate)
+    return simplices
 
 
 # =============================================================================
@@ -416,10 +342,17 @@ COMPLEX_BUILDER_REGISTRY: dict[str, callable] = {
     'vietoris_rips': build_vr_complex,
 }
 
-COMPLEX_BUILDER_ABBREV: dict[str, str] = {
-    'delaunay': 'delaunay',
-    'alpha': 'alpha',
-    'vietoris_rips': 'vietoris_rips',
+# Aliases for complex builder methods
+COMPLEX_BUILDER_ALIASES: dict[str, list[str]] = {
+    'delaunay': ['del'],
+    'alpha': ['alp'],
+    'vietoris_rips': ['vr', 'rips'],
+}
+
+COMPLEX_BUILDER_ALIAS_MAP: dict[str, str] = {
+    alias: canonical
+    for canonical, aliases in COMPLEX_BUILDER_ALIASES.items()
+    for alias in aliases
 }
 
 
@@ -427,11 +360,9 @@ def build_complex_from_config(
     config: dict,
     positions: np.ndarray | None = None,
     distances: np.ndarray | None = None,
-    metadata: dict | None = None,
-    validate: bool = True,
-) -> SimplicialComplex:
+) -> dict[int, list[tuple]]:
     """
-    Build a simplicial complex from a method config and input data.
+    Build raw simplices from a method config and input data.
 
     Parameters
     ----------
@@ -444,14 +375,11 @@ def build_complex_from_config(
         Point positions. Required for 'delaunay' and 'alpha'.
     distances : np.ndarray, shape (N, N), optional
         Pairwise distance matrix. Only used with 'vietoris_rips'.
-    metadata : dict, optional
-        Additional metadata forwarded to the builder.
-    validate : bool, default=True
-        Whether to validate the resulting complex structure.
 
     Returns
     -------
-    complex : SimplicialComplex
+    simplices : dict[int, list[tuple]]
+        Dictionary mapping dimension k to list of k-simplices as sorted tuples.
     """
     # Validate config
     if 'method' not in config:
@@ -459,14 +387,13 @@ def build_complex_from_config(
     if 'params' not in config:
         raise ValueError("config must contain a 'params' key")
 
-    method = config['method']
-    params = config['params']
-
+    method = COMPLEX_BUILDER_ALIAS_MAP.get(config['method'], config['method'])
     if method not in COMPLEX_BUILDER_REGISTRY:
         raise ValueError(
-            f"Unknown method '{method}'. "
+            f"Unknown method '{config['method']}'. "
             f"Available methods: {list(COMPLEX_BUILDER_REGISTRY)}"
         )
+    params = config['params']
 
     builder = COMPLEX_BUILDER_REGISTRY[method]
 
@@ -476,8 +403,6 @@ def build_complex_from_config(
         return builder(
             positions=positions,
             distances=distances,
-            metadata=metadata,
-            validate=validate,
             **params,
         )
     else:
@@ -485,8 +410,6 @@ def build_complex_from_config(
             raise ValueError(f"positions is required for method '{method}'")
         return builder(
             positions,
-            metadata=metadata,
-            validate=validate,
             **params,
         )
 
@@ -500,7 +423,8 @@ def create_complex_builder_label(
     Create a descriptive label from a complex builder config.
 
     Label format: method_param1_param2...
-    Method names are abbreviated per COMPLEX_BUILDER_ABBREV ('del', 'alp', 'vr').
+    Method names are the full canonical registry names. Aliases (e.g. 'vr', 'del') are
+    resolved to their canonical form via COMPLEX_BUILDER_ALIAS_MAP.
     Parameter names are abbreviated to their first two non-underscore characters.
     Floats are formatted with ``float_fmt``. None values are omitted.
 
@@ -520,11 +444,13 @@ def create_complex_builder_label(
     Examples
     --------
     >>> create_complex_builder_label({'method': 'delaunay', 'params': {'max_dim': 2}})
-    'del_md2'
+    'delaunay_md2'
     >>> create_complex_builder_label({'method': 'alpha', 'params': {'alpha': 1.5, 'max_dim': 2}})
-    'alp_al1p5_md2'
+    'alpha_al1p5_md2'
     >>> create_complex_builder_label({'method': 'vietoris_rips', 'params': {'epsilon': 1.2, 'max_dim': 2}})
-    'vr_ep1p2_md2'
+    'vietoris_rips_ep1p2_md2'
+    >>> create_complex_builder_label({'method': 'vr', 'params': {'epsilon': 1.2, 'max_dim': 2}})  # alias works too
+    'vietoris_rips_ep1p2_md2'
     """
     # Validate config
     if 'method' not in config:
@@ -532,16 +458,15 @@ def create_complex_builder_label(
     if 'params' not in config:
         raise ValueError("config must contain a 'params' key")
 
-    method = config['method']
-    params = config['params']
-
+    method = COMPLEX_BUILDER_ALIAS_MAP.get(config['method'], config['method'])
     if method not in COMPLEX_BUILDER_REGISTRY:
         raise ValueError(
-            f"Unknown method '{method}'. "
+            f"Unknown method '{config['method']}'. "
             f"Available methods: {list(COMPLEX_BUILDER_REGISTRY)}"
         )
+    params = config['params']
 
-    parts = [COMPLEX_BUILDER_ABBREV[method]]
+    parts = [method]
 
     for key, value in params.items():
         # Skip None values — they represent 'use default / no constraint'

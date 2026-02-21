@@ -455,7 +455,80 @@ class SimplicialComplex:
                     continue
         
         return complex
-    
+
+    @classmethod
+    def from_point_data(
+        cls,
+        point_data: 'PointData',
+        config: dict,
+        metadata: dict | None = None,
+        validate: bool = True,
+    ) -> 'SimplicialComplex':
+        """
+        Construct a SimplicialComplex from a PointData object and a method config.
+
+        Parameters
+        ----------
+        point_data : PointData
+            Input data containing positions or distances.
+        config : dict
+            Must contain 'method' (str) and 'params' (dict). E.g.:
+              {'method': 'delaunay', 'params': {'max_dim': 2}}
+              {'method': 'alpha', 'params': {'alpha': 1.5, 'max_dim': 2}}
+              {'method': 'vietoris_rips', 'params': {'epsilon': 1.2, 'max_dim': 2}}
+        metadata : dict, optional
+            Additional metadata to store with the complex. Construction parameters
+            and provenance from point_data are added automatically and will not
+            overwrite keys already present in metadata.
+        validate : bool, default=True
+            Whether to validate the resulting complex structure.
+
+        Returns
+        -------
+        complex : SimplicialComplex
+
+        Notes
+        -----
+        - For 'delaunay' and 'alpha', point_data.has_positions must be True.
+        - For 'vietoris_rips', either positions or distances are accepted;
+          positions are preferred when available.
+        - point_data.content_hash is recorded in the complex metadata for
+          provenance tracking.
+        """
+        from .complex_builders import build_complex_from_config
+
+        # Determine input arrays and record shape/type for metadata
+        if point_data.has_positions:
+            positions = point_data.get_positions()
+            N, d = positions.shape
+            input_type = 'positions'
+            input_shape = (N, d)
+            distances = None
+        else:
+            distances = point_data.get_distances()
+            N = distances.shape[0]
+            input_type = 'distances'
+            input_shape = (N, N)
+            positions = None
+
+        # Build raw simplices dict (pure computation, no framework objects)
+        simplices = build_complex_from_config(config, positions=positions, distances=distances)
+
+        # Assemble metadata: caller-supplied values take precedence
+        complex_metadata = {
+            'construction_method': config['method'],
+            'construction_config': {
+                'input_type': input_type,
+                'input_shape': input_shape,
+                **config.get('params', {}),
+            },
+            'input_hash': point_data.content_hash,
+        }
+        if metadata is not None:
+            complex_metadata.update(metadata)
+
+        return cls(simplices, metadata=complex_metadata, validate=validate)
+
     # =========================================================================
     # Utilities and Protocols
     # =========================================================================
