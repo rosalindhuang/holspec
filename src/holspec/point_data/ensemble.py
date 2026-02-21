@@ -198,7 +198,9 @@ class PointDataEnsemble:
         base_config: dict,
         noise_config: dict,
         num_realizations: int,
-        base_seed: int = 42
+        base_seed: int = 42,
+        metadata: dict | None = None,
+        member_metadata: dict | None = None,
     ) -> 'PointDataEnsemble':
         """
         Generate ensemble from base config with noise.
@@ -215,6 +217,9 @@ class PointDataEnsemble:
             Number of ensemble members to generate.
         base_seed : int, default=42
             Starting seed. Member i uses seed = base_seed + i.
+        member_metadata : dict, optional
+            Additional metadata applied uniformly to all members.
+            Merged with the per-member metadata (seed, member_index, etc.).
         
         Returns
         -------
@@ -255,21 +260,25 @@ class PointDataEnsemble:
             )
             
             # Create PointData with comprehensive metadata
-            metadata = {
+            member_metadata_all = dict(member_metadata) if member_metadata is not None else {}
+            member_metadata_all.update({
                 'base_config': base_config,
                 'noise_config': noise_config,
                 'seed': seed,
-                'realization_index': i
-            }
-            point_data = PointData(positions=noisy_positions, metadata=metadata)
+                'member_index': i,
+            })
+            point_data = PointData(positions=noisy_positions, metadata=member_metadata_all)
             members.append(point_data)
         
         # Construct and return ensemble
+        ensemble_metadata = dict(metadata) if metadata is not None else {}
+        ensemble_metadata['base_seed'] = base_seed
+
         return cls(
             members=members,
             base_config=base_config,
             noise_config=noise_config,
-            metadata={'base_seed': base_seed}   
+            metadata=ensemble_metadata,
         )
     
 

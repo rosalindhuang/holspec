@@ -93,7 +93,8 @@ def add_noise(
 
 def create_noise_label(
     noise_config: dict, 
-    float_fmt: str | None = 'g'
+    float_fmt: str | None = 'g',
+    strip_zeros: bool = True,
 ) -> str:
     """
     Create a unique label from noise configuration.
@@ -124,7 +125,7 @@ def create_noise_label(
     
     # Format scale for label
     scale = noise_config['scale']
-    scale_str = format_float_str(scale, float_fmt)
+    scale_str = format_float_str(scale, float_fmt, strip_zeros=strip_zeros)
 
     # Format distribution for label
     dist = noise_config.get('distribution')

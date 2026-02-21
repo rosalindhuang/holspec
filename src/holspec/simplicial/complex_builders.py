@@ -29,9 +29,9 @@ def build_delaunay_complex(
     """
     Construct Delaunay triangulation as a simplicial complex.
     
-    Computes the Delaunay triangulation and extracts the complete face lattice
-    to form an abstract simplicial complex. All faces of Delaunay simplices are
-    included automatically.
+    Computes the Delaunay triangulation and extracts all simplices with their
+    complete face closure to form an abstract simplicial complex. All faces of
+    Delaunay simplices are included automatically.
     
     Parameters
     ----------
@@ -51,7 +51,7 @@ def build_delaunay_complex(
     Returns
     -------
     complex : SimplicialComplex
-        The Delaunay complex with complete face lattice up to max_dim.
+        The Delaunay complex, closed under taking faces, up to max_dim.
         
     Raises
     ------
@@ -144,7 +144,7 @@ def build_alpha_complex(
     Returns
     -------
     complex : SimplicialComplex
-        The alpha complex with complete face lattice up to max_dim.
+        The alpha complex, closed under taking faces, up to max_dim.
         
     Raises
     ------
@@ -256,7 +256,7 @@ def build_vr_complex(
     Returns
     -------
     complex : SimplicialComplex
-        The Vietoris-Rips complex with complete face lattice up to max_dim.
+        The Vietoris-Rips complex, closed under taking faces, up to max_dim.
         
     Raises
     ------
@@ -417,9 +417,9 @@ COMPLEX_BUILDER_REGISTRY: dict[str, callable] = {
 }
 
 COMPLEX_BUILDER_ABBREV: dict[str, str] = {
-    'delaunay': 'del',
-    'alpha': 'alp',
-    'vietoris_rips': 'vr',
+    'delaunay': 'delaunay',
+    'alpha': 'alpha',
+    'vietoris_rips': 'vietoris_rips',
 }
 
 
@@ -494,6 +494,7 @@ def build_complex_from_config(
 def create_complex_builder_label(
     config: dict,
     float_fmt: str | None = 'g',
+    strip_zeros: bool = True,
 ) -> str:
     """
     Create a descriptive label from a complex builder config.
@@ -509,6 +510,8 @@ def create_complex_builder_label(
         Must contain 'method' (str) and 'params' (dict).
     float_fmt : str or None, default='g'
         Format specifier for float values (e.g. 'g', '.2e', '.3f').
+    strip_zeros : bool, default=True
+        If True, trailing zeros after the decimal point are removed.
 
     Returns
     -------
@@ -550,7 +553,7 @@ def create_complex_builder_label(
         if isinstance(value, bool):
             value_str = '1' if value else '0'
         elif isinstance(value, float):
-            value_str = format_float_str(value, float_fmt)
+            value_str = format_float_str(value, float_fmt, strip_zeros=strip_zeros)
         elif isinstance(value, str):
             value_str = value[:4].lower().replace('_', '')
         else:

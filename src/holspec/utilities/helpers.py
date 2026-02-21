@@ -75,7 +75,7 @@ def convert_numpy_to_python(obj):
 
 # %% String utilities
 
-def format_float_str(value: float, fmt: str | None = 'g') -> str:
+def format_float_str(value: float, fmt: str | None = 'g', strip_zeros: bool = True) -> str:
     """
     Format a float for use in labels with trailing zeros removed and dots replaced.
     
@@ -86,11 +86,14 @@ def format_float_str(value: float, fmt: str | None = 'g') -> str:
     fmt : str or None, optional
         Format specifier (e.g., 'g', '.2e', '.0e', '.3f'). Default is 'g'.
         If None, defaults to 'g'.
+    strip_zeros : bool, default=True
+        If True, trailing zeros after the decimal point are removed.
+        Set to False to preserve them (e.g. '1.50' with '.2f').
     
     Returns
     -------
     str
-        Formatted string with trailing zeros removed and '.' replaced by 'p'.
+        Formatted string with trailing zeros optionally removed and '.' replaced by 'p'.
     """
     # Handle None fmt
     if fmt is None:
@@ -100,7 +103,7 @@ def format_float_str(value: float, fmt: str | None = 'g') -> str:
     formatted = f"{value:{fmt}}"
     
     # Remove trailing zeros after decimal point
-    if '.' in formatted:
+    if '.' in formatted and strip_zeros:
         if 'e' in formatted.lower():
             # Handle scientific notation: split at 'e', trim mantissa, rejoin
             parts = formatted.lower().split('e')

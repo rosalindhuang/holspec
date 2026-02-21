@@ -364,7 +364,7 @@ def generate_points_from_config(config: dict) -> np.ndarray:
     return generator_func(**params)
 
 
-def create_point_generator_label(config: dict, dimension: int | None = None, float_fmt: str | None = 'g') -> str:
+def create_point_generator_label(config: dict, dimension: int | None = None, float_fmt: str | None = 'g', strip_zeros: bool = True) -> str:
     """
     Create a unique label from point data generation config.
     
@@ -418,7 +418,7 @@ def create_point_generator_label(config: dict, dimension: int | None = None, flo
         if isinstance(value, bool):
             value_str = '1' if value else '0'
         elif isinstance(value, float):
-            value_str = format_float_str(value, float_fmt)
+            value_str = format_float_str(value, float_fmt, strip_zeros=strip_zeros)
         elif isinstance(value, str):
             value_str = value[:4].lower().replace('_', '')
         else:
