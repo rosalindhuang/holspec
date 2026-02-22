@@ -6,7 +6,7 @@ Simplicial complex construction and representation.
 from .base import SimplicialComplex
 from .simplex import *
 from .incidence import *
-from .complex_builders import *
+from .simplicial_constructions import *
 from .validation import *
 
 # Define public API of the module
@@ -26,12 +26,12 @@ __all__ = [
     # incidence.py
     'compute_incidence_matrix',
 
-    # complex_builders.py
-    'build_delaunay_complex',
-    'build_alpha_complex',
-    'build_vr_complex',
-    'build_complex_from_config',
-    'create_complex_builder_label',
+    # simplicial_constructions.py
+    'construct_delaunay_complex',
+    'construct_alpha_complex',
+    'construct_vr_complex',
+    'construct_complex_from_config',
+    'create_simplicial_construction_label',
 
     # validation.py
     'validate_simplices_structure',

@@ -14,7 +14,7 @@ import numpy as np
 from scipy import sparse
 
 from holspec.utilities import save_h5, read_h5, convert_numpy_to_python
-from .complex_builders import build_complex_from_config
+from .simplicial_constructions import construct_complex_from_config
 
 if TYPE_CHECKING:
     from holspec.point_data import PointData
@@ -114,7 +114,7 @@ class SimplicialComplex:
     def euler_characteristic(self) -> int:
         """
         Euler characteristic: χ = Σ (-1)^k n_k.
-        Topological invariant of the complex.
+        Topological invariant of the simplicial complex.
         """
         return sum((-1)**k * len(self._simplices[k]) 
                    for k in range(self.max_dim + 1))
@@ -125,7 +125,7 @@ class SimplicialComplex:
         SHA-256 hash of simplex structure.
 
         Computed lazily and cached. Enables reproducibility tracking
-        and verification of complex identity across saves/loads.
+        and verification of simplicial complex identity across saves/loads.
 
         Notes
         -----
@@ -183,7 +183,7 @@ class SimplicialComplex:
 
     def validate(self) -> None:
         """
-        Comprehensive validation of complex structure.
+        Comprehensive validation of simplicial complex structure.
 
         Raises
         ------
@@ -252,7 +252,7 @@ class SimplicialComplex:
         hdf5_options: dict | None = None
     ) -> str:
         """
-        Save complex to HDF5 file.
+        Save simplicial complex to HDF5 file.
 
         Parameters
         ----------
@@ -272,7 +272,7 @@ class SimplicialComplex:
         Returns
         -------
         content_hash : str
-            Content hash of saved complex for verification.
+            Content hash of saved simplicial complex for verification.
 
         Format
         ------
@@ -352,7 +352,7 @@ class SimplicialComplex:
         load_incidence: bool = True
     ) -> 'SimplicialComplex':
         """
-        Load complex from HDF5 file.
+        Load simplicial complex from HDF5 file.
 
         Parameters
         ----------
@@ -368,8 +368,8 @@ class SimplicialComplex:
 
         Returns
         -------
-        complex : SimplicialComplex
-            Loaded complex instance.
+        sc : SimplicialComplex
+            Loaded simplicial complex instance.
 
         Raises
         ------
@@ -405,16 +405,16 @@ class SimplicialComplex:
         if not simplices:
             raise ValueError(f"No simplices found in {filepath}")
         
-        # Create complex without validation (data already validated when saved)
-        complex = cls(simplices, metadata=metadata, validate=False)
+        # Create simplicial complex without validation (data already validated when saved)
+        sc = cls(simplices, metadata=metadata, validate=False)
         
         # Validate content hash if requested
         if validate_hash:
             if 'content_hash' not in attributes:
-                print(f"Warning: No 'content_hash' in {filepath}, skipping validation")
+                raise ValueError(f"Missing 'content_hash' in {filepath}, cannot validate hash")
             else:
                 stored_hash = str(attributes['content_hash'])
-                computed_hash = complex.content_hash
+                computed_hash = sc.content_hash
                 if computed_hash != stored_hash:
                     raise ValueError(
                         f"Content hash mismatch in {filepath}: "
@@ -443,8 +443,8 @@ class SimplicialComplex:
                     shape = tuple(inc_attrs['shape'])
                     
                     # Validate shape matches expected dimensions
-                    expected_shape = (len(complex._simplices.get(k-1, [])), 
-                                    len(complex._simplices.get(k, [])))
+                    expected_shape = (len(sc._simplices.get(k-1, [])), 
+                                    len(sc._simplices.get(k, [])))
                     
                     if shape != expected_shape:
                         print(f"Warning: Incidence matrix D_{k} shape mismatch. "
@@ -455,13 +455,13 @@ class SimplicialComplex:
                     D_k = sparse.csr_matrix((data, indices, indptr), shape=shape)
                     
                     # Store in cache
-                    complex._incidence_cache[k] = D_k
+                    sc._incidence_cache[k] = D_k
                     
                 except (KeyError, OSError):
                     # Group doesn't exist - this is fine, not all k may have been saved
                     continue
         
-        return complex
+        return sc
 
     @classmethod
     def from_point_data(
@@ -492,7 +492,7 @@ class SimplicialComplex:
 
         Returns
         -------
-        complex : SimplicialComplex
+        sc : SimplicialComplex
 
         Notes
         -----
@@ -516,8 +516,8 @@ class SimplicialComplex:
             input_shape = (N, N)
             positions = None
 
-        # Build raw simplices dict (pure computation, no framework objects)
-        simplices = build_complex_from_config(config, positions=positions, distances=distances)
+        # Construct raw simplices dict (pure computation, no framework objects)
+        simplices = construct_complex_from_config(config, positions=positions, distances=distances)
 
         # Assemble metadata: caller-supplied values take precedence
         complex_metadata = {

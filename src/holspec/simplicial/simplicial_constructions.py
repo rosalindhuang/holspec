@@ -1,7 +1,7 @@
 """
 Simplicial complex construction from point data.
 
-Factory functions for building simplicial complexes from geometric data
+Factory functions for constructing simplicial complexes from geometric data
 using various construction methods (Delaunay, alpha, Vietoris-Rips).
 """
 
@@ -18,7 +18,7 @@ from holspec.utilities import format_float_str
 # Main Construction Functions
 # =============================================================================
 
-def build_delaunay_complex(
+def construct_delaunay_complex(
     positions: np.ndarray,
     max_dim: int | None = None,
 ) -> dict[int, list[tuple]]:
@@ -60,7 +60,7 @@ def build_delaunay_complex(
     Examples
     --------
     >>> positions = np.array([[0, 0], [1, 0], [0.5, 0.5]])
-    >>> simplices = build_delaunay_complex(positions)
+    >>> simplices = construct_delaunay_complex(positions)
     >>> [len(s) for s in simplices.values()]
     [3, 3, 1]  # 3 vertices, 3 edges, 1 triangle
     """
@@ -85,7 +85,7 @@ def build_delaunay_complex(
     return simplices
 
 
-def build_alpha_complex(
+def construct_alpha_complex(
     positions: np.ndarray,
     alpha: float | None = None,
     max_dim: int | None = None,
@@ -135,10 +135,10 @@ def build_alpha_complex(
     Examples
     --------
     >>> positions = np.array([[0, 0], [1, 0], [0.5, 0.866]])
-    >>> simplices = build_alpha_complex(positions)          # full complex
+    >>> simplices = construct_alpha_complex(positions)          # full complex
     >>> [len(s) for s in simplices.values()]
     [3, 3, 1]
-    >>> simplices_small = build_alpha_complex(positions, alpha=0.5)  # restrict by scale
+    >>> simplices_small = construct_alpha_complex(positions, alpha=0.5)  # restrict by scale
     """
     # Validate input positions
     N, d = positions.shape
@@ -166,7 +166,7 @@ def build_alpha_complex(
     return simplices
 
 
-def build_vr_complex(
+def construct_vr_complex(
     *,
     positions: np.ndarray | None = None,
     distances: np.ndarray | None = None,
@@ -221,13 +221,13 @@ def build_vr_complex(
     Examples
     --------
     >>> positions = np.array([[0, 0], [1, 0], [0.5, 0.866]])
-    >>> simplices = build_vr_complex(positions=positions, epsilon=1.1, max_dim=2)
+    >>> simplices = construct_vr_complex(positions=positions, epsilon=1.1, max_dim=2)
     >>> [len(s) for s in simplices.values()]
     [3, 3, 1]
     >>> # Using a pre-computed distance matrix
     >>> from scipy.spatial.distance import cdist
     >>> D = cdist(positions, positions)
-    >>> simplices2 = build_vr_complex(distances=D, epsilon=1.1, max_dim=2)
+    >>> simplices2 = construct_vr_complex(distances=D, epsilon=1.1, max_dim=2)
     >>> simplices == simplices2
     True
     """
@@ -336,27 +336,27 @@ def _extract_simplices_from_gudhi_tree(
 # Registry and Config-Driven Utilities
 # =============================================================================
 
-COMPLEX_BUILDER_REGISTRY: dict[str, callable] = {
-    'delaunay': build_delaunay_complex,
-    'alpha': build_alpha_complex,
-    'vietoris_rips': build_vr_complex,
+SIMPLICIAL_CONSTRUCTION_REGISTRY: dict[str, callable] = {
+    'delaunay': construct_delaunay_complex,
+    'alpha': construct_alpha_complex,
+    'vietoris_rips': construct_vr_complex,
 }
 
-# Aliases for complex builder methods
-COMPLEX_BUILDER_ALIASES: dict[str, list[str]] = {
+# Aliases for simplicial construction methods
+SIMPLICIAL_CONSTRUCTION_ALIASES: dict[str, list[str]] = {
     'delaunay': ['del'],
     'alpha': ['alp'],
     'vietoris_rips': ['vr', 'rips'],
 }
 
-COMPLEX_BUILDER_ALIAS_MAP: dict[str, str] = {
+SIMPLICIAL_CONSTRUCTION_ALIAS_MAP: dict[str, str] = {
     alias: canonical
-    for canonical, aliases in COMPLEX_BUILDER_ALIASES.items()
+    for canonical, aliases in SIMPLICIAL_CONSTRUCTION_ALIASES.items()
     for alias in aliases
 }
 
 
-def build_complex_from_config(
+def construct_complex_from_config(
     config: dict,
     positions: np.ndarray | None = None,
     distances: np.ndarray | None = None,
@@ -385,15 +385,15 @@ def build_complex_from_config(
     if 'method' not in config:
         raise ValueError("config must contain a 'method' key")
 
-    method = COMPLEX_BUILDER_ALIAS_MAP.get(config['method'], config['method'])
-    if method not in COMPLEX_BUILDER_REGISTRY:
+    method = SIMPLICIAL_CONSTRUCTION_ALIAS_MAP.get(config['method'], config['method'])
+    if method not in SIMPLICIAL_CONSTRUCTION_REGISTRY:
         raise ValueError(
             f"Unknown method '{config['method']}'. "
-            f"Available methods: {list(COMPLEX_BUILDER_REGISTRY)}"
+            f"Available methods: {list(SIMPLICIAL_CONSTRUCTION_REGISTRY)}"
         )
     params = config.get('params', {})
 
-    builder = COMPLEX_BUILDER_REGISTRY[method]
+    builder = SIMPLICIAL_CONSTRUCTION_REGISTRY[method]
 
     # vietoris_rips uses keyword-only positions/distances;
     # delaunay and alpha take positions as a positional argument.
@@ -412,7 +412,7 @@ def build_complex_from_config(
         )
 
 
-def create_complex_builder_label(
+def create_simplicial_construction_label(
     config: dict,
     float_fmt: str | None = 'g',
     strip_zeros: bool = True,
@@ -422,7 +422,7 @@ def create_complex_builder_label(
 
     Label format: method_param1_param2...
     Method names are the full canonical registry names. Aliases (e.g. 'vr', 'del') are
-    resolved to their canonical form via COMPLEX_BUILDER_ALIAS_MAP.
+    resolved to their canonical form via SIMPLICIAL_CONSTRUCTION_ALIAS_MAP.
     Parameter names are abbreviated to their first two non-underscore characters.
     Floats are formatted with ``float_fmt``. None values are omitted.
 
@@ -441,24 +441,24 @@ def create_complex_builder_label(
 
     Examples
     --------
-    >>> create_complex_builder_label({'method': 'delaunay', 'params': {'max_dim': 2}})
+    >>> create_simplicial_construction_label({'method': 'delaunay', 'params': {'max_dim': 2}})
     'delaunay_md2'
-    >>> create_complex_builder_label({'method': 'alpha', 'params': {'alpha': 1.5, 'max_dim': 2}})
+    >>> create_simplicial_construction_label({'method': 'alpha', 'params': {'alpha': 1.5, 'max_dim': 2}})
     'alpha_al1p5_md2'
-    >>> create_complex_builder_label({'method': 'vietoris_rips', 'params': {'epsilon': 1.2, 'max_dim': 2}})
+    >>> create_simplicial_construction_label({'method': 'vietoris_rips', 'params': {'epsilon': 1.2, 'max_dim': 2}})
     'vietoris_rips_ep1p2_md2'
-    >>> create_complex_builder_label({'method': 'vr', 'params': {'epsilon': 1.2, 'max_dim': 2}})  # alias works too
+    >>> create_simplicial_construction_label({'method': 'vr', 'params': {'epsilon': 1.2, 'max_dim': 2}})  # alias works too
     'vietoris_rips_ep1p2_md2'
     """
     # Validate config
     if 'method' not in config:
         raise ValueError("config must contain a 'method' key")
 
-    method = COMPLEX_BUILDER_ALIAS_MAP.get(config['method'], config['method'])
-    if method not in COMPLEX_BUILDER_REGISTRY:
+    method = SIMPLICIAL_CONSTRUCTION_ALIAS_MAP.get(config['method'], config['method'])
+    if method not in SIMPLICIAL_CONSTRUCTION_REGISTRY:
         raise ValueError(
             f"Unknown method '{config['method']}'. "
-            f"Available methods: {list(COMPLEX_BUILDER_REGISTRY)}"
+            f"Available methods: {list(SIMPLICIAL_CONSTRUCTION_REGISTRY)}"
         )
     params = config.get('params', {})
 
