@@ -4,13 +4,20 @@ Base simplicial complex class.
 Provides the core SimplicialComplex class for representing
 and manipulating oriented abstract simplicial complexes.
 """
+from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
+import hashlib
+from typing import TYPE_CHECKING
 import numpy as np
 from scipy import sparse
 
 from holspec.utilities import save_h5, read_h5, convert_numpy_to_python
+from .complex_builders import build_complex_from_config
+
+if TYPE_CHECKING:
+    from holspec.point_data import PointData
 
 class SimplicialComplex:
     """
@@ -495,8 +502,6 @@ class SimplicialComplex:
         - point_data.content_hash is recorded in the complex metadata for
           provenance tracking.
         """
-        from .complex_builders import build_complex_from_config
-
         # Determine input arrays and record shape/type for metadata
         if point_data.has_positions:
             positions = point_data.get_positions()
@@ -547,7 +552,6 @@ class SimplicialComplex:
         Hash is based on canonical string representation of all simplices,
         ensuring consistency across different orderings.
         """
-        import hashlib
         
         # Build canonical string representation
         # Format: dimension -> sorted list of sorted simplices

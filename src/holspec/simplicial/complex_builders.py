@@ -384,8 +384,6 @@ def build_complex_from_config(
     # Validate config
     if 'method' not in config:
         raise ValueError("config must contain a 'method' key")
-    if 'params' not in config:
-        raise ValueError("config must contain a 'params' key")
 
     method = COMPLEX_BUILDER_ALIAS_MAP.get(config['method'], config['method'])
     if method not in COMPLEX_BUILDER_REGISTRY:
@@ -393,7 +391,7 @@ def build_complex_from_config(
             f"Unknown method '{config['method']}'. "
             f"Available methods: {list(COMPLEX_BUILDER_REGISTRY)}"
         )
-    params = config['params']
+    params = config.get('params', {})
 
     builder = COMPLEX_BUILDER_REGISTRY[method]
 
@@ -455,8 +453,6 @@ def create_complex_builder_label(
     # Validate config
     if 'method' not in config:
         raise ValueError("config must contain a 'method' key")
-    if 'params' not in config:
-        raise ValueError("config must contain a 'params' key")
 
     method = COMPLEX_BUILDER_ALIAS_MAP.get(config['method'], config['method'])
     if method not in COMPLEX_BUILDER_REGISTRY:
@@ -464,7 +460,7 @@ def create_complex_builder_label(
             f"Unknown method '{config['method']}'. "
             f"Available methods: {list(COMPLEX_BUILDER_REGISTRY)}"
         )
-    params = config['params']
+    params = config.get('params', {})
 
     parts = [method]
 

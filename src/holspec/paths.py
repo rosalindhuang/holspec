@@ -6,8 +6,11 @@ from pathlib import Path
 import shutil
 from functools import lru_cache
 
-#%% Project paths
+# =============================================================================
+# Project paths
+# =============================================================================
 
+# Project root
 @lru_cache(maxsize=1)
 def get_project_root(start: Path | None = None, root_markers = ("pyproject.toml", ".git")) -> Path:
     """
@@ -25,7 +28,6 @@ def get_project_root(start: Path | None = None, root_markers = ("pyproject.toml"
             return parent
     raise RuntimeError(f"Could not find project root from {p} based on root markers {root_markers}.")
 
-# Project root
 PROJECT_ROOT = get_project_root()
 
 # Other directories
@@ -43,7 +45,9 @@ SRC_DIR = PROJECT_ROOT / "src"
 
 
 
-#%% Utilities for directory management
+# =============================================================================
+# Utilities for directory management
+# =============================================================================
 
 def prepare_directory(path: Path, clear_mode: str | bool | None = None, verbose: bool = True) -> None:
     """
@@ -222,8 +226,9 @@ def print_directory_tree(root_path, include_files=True, ignore_dotfiles=True,
     except Exception as e:
         print(f"{_prefix}[Error: {e}]")
 
-
-#%% Test code
+# =============================================================================
+# Test code
+# =============================================================================
 if __name__ == "__main__":
     print("Project paths:")
     print("  PROJECT_ROOT:".ljust(15), PROJECT_ROOT)
