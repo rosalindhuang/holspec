@@ -32,6 +32,7 @@ __all__ = [
     'format_float_str',
     'format_text',
     'inspect_dict',
+    'print_pipeline_config',
     'timed',
     'export_notebook_outputs',
     'convert_notebook',

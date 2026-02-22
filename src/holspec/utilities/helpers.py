@@ -297,6 +297,77 @@ def inspect_dict(data_dict, dict_name="dict", max_depth=None, _current_depth=0, 
             print(f"{_prefix}    {key} {summary}")
 
 
+def print_pipeline_config(
+    configs_content: dict,
+    stage_name: str = None,
+    print_items: bool = True,
+) -> None:
+    """
+    Print a formatted summary of a pipeline stage config document.
+
+    Handles the standard pipeline schema (summary / inputs / configs / runtime / outputs)
+    and generalises to any section structure. Within each section:
+
+    - Scalar values are printed as ``key: value``.
+    - List values are printed as ``key (N items):`` followed by each item indented.
+    - Dict values are printed as ``key (N entries):`` followed by each key indented.
+
+    Label widths are auto-computed per section from the longest key name.
+
+    Parameters
+    ----------
+    configs_content : dict
+        Config document loaded from YAML, following the pipeline config schema.
+    """
+    # Header
+    header = "Pipeline stage configs"
+    if stage_name is not None:
+        header += f" for {stage_name}"
+    print("=" * 60)
+    print(header)
+    print("=" * 60)
+
+    # Sections
+    sep = "-" * 60
+    for section_name, section in configs_content.items():
+        if not isinstance(section, dict):
+            continue
+
+        print(sep)
+        print(section_name.capitalize())
+        print(sep)
+
+        def _collection_hint(v):
+            """Return a concise type-hint string for dict/list values."""
+            if isinstance(v, dict):
+                if v:
+                    k0, v0 = next(iter(v.items()))
+                    return f"dict[{type(k0).__name__}, {type(v0).__name__}], {len(v)}"
+                return f"dict, {len(v)}"
+            elif isinstance(v, list):
+                if v:
+                    return f"list[{type(v[0]).__name__}], {len(v)}"
+                return f"list, {len(v)}"
+
+        lw = max((len(k) for k in section), default=8)
+
+        for key, value in section.items():
+            if isinstance(value, dict):
+                print(f"{key:{lw}s}: ({_collection_hint(value)})")
+                if print_items:
+                    for entry_key in value:
+                        print(f"  {entry_key}")
+            elif isinstance(value, list):
+                print(f"{key:{lw}s}: ({_collection_hint(value)})")
+                if print_items:
+                    for item in value:
+                        print(f"  {item}")
+            else:
+                print(f"{key:{lw}s}: {value}")
+
+        print()
+
+
 # %% Timing utilities
 
 def timed(fun, args, repeats=1) -> float:
