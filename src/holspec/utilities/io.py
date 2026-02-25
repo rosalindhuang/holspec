@@ -16,6 +16,26 @@ from holspec.utilities.helpers import convert_numpy_to_python
 
 
 # %% Saving and reading to HDF5
+
+def join_group_path(parent: str | None, child: str) -> str:
+    """
+    Join a parent group path and a child name with '/'.
+
+    Parameters
+    ----------
+    parent : str or None
+        Parent path segment. If None, the child is returned as-is (root level).
+    child : str
+        Child path segment to append.
+
+    Returns
+    -------
+    str
+        ``f"{parent}/{child}"`` when parent is not None, else ``child``.
+    """
+    return f"{parent}/{child}" if parent is not None else child
+
+
 def save_h5(
     filepath: str | Path,
     datasets: Optional[dict[str, Any]] = None,

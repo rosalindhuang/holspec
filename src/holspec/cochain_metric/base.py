@@ -11,9 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import numpy as np
-
-from holspec.utilities import save_h5, read_h5
+from holspec.utilities import save_h5, read_h5, join_group_path
 
 from .metric_tensor import MetricTensor
 from .metric_models import construct_cochain_metric_from_config
@@ -148,6 +146,7 @@ class CochainMetric:
         self,
         filepath: str | Path,
         mode: str = 'replace',
+        group: str | None = None,
         hdf5_options: dict | None = None,
     ) -> str:
         """
@@ -158,7 +157,10 @@ class CochainMetric:
         filepath : str or Path
             Output file path.
         mode : {'replace', 'update', 'create'}, default='replace'
-            How to handle an existing file.
+            How to handle an existing file/group.
+        group : str, optional
+            HDF5 group path for the data. If None, saves at root level.
+            Useful for co-locating with a SimplicialComplex in one file.
         hdf5_options : dict, optional
             HDF5 compression options. Default: gzip level 4.
 
@@ -171,9 +173,13 @@ class CochainMetric:
         ------
         - Root attributes: max_dim, all_diagonal, content_hash, metadata.
         - degree_{k}/ subgroup per degree:
-            - attributes: type ('identity' or 'diagonal'), size.
-            - dataset diagonal_elements (N_k,): present only for non-identity
-              diagonal metrics.
+            - attributes: size, is_diagonal.
+            - dataset diagonal_elements (N_k,): diagonal of G^k.
+
+        Raises
+        ------
+        NotImplementedError
+            If any metric tensor is not diagonal.
         """
         filepath = Path(filepath)
         if hdf5_options is None:
@@ -188,28 +194,28 @@ class CochainMetric:
         }
         save_h5(
             filepath,
-            datasets={},
+            datasets=None,
             attributes=root_attributes,
             mode=mode,
+            group=group,
             hdf5_options=hdf5_options,
         )
 
         # Per-degree subgroups
         for k, G_k in self._metric_tensors.items():
-            diag = G_k.matrix.diagonal()
-            is_identity = np.all(diag == 1.0)
-            metric_type = 'identity' if is_identity else 'diagonal'
-
-            degree_attributes = {'type': metric_type, 'size': G_k.size}
-            degree_datasets = (
-                {} if is_identity else {'diagonal_elements': diag}
-            )
+            if not G_k.is_diagonal:
+                raise NotImplementedError(
+                    f"save is not yet implemented for non-diagonal metric tensors "
+                    f"(degree {k})."
+                )
+            G_k_attributes = {'size': G_k.size, 'is_diagonal': G_k.is_diagonal}
+            G_k_datasets = {'diagonal_elements': G_k.matrix.diagonal()}
             save_h5(
                 filepath,
-                datasets=degree_datasets,
-                attributes=degree_attributes,
-                mode='update',
-                group=f'degree_{k}',
+                datasets=G_k_datasets,
+                attributes=G_k_attributes,
+                mode=mode,
+                group=join_group_path(group, f'degree_{k}'),
                 hdf5_options=hdf5_options,
             )
 
@@ -220,6 +226,7 @@ class CochainMetric:
         cls,
         filepath: str | Path,
         validate_hash: bool = True,
+        group: str | None = None,
     ) -> CochainMetric:
         """
         Load cochain metric from HDF5 file.
@@ -230,6 +237,8 @@ class CochainMetric:
             Path to HDF5 file created by save().
         validate_hash : bool, default=True
             Whether to verify content hash after loading.
+        group : str, optional
+            HDF5 group path for the data. Must match the group used in save().
 
         Returns
         -------
@@ -239,11 +248,13 @@ class CochainMetric:
         ------
         ValueError
             If file format is invalid or hash validation fails.
+        NotImplementedError
+            If any stored metric tensor is not diagonal.
         """
         filepath = Path(filepath)
 
         # Read root-level attributes
-        _, root_attributes = read_h5(filepath)
+        _, root_attributes = read_h5(filepath, group=group)
         if 'max_dim' not in root_attributes:
             raise ValueError(f"Missing 'max_dim' in {filepath}")
 
@@ -251,38 +262,34 @@ class CochainMetric:
         metadata = root_attributes.get('metadata', {})
 
         # Reconstruct per-degree metric tensors
+        from .metric_models import construct_diagonal_metric
         metric_tensors: dict[int, MetricTensor] = {}
         for k in range(max_dim + 1):
-            degree_datasets, degree_attributes = read_h5(
-                filepath, group=f'degree_{k}'
+            metric_tensor_datasets, metric_tensor_attributes = read_h5(
+                filepath, group=join_group_path(group, f'degree_{k}')
             )
-            if 'type' not in degree_attributes or 'size' not in degree_attributes:
+            if 'size' not in metric_tensor_attributes:
                 raise ValueError(
-                    f"Missing 'type' or 'size' attribute in degree_{k} group "
-                    f"of {filepath}"
+                    f"Missing 'size' attribute in degree_{k} group of {filepath}"
                 )
-
-            metric_type = degree_attributes['type']
-            size = int(degree_attributes['size'])
-
-            if metric_type == 'identity':
-                from .metric_models import construct_identity_metric
-                metric_tensors[k] = construct_identity_metric(size)
-            elif metric_type == 'diagonal':
-                if 'diagonal_elements' not in degree_datasets:
-                    raise ValueError(
-                        f"Missing 'diagonal_elements' dataset in degree_{k} "
-                        f"group of {filepath}"
-                    )
-                from .metric_models import construct_diagonal_metric
-                metric_tensors[k] = construct_diagonal_metric(
-                    degree_datasets['diagonal_elements']
-                )
-            else:
+            if 'is_diagonal' not in metric_tensor_attributes:
                 raise ValueError(
-                    f"Unknown metric type '{metric_type}' in degree_{k} "
+                    f"Missing 'is_diagonal' attribute in degree_{k} group of {filepath}"
+                )
+            if not metric_tensor_attributes['is_diagonal']:
+                raise NotImplementedError(
+                    f"load is not yet implemented for non-diagonal metric tensors "
+                    f"(degree {k})."
+                )
+            if 'diagonal_elements' not in metric_tensor_datasets:
+                raise ValueError(
+                    f"Missing 'diagonal_elements' dataset in degree_{k} "
                     f"group of {filepath}"
                 )
+
+            metric_tensors[k] = construct_diagonal_metric(
+                metric_tensor_datasets['diagonal_elements']
+            )
 
         cm = cls(metric_tensors, metadata=metadata)
 

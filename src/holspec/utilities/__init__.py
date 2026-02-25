@@ -10,6 +10,7 @@ from .helpers import *
 # Define public API of the module
 __all__ = [
     # io.py
+    'join_group_path',
     'save_h5',
     'read_h5',
     'initialize_h5',
