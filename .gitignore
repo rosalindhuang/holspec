@@ -25,5 +25,6 @@ archive/
 archive/*
 !archive/old_repo/
 
+*AI_*
 *claude*
-holspec_AI_context.md
+*copilot*

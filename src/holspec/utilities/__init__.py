@@ -18,6 +18,7 @@ __all__ = [
     'inspect_h5',
     
     # validation.py
+    'check_raises',
     'validate_positions',
     'validate_distances',
 
