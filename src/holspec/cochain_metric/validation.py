@@ -107,10 +107,67 @@ def validate_cochain_metric(
     cochain_metrics: dict[int, MetricTensor],
     cochain_dimensions: dict[int, int],
 ) -> None:
-    pass
+    """
+    Validate a collection of metric tensors against expected cochain space dimensions.
 
+    Parameters
+    ----------
+    cochain_metrics : dict[int, MetricTensor]
+        Dictionary mapping degree k to MetricTensor at that degree.
+    cochain_dimensions : dict[int, int]
+        Dictionary mapping degree k to the expected dimension N_k of C^k.
 
+    Raises
+    ------
+    ValueError
+        If any structural invariant is violated.
 
+    Notes
+    -----
+    Performs the following checks:
 
+    - Degrees are non-empty and form a consecutive sequence 0, 1, ..., n.
+    - The set of degrees in cochain_metrics matches that in cochain_dimensions.
+    - For each degree k, MetricTensor.size equals cochain_dimensions[k].
+    """
+    if not cochain_metrics:
+        raise ValueError("cochain_metrics cannot be empty")
 
+    # --- Consecutive degrees starting at 0 ---
+    degrees = sorted(cochain_metrics.keys())
+    if degrees[0] != 0:
+        raise ValueError(
+            f"Cochain metric degrees must start at 0, got min degree {degrees[0]}"
+        )
+    if degrees != list(range(degrees[-1] + 1)):
+        missing = sorted(set(range(degrees[-1] + 1)) - set(degrees))
+        raise ValueError(
+            f"Cochain metric degrees must be consecutive integers 0, ..., n. "
+            f"Missing degrees: {missing}"
+        )
 
+    # --- Degree sets match ---
+    dim_degrees = sorted(cochain_dimensions.keys())
+    if degrees != dim_degrees:
+        raise ValueError(
+            f"Degree mismatch between cochain_metrics {degrees} "
+            f"and provided cochain_dimensions {dim_degrees}"
+        )
+
+    # --- Size agreement at each degree ---
+    mismatches = []
+    for k in degrees:
+        actual = cochain_metrics[k].size
+        expected = cochain_dimensions[k]
+        if actual != expected:
+            mismatches.append((k, actual, expected))
+
+    if mismatches:
+        detail = ", ".join(
+            f"k={k}: size={actual} (expected {expected})"
+            for k, actual, expected in mismatches
+        )
+        raise ValueError(
+            f"Metric tensor size mismatch at "
+            f"{'degree' if len(mismatches) == 1 else 'degrees'}: {detail}"
+        )

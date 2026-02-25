@@ -20,32 +20,107 @@ if TYPE_CHECKING:
 
 
 # =============================================================================
-# Per-Degree Builders
+# Per-Degree Construction Functions
 # =============================================================================
 
 def construct_identity_metric(size: int) -> MetricTensor:
-    pass
+    """
+    Construct an identity metric tensor on an N-dimensional vector space.
+
+    Parameters
+    ----------
+    size : int
+        Dimension N of the vector space (must be positive).
+
+    Returns
+    -------
+    MetricTensor
+        Diagonal metric with all weights equal to 1.
+    """
+    if not isinstance(size, (int, np.integer)) or size <= 0:
+        raise ValueError(f"size must be a positive integer, got {size!r}")
+    return MetricTensor(sparse.eye(size, format='csr'), is_diagonal=True)
 
 
 def construct_diagonal_metric(diagonal_elements: np.ndarray) -> MetricTensor:
-    pass
+    """
+    Construct a diagonal metric tensor from explicit weights.
+
+    Parameters
+    ----------
+    diagonal_elements : ndarray, shape (N,)
+        Strictly positive weights for each basis element. Validated against
+        the SPD contract by MetricTensor at construction.
+
+    Returns
+    -------
+    MetricTensor
+        Diagonal metric with the specified weights.
+    """
+    diagonal_elements = np.asarray(diagonal_elements, dtype=float)
+    if diagonal_elements.ndim != 1 or diagonal_elements.size == 0:
+        raise ValueError(
+            f"diagonal_elements must be a non-empty 1D array, "
+            f"got shape {diagonal_elements.shape}"
+        )
+    return MetricTensor(
+        sparse.diags(diagonal_elements, format='csr'), is_diagonal=True
+    )
 
 
 # =============================================================================
-# Collection-Level Builders
+# Collection-Level Construction Functions
 # =============================================================================
 
-def construct_combinatorial_metrics(sc: SimplicialComplex) -> dict[int, MetricTensor]:
-    pass
+def construct_combinatorial_cochain_metric(
+    sc: SimplicialComplex,
+    point_data: PointData | None = None,
+    **params,
+) -> dict[int, MetricTensor]:
+    """
+    Construct the combinatorial cochain metric for a simplicial complex.
 
+    Assigns the identity metric G^k = I on each cochain space C^k, giving
+    equal weight to every k-simplex. This is the canonical topology-only
+    baseline: the resulting Hodge Laplacian depends purely on combinatorial
+    structure, with no geometric information from point positions.
+
+    Parameters
+    ----------
+    sc : SimplicialComplex
+        Source simplicial complex. Only `num_simplices` is accessed.
+    point_data : PointData, optional
+        Accepted for interface consistency with other metric model construction 
+        functions; not used in the combinatorial special case.
+    **params
+        Accepted for interface consistency; no parameters are defined for
+        the combinatorial model.
+
+    Returns
+    -------
+    dict[int, MetricTensor]
+        Identity metric tensor at each degree k = 0, ..., max_dim.
+    """
+    return {
+        k: construct_identity_metric(n_k)
+        for k, n_k in sc.num_simplices.items()
+    }
+
+# Future:
+# def construct_hodge_star_cochain_metric(
+#     sc: SimplicialComplex,
+#     point_data: PointData,
+# ) -> dict[int, MetricTensor]:
+#     pass
 
 # =============================================================================
 # Registry and Config-Driven Utilities
 # =============================================================================
 
 COCHAIN_METRIC_MODEL_REGISTRY: dict[str, callable] = {
-    'combinatorial': construct_combinatorial_metrics,
-    # 'hodge_star': construct_hodge_star_metrics,  # future
+    'combinatorial': construct_combinatorial_cochain_metric,
+    # Future entries:
+    # 'hodge_star': construct_hodge_star_cochain_metric,
 }
 
 
@@ -54,7 +129,45 @@ def construct_cochain_metric_from_config(
     sc: SimplicialComplex,
     point_data: PointData,
 ) -> dict[int, MetricTensor]:
-    pass
+    """
+    Construct cochain metric tensors G^k : C^k -> C^k for k = 0, ..., n
+    on the cochain spaces of a simplicial complex. 
+
+    Parameters
+    ----------
+    config : dict
+        Must contain 'model' (str) and 'params' (dict). For example:
+            {'model': 'combinatorial', 'params': {}}
+
+    sc : SimplicialComplex
+        Source simplicial complex.
+    point_data : PointData
+        Point cloud data. Required by geometric metric models; unused in
+        the combinatorial special case.
+
+    Returns
+    -------
+    dict[int, MetricTensor]
+        Metric tensor G^k at each degree k = 0, ..., max_dim.
+
+    Raises
+    ------
+    ValueError
+        If 'model' key is missing or the model name is not in the registry.
+    """
+    if 'model' not in config:
+        raise ValueError("config must contain a 'model' key")
+
+    model = config['model']
+    if model not in COCHAIN_METRIC_MODEL_REGISTRY:
+        raise ValueError(
+            f"Unknown metric model '{model}'. "
+            f"Available models: {list(COCHAIN_METRIC_MODEL_REGISTRY)}"
+        )
+
+    params = config.get('params', {})
+    construct_fn = COCHAIN_METRIC_MODEL_REGISTRY[model]
+    return construct_fn(sc, point_data, **params)
 
 
 def create_metric_model_label(
@@ -62,4 +175,65 @@ def create_metric_model_label(
     float_fmt: str | None = 'g',
     strip_zeros: bool = True,
 ) -> str:
-    pass
+    """
+    Create a descriptive label from a metric model config.
+
+    Label format: ``model_param1_param2...``
+    Parameter names are abbreviated to their first two non-underscore characters.
+    Floats are formatted with ``float_fmt``. None values are omitted.
+
+    Parameters
+    ----------
+    config : dict
+        Must contain 'model' (str) and 'params' (dict).
+    float_fmt : str or None, default='g'
+        Format specifier for float values (e.g. 'g', '.2f').
+    strip_zeros : bool, default=True
+        If True, trailing zeros after the decimal point are removed from floats.
+
+    Returns
+    -------
+    label : str
+
+    Raises
+    ------
+    ValueError
+        If 'model' key is missing or the model name is not in the registry.
+
+    Examples
+    --------
+    >>> create_metric_model_label({'model': 'combinatorial', 'params': {}})
+    'combinatorial'
+    """
+    if 'model' not in config:
+        raise ValueError("config must contain a 'model' key")
+
+    model = config['model']
+    if model not in COCHAIN_METRIC_MODEL_REGISTRY:
+        raise ValueError(
+            f"Unknown metric model '{model}'. "
+            f"Available models: {list(COCHAIN_METRIC_MODEL_REGISTRY)}"
+        )
+
+    params = config.get('params', {})
+    parts = [model]
+
+    for key, value in params.items():
+        # Skip None values — they represent 'use default / no constraint'
+        if value is None:
+            continue
+
+        param_abbr = key.replace('_', '')[:2]
+
+        if isinstance(value, bool):
+            value_str = '1' if value else '0'
+        elif isinstance(value, float):
+            value_str = format_float_str(value, float_fmt, strip_zeros=strip_zeros)
+        elif isinstance(value, str):
+            value_str = value[:4].lower().replace('_', '')
+        else:
+            value_str = str(value).replace('.', 'p')
+
+        parts.append(f"{param_abbr}{value_str}")
+
+    return '_'.join(parts)

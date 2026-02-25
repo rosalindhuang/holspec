@@ -8,7 +8,7 @@ from .metric_tensor import MetricTensor
 from .metric_models import (
     construct_identity_metric,
     construct_diagonal_metric,
-    construct_combinatorial_metrics,
+    construct_combinatorial_cochain_metric,
     construct_cochain_metric_from_config,
     create_metric_model_label,
     COCHAIN_METRIC_MODEL_REGISTRY,
@@ -26,7 +26,7 @@ __all__ = [
     # metric_models.py
     'construct_identity_metric',
     'construct_diagonal_metric',
-    'construct_combinatorial_metrics',
+    'construct_combinatorial_cochain_metric',
     'construct_cochain_metric_from_config',
     'create_metric_model_label',
     'COCHAIN_METRIC_MODEL_REGISTRY',

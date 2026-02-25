@@ -23,8 +23,8 @@ def check_raises(
     label: str,
     func: Callable,
     expected_exception: type[Exception],
-    label_width: int = 35,
-    prefix: str = "",
+    label_width: int = 0,
+    prefix: str = "  ",
 ) -> bool:
     """
     Check that calling func raises expected_exception, printing a PASS/FAIL result.
