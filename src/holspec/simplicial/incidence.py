@@ -102,7 +102,9 @@ def compute_incidence_matrix(
     return D_k
 
 
-# %% Demo and testing
+# =============================================================================
+# Demo and testing
+# =============================================================================
 if __name__ == "__main__":
     from holspec.simplicial.simplex import get_boundary, get_faces
     # ============================================================================

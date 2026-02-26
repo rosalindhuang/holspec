@@ -10,7 +10,9 @@ import numpy as np
 
 from holspec.utilities import format_float_str
 
-# %% 2D Lattice Generators
+# =============================================================================
+# 2D Lattice Generators
+# =============================================================================
 
 def generate_triangular_lattice_hex(
     n_rings: int,
@@ -121,7 +123,9 @@ def generate_square_lattice(
     return positions - center
 
 
-# %% 3D Lattice Generators
+# =============================================================================
+# 3D Lattice Generators
+# =============================================================================
 
 def generate_bcc_lattice(
     nx: int,
@@ -179,7 +183,9 @@ def generate_bcc_lattice(
     return positions - center
 
 
-# %% Random Point Generators
+# =============================================================================
+# Random Point Generators
+# =============================================================================
 
 def generate_random_uniform(
     n_points: int,
@@ -216,7 +222,9 @@ def generate_random_uniform(
 
 
 
-# %% Simple Shape Generators
+# =============================================================================
+# Simple Shape Generators
+# =============================================================================
 
 def generate_regular_polygon(
     n_sides: int,
@@ -317,7 +325,9 @@ def generate_cube_vertices(
 
 
 
-# %% Utilities
+# =============================================================================
+# Utilities
+# =============================================================================
 
 POINT_GENERATOR_REGISTRY = {
     'trilatthex': generate_triangular_lattice_hex,

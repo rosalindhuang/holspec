@@ -28,7 +28,9 @@ from holspec.visualization import (
     add_simplex_labels_3d
 )
 
-# %% Point data
+# =============================================================================
+# Point data
+# =============================================================================
 
 def plot_point_data(
     positions: np.ndarray,
@@ -134,7 +136,9 @@ def plot_point_data(
     return fig, ax
 
 
-# %% Simplicial complex
+# =============================================================================
+# Simplicial complex
+# =============================================================================
 
 def _parse_feature_flags(flags: Union[bool, Dict[int, bool]], all_keys: List[int]) -> List[int]:
     """

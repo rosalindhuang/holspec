@@ -230,7 +230,9 @@ def compute_circumradius(simplex_vertices: np.ndarray) -> float:
     pass
 
 
-#%% Combinatorial utilities
+# =============================================================================
+# Combinatorial utilities
+# =============================================================================
 
 def compute_permutation_sign(seq_a: tuple, seq_b: tuple) -> int:
     """
@@ -277,7 +279,9 @@ def compute_permutation_sign(seq_a: tuple, seq_b: tuple) -> int:
     return (-1) ** (len(perm) - n_cycles)
 
 
-# %% Testing and demo
+# =============================================================================
+# Testing and demo
+# =============================================================================
 if __name__ == "__main__":
     
     # Demo: Simplex operations

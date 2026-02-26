@@ -11,7 +11,9 @@ from matplotlib.colorbar import Colorbar
 from typing import Optional, Tuple, List, Union, Dict, Any
 from itertools import combinations
 
-# %% Line plots
+# =============================================================================
+# Line plots
+# =============================================================================
 
 def plot_lines(
     xy_list: List[Tuple[np.ndarray, np.ndarray]],
@@ -177,7 +179,9 @@ def plot_lines_stack(
     return fig, axes if len(xy_list) > 1 else axes[0]
 
 
-# %% Scatter plots
+# =============================================================================
+# Scatter plots
+# =============================================================================
 
 def plot_scatters(
     xy_list: List[Tuple[np.ndarray, np.ndarray]],
@@ -304,7 +308,9 @@ def plot_scatters(
     return fig, ax, cbar
 
 
-# %% Basic shapes plots
+# =============================================================================
+# Basic shapes plots
+# =============================================================================
 
 def plot_circles(
     positions: np.ndarray,
@@ -516,7 +522,9 @@ def plot_spheres(
     return fig, ax
 
 
-# %% Simplicial complex primitives (2D)
+# =============================================================================
+# Simplicial complex primitives (2D)
+# =============================================================================
 
 def plot_vertices_2d(
     vertices: List[Tuple],
@@ -731,7 +739,9 @@ def plot_triangles_2d(
     return fig, ax
 
 
-# %% Simplicial complex primitives (3D)
+# =============================================================================
+# Simplicial complex primitives (3D)
+# =============================================================================
 
 def plot_vertices_3d(
     vertices: List[Tuple],
@@ -1200,7 +1210,9 @@ def add_simplex_labels_2d(
             )
 
 
-# %% Simplicial complex annotation (3D)
+# =============================================================================
+# Simplicial complex annotation (3D)
+# =============================================================================
 
 def add_simplex_orientation_3d(
     simplices: Dict[int, List[Tuple]],
@@ -1400,7 +1412,136 @@ def add_simplex_labels_3d(
             )
 
 
-# %% Helper functions
+# =============================================================================
+# Matrix plots
+# =============================================================================
+
+def plot_matrix(
+    matrix: np.ndarray,
+    # Figure properties
+    ax: Optional[Axes] = None,
+    figsize: Optional[Tuple[float, float]] = None,
+    # Colormap
+    cmap: str = 'RdBu_r',
+    vmin: Optional[float] = None,
+    vmax: Optional[float] = None,
+    # Zero masking
+    zero_color: Optional[str] = None,
+    zero_thresh: float = 0.0,
+    # Colorbar
+    colorbar: bool = False,
+    **kwargs
+) -> Union[Tuple[Figure, Axes], Tuple[Figure, Axes, Colorbar]]:
+    """
+    Visualize a matrix as a color-mapped grid using pcolormesh.
+
+    Each cell in the plot corresponds to one entry in the matrix. Row 0 is
+    placed at the top, matching standard matrix convention. The axes aspect
+    ratio is set to equal so every cell is square.
+
+    Parameters
+    ----------
+    matrix : array-like
+        2-D array of shape (nrows, ncols) to visualize.
+    ax : Axes, optional
+        Existing axes to plot on. If None, a new figure is created.
+    figsize : tuple of float, optional
+        Figure size as (width, height) in inches. If None, auto-sized based on
+        the matrix shape at 0.65 inches per cell.
+    cmap : str, default 'RdBu_r'
+        Matplotlib colormap name. The default places red at positive values
+        and blue at negative values.
+    vmin : float, optional
+        Lower bound for colormap normalization. Defaults to data minimum.
+    vmax : float, optional
+        Upper bound for colormap normalization. Defaults to data maximum.
+    zero_color : str, optional
+        Color for entries satisfying ``|value| <= zero_thresh``. If None,
+        zero masking is disabled and zeros are colored by the colormap.
+    zero_thresh : float, default 0.0
+        Threshold below which entries are considered zero. Only used when
+        ``zero_color`` is not None.
+    colorbar : bool, default False
+        Whether to add a colorbar to the figure.
+    **kwargs
+        Additional keyword arguments passed to ``ax.pcolormesh()``.
+
+    Returns
+    -------
+    tuple
+        ``(fig, ax)`` if ``colorbar=False``, or ``(fig, ax, cbar)`` if
+        ``colorbar=True``.
+
+    Raises
+    ------
+    ValueError
+        If ``matrix`` is not 2-D.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> M = np.random.randn(4, 6)
+    >>> fig, ax = plot_matrix(M, vmin=-3, vmax=3)
+
+    >>> # Highlight zeros in a sparse matrix
+    >>> fig, ax, cbar = plot_matrix(M, zero_color='lightgray', colorbar=True)
+    """
+    matrix = np.asarray(matrix)
+    if matrix.ndim != 2:
+        raise ValueError(f"matrix must be 2-D, got shape {matrix.shape}")
+
+    nrows, ncols = matrix.shape
+
+    # Build colormap object; copy it when we need to set a bad (masked) color
+    # so the global colormap registry is not mutated.
+    if zero_color is not None:
+        cmap_obj = plt.get_cmap(cmap).copy()
+        cmap_obj.set_bad(zero_color)
+        data = np.ma.masked_where(np.abs(matrix) <= zero_thresh, matrix)
+    else:
+        cmap_obj = cmap
+        data = matrix
+
+    # Auto figsize: 0.65 in per cell, extra width for colorbar
+    if ax is None:
+        if figsize is None:
+            cell = 0.65
+            w = ncols * cell + (1.5 if colorbar else 0.4)
+            h = nrows * cell + 0.4
+            figsize = (w, h)
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        fig = ax.figure
+
+    # Cell edge coordinates
+    X = np.arange(ncols + 1)
+    Y = np.arange(nrows + 1)
+
+    mesh = ax.pcolormesh(X, Y, data, cmap=cmap_obj, vmin=vmin, vmax=vmax, **kwargs)
+
+    # Row 0 at top
+    ax.invert_yaxis()
+
+    # Equal aspect so each cell is square
+    ax.set_aspect('equal')
+
+    # Ticks at cell centres, labelled with integer indices
+    ax.set_xticks(np.arange(ncols) + 0.5)
+    ax.set_xticklabels(np.arange(ncols))
+    ax.set_yticks(np.arange(nrows) + 0.5)
+    ax.set_yticklabels(np.arange(nrows))
+    ax.tick_params(length=0)
+
+    if colorbar:
+        cbar = fig.colorbar(mesh, ax=ax)
+        return fig, ax, cbar
+
+    return fig, ax
+
+
+# =============================================================================
+# Helper functions
+# =============================================================================
 
 def _extend_list(lst: List, target_length: int, default_value) -> List:
     """

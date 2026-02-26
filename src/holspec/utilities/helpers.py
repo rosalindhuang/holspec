@@ -316,7 +316,9 @@ def format_text(text: str, max_width: int = 80, preserve_paragraphs: bool = True
     return '\n'.join(formatted_lines)
 
 
-#%% Printing utilities
+# =============================================================================
+# Printing utilities
+# =============================================================================
 
 def inspect_dict(
     data_dict: dict,

@@ -14,7 +14,9 @@ import subprocess
 from typing import Optional, Tuple, Dict, Any, List, Union
 from pathlib import Path
 
-# %% Formatting
+# =============================================================================
+# Formatting
+# =============================================================================
 
 def format_axis(
     ax: Axes,
@@ -281,7 +283,9 @@ def format_cbar(
         cbar.ax.tick_params(rotation=45)
 
 
-# %% Animation functions
+# =============================================================================
+# Animation functions
+# =============================================================================
 
 def animate_3d_turn(
     fig: Figure,

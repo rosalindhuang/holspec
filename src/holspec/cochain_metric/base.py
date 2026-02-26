@@ -393,9 +393,15 @@ class CochainMetric:
             f"hash={self.content_hash[:8]})"
         )
 
-    def summary(self) -> str:
+    def summary(self, indent: str = '') -> str:
         """
         Generate human-readable summary of the metric collection.
+
+        Parameters
+        ----------
+        indent : str, optional
+            String prepended to every line. Default is '' (no indent).
+            Common values: '  ' (two spaces) or '    ' (four spaces).
 
         Returns
         -------
@@ -428,7 +434,7 @@ class CochainMetric:
         lines.append(f"content_hash: {self.content_hash[:16]}")
         lines.append("")
 
-        return '\n'.join(lines)
+        return '\n'.join(indent + line for line in lines)
 
     # =========================================================================
     # Private Methods
