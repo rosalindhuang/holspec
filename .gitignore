@@ -26,5 +26,6 @@ archive/*
 !archive/old_repo/
 
 *AI_*
+*ai_*
 *claude*
 *copilot*

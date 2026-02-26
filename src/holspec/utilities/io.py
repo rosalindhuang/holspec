@@ -15,26 +15,9 @@ from natsort import natsorted
 from holspec.utilities.helpers import convert_numpy_to_python
 
 
-# %% Saving and reading to HDF5
-
-def join_group_path(parent: str | None, child: str) -> str:
-    """
-    Join a parent group path and a child name with '/'.
-
-    Parameters
-    ----------
-    parent : str or None
-        Parent path segment. If None, the child is returned as-is (root level).
-    child : str
-        Child path segment to append.
-
-    Returns
-    -------
-    str
-        ``f"{parent}/{child}"`` when parent is not None, else ``child``.
-    """
-    return f"{parent}/{child}" if parent is not None else child
-
+# =============================================================================
+# Saving and reading to HDF5
+# =============================================================================
 
 def save_h5(
     filepath: str | Path,
@@ -234,7 +217,9 @@ def read_h5(
     return datasets, attributes
 
 
-# %% Additional functions for HDF5 handling
+# =============================================================================
+# Additional functions for HDF5 handling
+# =============================================================================
 
 def initialize_h5(
     path: str | Path, 
@@ -300,7 +285,8 @@ def get_keys_h5(
 def inspect_h5(
     filepath: str | Path, 
     relative_to: Optional[str | Path] = None,
-    prefix: str = ''
+    prefix: str = '',
+    indent: str = '  '
 ) -> None:
     """
     Print the structure and attributes of an HDF5 file.
@@ -316,42 +302,44 @@ def inspect_h5(
         instead of the full path.
     prefix : str, default ''
         String prepended to every printed line (e.g., '    ' to indent the whole block).
+    indent : str, default '  '
+        String used for each level of indentation (e.g., '  ' for two spaces).
     """
     filepath = Path(filepath)
     display_path = filepath.relative_to(relative_to) if relative_to is not None else filepath
 
-    def summarize_attr(value):
+    def summarize_value(value):
         if isinstance(value, (str, bytes)):
             return f'(type={type(value).__name__}, len={len(value)})'
         elif isinstance(value, np.ndarray):
             return f'(type=ndarray, shape={value.shape}, dtype={value.dtype})'
         elif isinstance(value, (int, float, bool)):
-            return f'(type={type(value).__name__})'
+            return f'(type={type(value).__name__}, value={value})'
         elif hasattr(value, 'shape'):
             return f'(type={type(value).__name__}, shape={value.shape})'
         else:
             return f'(type={type(value).__name__})'
 
-    def print_attrs(obj, indent):
+    def print_attrs(obj, _indent):
         for key, val in obj.attrs.items():
-            summary = summarize_attr(val)
-            print(f"{prefix}{indent}@{key} {summary}")
+            summary = summarize_value(val)
+            print(f"{prefix}{_indent}@{key} {summary}")
 
-    def print_h5_structure(name, obj, indent=""):
+    def print_h5_structure(name, obj, _indent=""):
         if isinstance(obj, h5py.Group):
-            print(f"{prefix}{indent}{name}/")
-            print_attrs(obj, indent + "    ")
+            print(f"{prefix}{_indent}{name}/")
+            print_attrs(obj, _indent + indent)
             for key in obj:
-                print_h5_structure(key, obj[key], indent + "    ")
+                print_h5_structure(key, obj[key], _indent + indent)
         elif isinstance(obj, h5py.Dataset):
-            print(f"{prefix}{indent}{name} (shape={obj.shape}, dtype={obj.dtype})")
-            print_attrs(obj, indent + "    ")
+            print(f"{prefix}{_indent}{name} (type=Dataset, shape={obj.shape}, dtype={obj.dtype})")
+            print_attrs(obj, _indent + indent)
     
     with h5py.File(filepath, 'r') as f:
         print(f"{prefix}{display_path}/")
-        print_attrs(f, indent="    ")
+        print_attrs(f, _indent=indent)
         for key in f:
-            print_h5_structure(key, f[key], indent="    ")
+            print_h5_structure(key, f[key], _indent=indent)
 
 
 def repack_h5(
@@ -434,7 +422,29 @@ def to_h5_attribute(obj):
         )
 
 
-# %% Test
+def join_h5_group(parent: str | None, child: str) -> str:
+    """
+    Join a parent HDF5 group path and a child name with '/'.
+
+    Parameters
+    ----------
+    parent : str or None
+        Parent group path. If None, the child is returned as-is (root level).
+    child : str
+        Child group or dataset name to append.
+
+    Returns
+    -------
+    str
+        ``f"{parent}/{child}"`` when parent is not None, else ``child``.
+    """
+    return f"{parent}/{child}" if parent is not None else child
+
+
+
+# =============================================================================
+# Test
+# =============================================================================
 if __name__ == "__main__":
     import tempfile
     

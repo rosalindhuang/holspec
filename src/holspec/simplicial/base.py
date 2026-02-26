@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 from scipy import sparse
 
-from holspec.utilities import save_h5, read_h5, convert_numpy_to_python, join_group_path
+from holspec.utilities import save_h5, read_h5, convert_numpy_to_python, join_h5_group
 from .simplicial_constructions import construct_complex_from_config
 
 if TYPE_CHECKING:
@@ -333,7 +333,7 @@ class SimplicialComplex:
                     datasets=inc_datasets,
                     attributes=inc_attributes,
                     mode=mode,
-                    group=join_group_path(group, f'incidence/{k}'),
+                    group=join_h5_group(group, f'incidence/{k}'),
                     hdf5_options=hdf5_options
                 )
         
@@ -385,7 +385,7 @@ class SimplicialComplex:
         max_dim = attributes['max_dim']
         
         # Read all simplices from /simplices group
-        datasets, _ = read_h5(filepath, group=join_group_path(group, 'simplices'))
+        datasets, _ = read_h5(filepath, group=join_h5_group(group, 'simplices'))
         
         simplices = {}
         for key, data in datasets.items():
@@ -421,7 +421,7 @@ class SimplicialComplex:
                 try:
                     datasets, inc_attrs = read_h5(
                         filepath, 
-                        group=join_group_path(group, f'incidence/{k}')
+                        group=join_h5_group(group, f'incidence/{k}')
                     )
                     
                     # Extract CSR components

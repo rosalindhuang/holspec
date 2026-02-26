@@ -10,7 +10,7 @@ from .helpers import *
 # Define public API of the module
 __all__ = [
     # io.py
-    'join_group_path',
+    'join_h5_group',
     'save_h5',
     'read_h5',
     'initialize_h5',
@@ -31,6 +31,8 @@ __all__ = [
     # helpers.py
     'natsorted',
     'convert_numpy_to_python',
+    'convert_paths_to_relative',
+    'convert_relative_to_paths',
     'format_float_str',
     'format_text',
     'inspect_dict',

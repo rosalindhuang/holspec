@@ -49,7 +49,11 @@ SRC_DIR = PROJECT_ROOT / "src"
 # Utilities for directory management
 # =============================================================================
 
-def prepare_directory(path: Path, clear_mode: str | bool | None = None, verbose: bool = True) -> None:
+def prepare_directory(
+    path: Path, 
+    clear_mode: str | bool | None = None, 
+    verbose: bool = True
+) -> None:
     """
     Ensure a directory exists, creating it if necessary, and optionally clearing its contents.
 
@@ -57,9 +61,9 @@ def prepare_directory(path: Path, clear_mode: str | bool | None = None, verbose:
     ----------
     path : Path
         Directory path to prepare.
-    clear_mode : {'all', 'files', 'dirs'}, bool, or None, default=None
+    clear_mode : {'all', 'files', 'dirs', 'none'}, bool, or None, default=None
         What to clear if directory exists:
-        - None or False: Don't clear anything
+        - None, False, or 'none': Don't clear anything
         - True or 'all': Remove all files and subdirectories
         - 'files': Remove only files, keep subdirectories
         - 'dirs': Remove only subdirectories, keep files
@@ -73,10 +77,10 @@ def prepare_directory(path: Path, clear_mode: str | bool | None = None, verbose:
     if path is None:
         return
     
-    # Normalize boolean to string
+    # Normalize boolean and string inputs for clear_mode
     if clear_mode is True:
         clear_mode = 'all'
-    elif clear_mode is False:
+    elif clear_mode is False or clear_mode == 'none':
         clear_mode = None
     
     # Validate clear_mode

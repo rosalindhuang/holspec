@@ -22,7 +22,9 @@ import nbformat
 import subprocess
 
 
-# %% Type conversion
+# =============================================================================
+# Type conversion
+# =============================================================================
 
 def convert_numpy_to_python(obj):
     """
@@ -73,7 +75,96 @@ def convert_numpy_to_python(obj):
         return obj
 
 
-# %% String utilities
+def convert_paths_to_relative(obj, root: Path):
+    """
+    Recursively convert Path objects to relative path strings.
+
+    Intended for serializing file path structures into YAML configs, where
+    paths are stored as strings relative to the project root.
+
+    Parameters
+    ----------
+    obj : dict, list, or Path
+        Nested structure (dicts and/or lists) with Path objects at the leaves.
+        String leaves are passed through unchanged.
+    root : Path
+        Root path to make paths relative to.
+
+    Returns
+    -------
+    dict, list, or str
+        Same structure with Path leaves replaced by relative path strings.
+
+    Raises
+    ------
+    TypeError
+        If a leaf value is neither a Path nor a str.
+
+    Examples
+    --------
+    >>> from pathlib import Path
+    >>> root = Path('/project')
+    >>> obj = {'a': Path('/project/data/a.h5'), 'b': {'c': Path('/project/data/b.h5')}}
+    >>> convert_paths_to_relative(obj, root)
+    {'a': 'data/a.h5', 'b': {'c': 'data/b.h5'}}
+    """
+    if isinstance(obj, dict):
+        return {key: convert_paths_to_relative(value, root) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_paths_to_relative(item, root) for item in obj]
+    elif isinstance(obj, Path):
+        return str(obj.relative_to(root))
+    elif isinstance(obj, str):
+        return obj
+    else:
+        raise TypeError(f"Expected Path, str, dict, or list; got {type(obj).__name__!r}.")
+
+
+def convert_relative_to_paths(obj, root: Path):
+    """
+    Recursively convert relative path strings to absolute Path objects.
+
+    Inverse of convert_paths_to_relative. Intended for reconstructing file path
+    structures read back from YAML configs.
+
+    Parameters
+    ----------
+    obj : dict, list, or str
+        Nested structure (dicts and/or lists) with relative path strings at the leaves.
+    root : Path
+        Root path to resolve relative paths against.
+
+    Returns
+    -------
+    dict, list, or Path
+        Same structure with string leaves replaced by absolute Path objects.
+
+    Raises
+    ------
+    TypeError
+        If a leaf value is not a str.
+
+    Examples
+    --------
+    >>> from pathlib import Path
+    >>> root = Path('/project')
+    >>> obj = {'a': 'data/a.h5', 'b': {'c': 'data/b.h5'}}
+    >>> convert_relative_to_paths(obj, root)
+    {'a': PosixPath('/project/data/a.h5'), 'b': {'c': PosixPath('/project/data/b.h5')}}
+    """
+    if isinstance(obj, dict):
+        return {key: convert_relative_to_paths(value, root) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_relative_to_paths(item, root) for item in obj]
+    elif isinstance(obj, str):
+        return root / obj
+    else:
+        raise TypeError(f"Expected str, dict, or list; got {type(obj).__name__!r}.")
+
+
+# =============================================================================
+# String utilities
+# =============================================================================
 
 def format_float_str(value: float, fmt: str | None = 'g', strip_zeros: bool = True) -> str:
     """
@@ -227,7 +318,15 @@ def format_text(text: str, max_width: int = 80, preserve_paragraphs: bool = True
 
 #%% Printing utilities
 
-def inspect_dict(data_dict, dict_name="dict", max_depth=None, _current_depth=0, _prefix=""):
+def inspect_dict(
+    data_dict: dict,
+    dict_name: str = "dict",
+    max_depth: int | None = None,
+    prefix: str = "",
+    indent: str = "  ",
+    _current_depth: int = 0,
+    _indent: str = ""
+) -> None:
     """
     Print the structure and contents of a nested dictionary.
 
@@ -239,10 +338,14 @@ def inspect_dict(data_dict, dict_name="dict", max_depth=None, _current_depth=0, 
         Name to display for the root dictionary.
     max_depth : int, optional
         Maximum depth to traverse. If None, traverse all levels.
+    prefix : str, default=''
+        String prepended to every printed line (e.g., '    ' to indent the whole block).
+    indent : str, default='  '
+        String used for each level of indentation (e.g., '  ' for two spaces).
     _current_depth : int, optional
         Internal parameter for tracking recursion depth (do not use).
-    _prefix : str, optional
-        Internal parameter for indentation (do not use).
+    _indent : str, optional
+        Internal parameter for accumulating indentation (do not use).
 
     Returns
     -------
@@ -270,31 +373,30 @@ def inspect_dict(data_dict, dict_name="dict", max_depth=None, _current_depth=0, 
         else:
             return f"(type={type(value).__name__})"
     
-    # Print current level
+    # Print root header
     if _current_depth == 0:
-        print(f"{dict_name}/")
+        print(f"{prefix}{dict_name}/")
 
     # Check depth limit
     if max_depth is not None and _current_depth >= max_depth:
-        # print(f"{_prefix}    ...")
         return
     
     # Iterate through dictionary items
     for key, value in data_dict.items():
         if isinstance(value, dict):
-            # Nested dictionary
-            print(f"{_prefix}    {key}/")
+            print(f"{prefix}{_indent}{indent}{key}/")
             inspect_dict(
-                value, 
+                value,
                 dict_name=key,
                 max_depth=max_depth,
+                prefix=prefix,
+                indent=indent,
                 _current_depth=_current_depth + 1,
-                _prefix=_prefix + "    "
+                _indent=_indent + indent
             )
         else:
-            # Regular value
             summary = summarize_value(value)
-            print(f"{_prefix}    {key} {summary}")
+            print(f"{prefix}{_indent}{indent}{key} {summary}")
 
 
 def print_pipeline_config(
@@ -368,7 +470,9 @@ def print_pipeline_config(
         print()
 
 
-# %% Timing utilities
+# =============================================================================
+# Timing utilities
+# =============================================================================
 
 def timed(fun, args, repeats=1) -> float:
     """
@@ -394,7 +498,9 @@ def timed(fun, args, repeats=1) -> float:
     return (time.time() - start) / repeats
 
 
-# %% Notebook utilities
+# =============================================================================
+# Notebook utilities
+# =============================================================================
 
 def export_notebook_outputs(notebook_name: str, output_filename: str = None):
     """

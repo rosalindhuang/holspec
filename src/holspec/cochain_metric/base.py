@@ -11,7 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from holspec.utilities import save_h5, read_h5, join_group_path
+from holspec.utilities import save_h5, read_h5, join_h5_group
 
 from .metric_tensor import MetricTensor
 from .metric_models import construct_cochain_metric_from_config
@@ -215,7 +215,7 @@ class CochainMetric:
                 datasets=G_k_datasets,
                 attributes=G_k_attributes,
                 mode=mode,
-                group=join_group_path(group, f'degree_{k}'),
+                group=join_h5_group(group, f'degree_{k}'),
                 hdf5_options=hdf5_options,
             )
 
@@ -266,7 +266,7 @@ class CochainMetric:
         metric_tensors: dict[int, MetricTensor] = {}
         for k in range(max_dim + 1):
             metric_tensor_datasets, metric_tensor_attributes = read_h5(
-                filepath, group=join_group_path(group, f'degree_{k}')
+                filepath, group=join_h5_group(group, f'degree_{k}')
             )
             if 'size' not in metric_tensor_attributes:
                 raise ValueError(
