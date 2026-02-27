@@ -13,7 +13,7 @@ Utilities (for data creation/loading):
 from .base import PointData
 from .ensemble import PointDataEnsemble
 from .point_generators import *
-from .loaders import *
+from .data_loaders import *
 
 
 # Define public API of the module
