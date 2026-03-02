@@ -30,15 +30,16 @@ def construct_identity_metric(size: int) -> MetricTensor:
     Parameters
     ----------
     size : int
-        Dimension N of the vector space (must be positive).
+        Dimension N of the vector space. Must be a non-negative integer.
+        N=0 is permitted and returns the unique metric on the zero vector space.
 
     Returns
     -------
     MetricTensor
         Diagonal metric with all weights equal to 1.
     """
-    if not isinstance(size, (int, np.integer)) or size <= 0:
-        raise ValueError(f"size must be a positive integer, got {size!r}")
+    if not isinstance(size, (int, np.integer)) or size < 0:
+        raise ValueError(f"size must be a non-negative integer, got {size!r}")
     return MetricTensor(sparse.eye(size, format='csr'), is_diagonal=True)
 
 
@@ -50,7 +51,8 @@ def construct_diagonal_metric(diagonal_elements: np.ndarray) -> MetricTensor:
     ----------
     diagonal_elements : ndarray, shape (N,)
         Strictly positive weights for each basis element. Validated against
-        the SPD contract by MetricTensor at construction.
+        the SPD contract by MetricTensor at construction. An empty array
+        (N=0) is permitted and returns the unique metric on the zero vector space.
 
     Returns
     -------
@@ -58,9 +60,9 @@ def construct_diagonal_metric(diagonal_elements: np.ndarray) -> MetricTensor:
         Diagonal metric with the specified weights.
     """
     diagonal_elements = np.asarray(diagonal_elements, dtype=float)
-    if diagonal_elements.ndim != 1 or diagonal_elements.size == 0:
+    if diagonal_elements.ndim != 1:
         raise ValueError(
-            f"diagonal_elements must be a non-empty 1D array, "
+            f"diagonal_elements must be a 1D array, "
             f"got shape {diagonal_elements.shape}"
         )
     return MetricTensor(

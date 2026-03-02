@@ -11,6 +11,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from scipy import sparse
+
 from holspec.utilities import save_h5, read_h5, join_h5_group
 
 from .metric_tensor import MetricTensor
@@ -368,7 +370,32 @@ class CochainMetric:
     # =========================================================================
 
     def __getitem__(self, k: int) -> MetricTensor:
-        """Return metric tensor G^k at degree k."""
+        """Return metric tensor G^k at degree k.
+
+        Parameters
+        ----------
+        k : int
+            Degree. Valid range: -1 <= k <= max_dim+1.
+
+        Returns
+        -------
+        MetricTensor
+
+        Raises
+        ------
+        KeyError
+            If k is not in [-1, max_dim+1].
+
+        Notes
+        -----
+        For interior degrees 0 <= k <= max_dim, returns the stored metric tensor.
+        For boundary degrees k=-1 and k=max_dim+1, returns the unique 0x0 metric
+        tensor on the zero vector space, constructed on demand.
+        """
+        if k == -1 or k == self.max_dim + 1:
+            # Boundary-degree metric: unique metric on the zero cochain space.
+            # Constructed on demand; trivially cheap (no diagonal to cache).
+            return MetricTensor(sparse.csr_matrix((0, 0)), is_diagonal=True)
         if k not in self._metric_tensors:
             raise KeyError(
                 f"No metric tensor at degree {k}. Available degrees: {self.degrees}"

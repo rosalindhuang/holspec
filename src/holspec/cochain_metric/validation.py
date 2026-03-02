@@ -55,7 +55,8 @@ def validate_metric_tensor(
     Current checks (diagonal case only):
 
     - Type: must be a scipy sparse matrix.
-    - Shape: must be square and non-empty.
+    - Shape: must be square. Size-0 (0x0) matrices are permitted as the
+      unique metric on the zero vector space; all checks pass vacuously.
     - Values: all stored entries must be finite (NaN and Inf not allowed).
     - Positive definiteness: all diagonal entries must be strictly positive.
       For a diagonal matrix, this is equivalent to the full SPD contract.
@@ -76,8 +77,11 @@ def validate_metric_tensor(
         raise ValueError(
             f"Metric tensor must be a square matrix, got shape {matrix.shape}"
         )
+
+    # --- Size-0 case: unique metric on the zero vector space ---
+    # All remaining checks pass vacuously; no entries to validate.
     if matrix.shape[0] == 0:
-        raise ValueError("Metric tensor must be non-empty (size > 0)")
+        return
 
     # --- Finite values ---
     # Only stored (non-zero) entries are checked; implicit zeros are always finite.

@@ -27,7 +27,8 @@ class MetricTensor:
     Parameters
     ----------
     matrix : sparse.spmatrix
-        Square SPD sparse matrix of shape (N, N).
+        Square SPD sparse matrix of shape (N, N). N=0 is permitted and
+        represents the unique metric on the zero vector space.
     is_diagonal : bool, default=False
         Whether the matrix is diagonal. Set by construction functions, which
         have the context to know the structure of what they built. When True,
@@ -43,6 +44,9 @@ class MetricTensor:
     - Non-diagonal support is deferred. Extension path: lazy sparse Cholesky
       factorization for apply_inverse; full symmetry and Cholesky-based PD check
       in validate_metric_tensor.
+    - Size-0 metrics (N=0) represent the unique metric on the zero vector space.
+      All linear algebra operations return empty arrays/matrices of the correct
+      shape.
     - In the cochain metric context, N = N_k = dim(C^k) and the metric tensor
       represents the inner product G^k on the k-cochain space C^k.
     """
@@ -147,12 +151,39 @@ class MetricTensor:
         """Return the metric tensor as an explicit sparse matrix."""
         return self._matrix
     
-    def to_inverse_matrix(self) -> sparse.csr_matrix:
-        """Return the inverse metric tensor as an explicit sparse matrix."""
+    def to_matrix_inverse(self) -> sparse.csr_matrix:
+        """
+        Return the inverse metric tensor G^{-1} as an explicit sparse matrix.
+        Convenience wrapper for ``to_matrix_power(-1)``.
+        """
+        return self.to_matrix_power(-1)
+
+    def to_matrix_power(self, p: float) -> sparse.csr_matrix:
+        """
+        Return G^p as an explicit sparse matrix.
+
+        For diagonal metrics, computes elementwise powers of the diagonal.
+        Common cases: p=-1 (inverse), p=0.5 (square root), p=-0.5
+        (inverse square root).
+
+        Parameters
+        ----------
+        p : float
+            Exponent. Any real value is accepted for diagonal metrics.
+
+        Returns
+        -------
+        sparse.csr_matrix, shape (N, N)
+
+        Raises
+        ------
+        NotImplementedError
+            If the metric is not diagonal.
+        """
         if self._is_diagonal:
-            return sparse.diags(1.0 / self._diagonal, format='csr')
+            return sparse.diags(self._diagonal ** p, format='csr')
         raise NotImplementedError(
-            "to_inverse_matrix is not yet implemented for non-diagonal "
+            "to_matrix_power is not yet implemented for non-diagonal "
             "metric tensors. Extension path: sparse Cholesky factorization."
         )
 

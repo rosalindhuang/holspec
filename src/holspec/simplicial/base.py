@@ -105,7 +105,7 @@ class SimplicialComplex:
     @property
     def f_vector(self) -> list[int]:
         """
-        Face vector: [n_0, n_1, ..., n_dim].
+        Face vector: [N_0, N_1, ..., N_n].
         Standard combinatorial topology notation.
         """
         return [len(self._simplices[k]) for k in range(self.max_dim + 1)]
@@ -113,7 +113,7 @@ class SimplicialComplex:
     @property
     def euler_characteristic(self) -> int:
         """
-        Euler characteristic: χ = Σ (-1)^k n_k.
+        Euler characteristic: χ = Σ (-1)^k N_k.
         Topological invariant of the simplicial complex.
         """
         return sum((-1)**k * len(self._simplices[k]) 
@@ -147,11 +147,12 @@ class SimplicialComplex:
         Parameters
         ----------
         k : int
-            Dimension of domain (k-simplices).
+            Dimension of domain (k-simplices). Valid range: 0 <= k <= max_dim+1.
+            Boundary degrees k=0 and k=max_dim+1 return zero maps.
 
         Returns
         -------
-        D_k : sparse.csr_matrix, shape (n_{k-1}, n_k)
+        D_k : sparse.csr_matrix, shape (N_{k-1}, N_k)
             Boundary operator matrix.
 
         Notes
@@ -160,12 +161,28 @@ class SimplicialComplex:
         - D_k[i, j] = ±1 if simplex j has face i, 0 otherwise.
         - Sign determined by orientation convention.
         - This is the primary method; use boundary_matrix() for alternative naming.
+        - Boundary-degree conventions (consistent with the mathematical framework):
+            - k=0: D_0 = 0_{0 x N_0}, the zero map C_0 -> C_{-1} = 0.
+            - k=max_dim+1: D_{n+1} = 0_{N_n x 0}, the zero map C_{n+1}=0 -> C_n.
         """
         if k not in self._incidence_cache:
-            from .incidence import compute_incidence_matrix
-            self._incidence_cache[k] = compute_incidence_matrix(
-                self._simplices, k
-            )
+            if k < 0 or k > self.max_dim + 1:
+                raise ValueError(
+                    f"k={k} is out of range. Valid range: 0 <= k <= {self.max_dim + 1} "
+                    f"(max_dim+1={self.max_dim + 1})."
+                )
+            elif k == 0:
+                # D_0: C_0 -> C_{-1} = 0, zero map of shape (0, N_0)
+                self._incidence_cache[k] = sparse.csr_matrix((0, len(self._simplices[0])))
+            elif k == self.max_dim + 1:
+                # D_{n+1}: C_{n+1} = 0 -> C_n, zero map of shape (N_n, 0)
+                self._incidence_cache[k] = sparse.csr_matrix((len(self._simplices[self.max_dim]), 0))
+            else:
+                # D_k: C_k -> C_{k-1}, shape (N_{k-1}, N_k)
+                from .incidence import compute_incidence_matrix
+                self._incidence_cache[k] = compute_incidence_matrix(
+                    self._simplices, k
+                )
         return self._incidence_cache[k]
 
     def boundary_matrix(self, k: int) -> sparse.csr_matrix:
@@ -277,7 +294,7 @@ class SimplicialComplex:
         Format
         ------
         - Root attributes: max_dim, f_vector, content_hash, has_incidence, metadata
-        - /simplices/{k}-simplices: datasets containing k-simplices as (n_k, k+1) arrays
+        - /simplices/{k}-simplices: datasets containing k-simplices as (N_k, k+1) arrays
         - /incidence/k/: subgroups with CSR components (if save_incidence=True)
         """
         filepath = Path(filepath)
@@ -391,7 +408,7 @@ class SimplicialComplex:
         for key, data in datasets.items():
             if key.endswith('-simplices'):
                 k = int(key.split('-')[0])
-                # Convert (n_k, k+1) array to list of tuples
+                # Convert (N_k, k+1) array to list of tuples
                 simplices[k] = [tuple(row) for row in data]
         
         if not simplices:
