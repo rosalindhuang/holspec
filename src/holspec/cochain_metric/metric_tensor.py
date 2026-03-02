@@ -146,6 +146,15 @@ class MetricTensor:
     def to_matrix(self) -> sparse.csr_matrix:
         """Return the metric tensor as an explicit sparse matrix."""
         return self._matrix
+    
+    def to_inverse_matrix(self) -> sparse.csr_matrix:
+        """Return the inverse metric tensor as an explicit sparse matrix."""
+        if self._is_diagonal:
+            return sparse.diags(1.0 / self._diagonal, format='csr')
+        raise NotImplementedError(
+            "to_inverse_matrix is not yet implemented for non-diagonal "
+            "metric tensors. Extension path: sparse Cholesky factorization."
+        )
 
     # =========================================================================
     # Utilities
