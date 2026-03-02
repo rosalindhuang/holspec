@@ -11,6 +11,8 @@ from .operators import (
     compute_dual_coboundary_matrix,
     compute_laplacian_lower_matrix,
     compute_laplacian_upper_matrix,
+    compute_laplacian_matrix,
+    symmetrize_matrix,
 )
 from .validation import (
     validate_hodge_laplacian_inputs,
