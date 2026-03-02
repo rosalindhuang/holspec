@@ -293,9 +293,9 @@ class SimplicialComplex:
 
         Format
         ------
-        - Root attributes: max_dim, f_vector, content_hash, has_incidence, metadata
-        - /simplices/{k}-simplices: datasets containing k-simplices as (N_k, k+1) arrays
-        - /incidence/k/: subgroups with CSR components (if save_incidence=True)
+        - Root attributes: max_dim, f_vector, content_hash, incidence_keys, metadata
+        - /simplices/degree_{k}: datasets containing k-simplices as (N_k, k+1) arrays
+        - /incidence/degree_{k}/: subgroups with CSR components (if save_incidence=True)
         """
         filepath = Path(filepath)
         
@@ -303,18 +303,25 @@ class SimplicialComplex:
         if hdf5_options is None:
             hdf5_options = {'compression': 'gzip', 'compression_opts': 4}
         
+        # Serialize cached incidence keys
+        incidence_keys = (
+            [f'degree_{k}' for k in sorted(self._incidence_cache.keys())]
+            if save_incidence and self._incidence_cache
+            else []
+        )
+
         # Prepare root-level attributes
         root_attributes = {
             'max_dim': self.max_dim,
             'f_vector': self.f_vector,
             'content_hash': self.content_hash,
-            'has_incidence': save_incidence and bool(self._incidence_cache),
+            'incidence_keys': incidence_keys,
             'metadata': self.metadata
         }
         
         # Prepare simplices datasets with subgroup paths
         simplices_datasets = {
-            f'simplices/{k}-simplices': np.array(simps, dtype=int)
+            f'simplices/degree_{k}': np.array(simps, dtype=int)
             for k, simps in self._simplices.items()
         }
         
@@ -350,7 +357,7 @@ class SimplicialComplex:
                     datasets=inc_datasets,
                     attributes=inc_attributes,
                     mode=mode,
-                    group=join_h5_group(group, f'incidence/{k}'),
+                    group=join_h5_group(group, f'incidence/degree_{k}'),
                     hdf5_options=hdf5_options
                 )
         
@@ -406,8 +413,8 @@ class SimplicialComplex:
         
         simplices = {}
         for key, data in datasets.items():
-            if key.endswith('-simplices'):
-                k = int(key.split('-')[0])
+            if key.startswith('degree_'):
+                k = int(key.split('_')[1])
                 # Convert (N_k, k+1) array to list of tuples
                 simplices[k] = [tuple(row) for row in data]
         
@@ -431,44 +438,20 @@ class SimplicialComplex:
                     )
         
         # Load incidence matrices if available and requested
-        has_incidence = attributes.get('has_incidence', False)
-        if has_incidence and load_incidence:
-            # Try loading each possible incidence matrix
-            for k in range(max_dim + 1):
-                try:
-                    datasets, inc_attrs = read_h5(
-                        filepath, 
-                        group=join_h5_group(group, f'incidence/{k}')
-                    )
-                    
-                    # Extract CSR components
-                    if 'data' not in datasets or 'indices' not in datasets or 'indptr' not in datasets:
-                        print(f"Warning: Incomplete incidence matrix D_{k}, skipping")
-                        continue
-                    
-                    data = datasets['data']
-                    indices = datasets['indices']
-                    indptr = datasets['indptr']
-                    shape = tuple(inc_attrs['shape'])
-                    
-                    # Validate shape matches expected dimensions
-                    expected_shape = (len(sc._simplices.get(k-1, [])), 
-                                    len(sc._simplices.get(k, [])))
-                    
-                    if shape != expected_shape:
-                        print(f"Warning: Incidence matrix D_{k} shape mismatch. "
-                            f"Expected {expected_shape}, got {shape}. Skipping.")
-                        continue
-                    
-                    # Reconstruct sparse matrix
-                    D_k = sparse.csr_matrix((data, indices, indptr), shape=shape)
-                    
-                    # Store in cache
-                    sc._incidence_cache[k] = D_k
-                    
-                except (KeyError, OSError):
-                    # Group doesn't exist - this is fine, not all k may have been saved
-                    continue
+        incidence_keys = list(attributes.get('incidence_keys', []))
+        if incidence_keys and load_incidence:
+            for key in incidence_keys:
+                k = int(key.split('_')[1])
+                inc_datasets, inc_attrs = read_h5(
+                    filepath,
+                    group=join_h5_group(group, f'incidence/{key}')
+                )
+                shape = tuple(inc_attrs['shape'])
+                D_k = sparse.csr_matrix(
+                    (inc_datasets['data'], inc_datasets['indices'], inc_datasets['indptr']),
+                    shape=shape,
+                )
+                sc._incidence_cache[k] = D_k
         
         return sc
 
@@ -634,8 +617,12 @@ class SimplicialComplex:
 
     def __repr__(self) -> str:
         """Concise representation for debugging."""
-        return (f"SimplicialComplex(dim={self.max_dim}, "
-                f"f_vector={self.f_vector}, χ={self.euler_characteristic}, hash={self.content_hash[:8]})")
+        return (
+            f"SimplicialComplex(dim={self.max_dim}, "
+            f"f_vector={self.f_vector}, "
+            f"χ={self.euler_characteristic}, "
+            f"hash={self.content_hash[:8]})"
+        )
     
     def __eq__(self, other: 'SimplicialComplex') -> bool:
         """
