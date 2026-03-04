@@ -32,7 +32,7 @@ if TYPE_CHECKING:
 
 
 # Valid component names for Laplacian access methods
-_VALID_COMPONENTS = ('lower', 'upper', 'full')
+LAPLACIAN_COMPONENT_NAMES = ('lower', 'upper', 'full')
 
 
 # =============================================================================
@@ -158,7 +158,7 @@ class HodgeLaplacian:
         return self._hash_cache
 
     # =========================================================================
-    # Primary Access Methods
+    # Laplacian Access Methods (Primary)
     # =========================================================================
 
     def to_matrix(
@@ -225,7 +225,7 @@ class HodgeLaplacian:
         return self._symmetric_laplacian_cache[(k, component)]
 
     # =========================================================================
-    # Differential Operator Inspection
+    # Differential Operator Access
     # =========================================================================
 
     def coboundary(self, k: int) -> sparse.csr_matrix:
@@ -439,7 +439,7 @@ class HodgeLaplacian:
         dict with keys 'lower', 'upper', 'full', each mapping to a
         sparse.csr_matrix of shape (N_k, N_k).
         """
-        return {comp: self.to_matrix(k, comp) for comp in _VALID_COMPONENTS}
+        return {comp: self.to_matrix(k, comp) for comp in LAPLACIAN_COMPONENT_NAMES}
 
     def __len__(self) -> int:
         """Number of degrees (= max_dim + 1)."""
@@ -488,7 +488,7 @@ class HodgeLaplacian:
         for k in self.degrees:
             N_k = self._sc.num_simplices[k]
             parts = []
-            for comp in _VALID_COMPONENTS:
+            for comp in LAPLACIAN_COMPONENT_NAMES:
                 key = (k, comp)
                 if key in self._laplacian_cache:
                     parts.append(f"nnz={self._laplacian_cache[key].nnz}")
@@ -521,10 +521,10 @@ class HodgeLaplacian:
     @staticmethod
     def _validate_component(component: str) -> None:
         """Validate that component is a recognized name."""
-        if component not in _VALID_COMPONENTS:
+        if component not in LAPLACIAN_COMPONENT_NAMES:
             raise ValueError(
                 f"Unknown component '{component}'. "
-                f"Valid components: {_VALID_COMPONENTS}."
+                f"Valid components: {LAPLACIAN_COMPONENT_NAMES}."
             )
 
     def _compute_laplacian(self, k: int, component: str) -> None:

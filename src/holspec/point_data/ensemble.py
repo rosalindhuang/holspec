@@ -93,7 +93,12 @@ class PointDataEnsemble:
     # I/O and Factory Methods
     # =========================================================================
     
-    def save(self, filepath: str | Path, overwrite: bool = True, verbose: bool = False) -> None:
+    def save(
+        self, 
+        filepath: str | Path, 
+        overwrite: bool = True, 
+        verbose: bool = False
+    ) -> None:
         """
         Save ensemble to HDF5 file.
         
