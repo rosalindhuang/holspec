@@ -132,13 +132,12 @@ def load_hodge_laplacian(
     ----------
     filepath : str or Path
         Path to an HDF5 pipeline file containing HodgeLaplacian data.
-        Must have root-level ``input_file`` and ``stage_name`` attributes
-        (written by the pipeline notebook).
+        Must have root-level ``input_file`` and ``stage_name`` attributes.
     project_root : str or Path
         Project root for resolving relative provenance paths.
     group : str, optional
         HDF5 group for all three objects (HL, CM, SC). Typically
-        ``'member_{i:04d}'`` for ensemble pipelines.
+        ``'member_{i:04d}'`` for pipelines based on point data ensembles.
     validate_hash : bool, default=True
         Whether to verify content hashes during loading. Passed through
         to ``SimplicialComplex.load()``, ``CochainMetric.load()``, and

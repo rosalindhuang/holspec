@@ -1425,9 +1425,10 @@ def plot_matrix(
     cmap: str = 'RdBu_r',
     vmin: Optional[float] = None,
     vmax: Optional[float] = None,
+    symmetric: bool = False,
     # Zero masking
     zero_color: Optional[str] = None,
-    zero_thresh: float = 0.0,
+    zero_thresh: float = 1e-8,
     # Colorbar
     colorbar: bool = False,
     **kwargs
@@ -1455,10 +1456,15 @@ def plot_matrix(
         Lower bound for colormap normalization. Defaults to data minimum.
     vmax : float, optional
         Upper bound for colormap normalization. Defaults to data maximum.
+    symmetric : bool, default False
+        If True, automatically sets ``vmin = -abs_max`` and ``vmax = abs_max``
+        where ``abs_max`` is the maximum absolute value in the data. This
+        ensures the colormap is centered on zero. Overrides any explicit
+        ``vmin``/``vmax`` when True.
     zero_color : str, optional
         Color for entries satisfying ``|value| <= zero_thresh``. If None,
         zero masking is disabled and zeros are colored by the colormap.
-    zero_thresh : float, default 0.0
+    zero_thresh : float, default 1e-8
         Threshold below which entries are considered zero. Only used when
         ``zero_color`` is not None.
     colorbar : bool, default False
@@ -1501,6 +1507,12 @@ def plot_matrix(
     else:
         cmap_obj = cmap
         data = matrix
+
+    # Symmetric normalization: center colormap on zero
+    if symmetric:
+        filled = np.ma.filled(data, 0) if np.ma.is_masked(data) else data
+        abs_max = np.nanmax(np.abs(filled))
+        vmin, vmax = -abs_max, abs_max
 
     # Auto figsize: 0.65 in per cell, extra width for colorbar
     if ax is None:
