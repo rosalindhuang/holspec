@@ -76,7 +76,7 @@ def construct_diagonal_metric(diagonal_elements: np.ndarray) -> MetricTensor:
 
 def construct_combinatorial_cochain_metric(
     sc: SimplicialComplex,
-    point_data: PointData | None = None,
+    ptd: PointData | None = None,
     **params,
 ) -> dict[int, MetricTensor]:
     """
@@ -91,7 +91,7 @@ def construct_combinatorial_cochain_metric(
     ----------
     sc : SimplicialComplex
         Source simplicial complex. Only `num_simplices` is accessed.
-    point_data : PointData, optional
+    ptd : PointData, optional
         Accepted for interface consistency with other metric model construction 
         functions; not used in the combinatorial special case.
     **params
@@ -129,7 +129,7 @@ COCHAIN_METRIC_MODEL_REGISTRY: dict[str, callable] = {
 def construct_cochain_metric_from_config(
     config: dict,
     sc: SimplicialComplex,
-    point_data: PointData,
+    ptd: PointData,
 ) -> dict[int, MetricTensor]:
     """
     Construct cochain metric tensors G^k : C^k -> C^k for k = 0, ..., n
@@ -143,7 +143,7 @@ def construct_cochain_metric_from_config(
 
     sc : SimplicialComplex
         Source simplicial complex.
-    point_data : PointData
+    ptd : PointData
         Point cloud data. Required by geometric metric models; unused in
         the combinatorial special case.
 
@@ -169,7 +169,7 @@ def construct_cochain_metric_from_config(
 
     params = config.get('params', {})
     construct_fn = COCHAIN_METRIC_MODEL_REGISTRY[model]
-    return construct_fn(sc, point_data, **params)
+    return construct_fn(sc, ptd, **params)
 
 
 def create_metric_model_label(
