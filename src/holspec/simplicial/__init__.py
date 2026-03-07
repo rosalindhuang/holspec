@@ -20,7 +20,6 @@ __all__ = [
     'compute_orientation_sign',
     'get_boundary',
     'compute_simplicial_closure',
-    'compute_circumradius',
     'compute_permutation_sign',
 
     # incidence.py

@@ -197,39 +197,6 @@ def compute_simplicial_closure(
     return result
 
 
-def compute_circumradius(simplex_vertices: np.ndarray) -> float:
-    """
-    Compute circumradius of a simplex.
-    
-    Parameters
-    ----------
-    simplex_vertices : np.ndarray, shape (k+1, d)
-        Vertex positions of a k-simplex in d-dimensional space.
-        
-    Returns
-    -------
-    radius : float
-        Circumradius of the simplex.
-        
-    Notes
-    -----
-    - For a d-simplex in d dimensions (full-dimensional), circumcenter is unique.
-    - For lower-dimensional simplices (k < d), computes circumradius in the
-      affine subspace spanned by the simplex.
-    - Uses stable numerical algorithm for degenerate or near-degenerate cases.
-    - For a single vertex (0-simplex), returns 0.
-    - For an edge (1-simplex), returns half the edge length.
-    
-    Examples
-    --------
-    >>> # Equilateral triangle with side length 2
-    >>> vertices = np.array([[0, 0], [2, 0], [1, np.sqrt(3)]])
-    >>> compute_circumradius(vertices)
-    1.1547...  # 2/sqrt(3)
-    """
-    pass
-
-
 # =============================================================================
 # Combinatorial utilities
 # =============================================================================
