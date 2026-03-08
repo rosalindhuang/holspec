@@ -263,7 +263,7 @@ class SimplicialComplex:
     def save(
         self,
         filepath: str | Path,
-        save_incidence: bool = False,
+        save_incidence: bool = True,
         mode: str = 'replace',
         group: str | None = None,
         hdf5_options: dict | None = None
@@ -275,7 +275,7 @@ class SimplicialComplex:
         ----------
         filepath : str or Path
             Output file path.
-        save_incidence : bool, default=False
+        save_incidence : bool, default=True
             Whether to save cached incidence matrices.
             Only saves matrices that have been computed (in cache).
         mode : {'replace', 'update', 'create'}, default='replace'

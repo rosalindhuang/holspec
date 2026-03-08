@@ -240,6 +240,7 @@ class HodgeLaplacianSpectra:
         filepath: str | Path,
         mode: str = 'replace',
         group: str | None = None,
+        save_eigenvectors: bool = True,
         hdf5_options: dict | None = None,
     ) -> str:
         """
@@ -256,6 +257,10 @@ class HodgeLaplacianSpectra:
             How to handle an existing file/group.
         group : str, optional
             HDF5 group path for the data. If None, saves at root level.
+        save_eigenvectors : bool, default=True
+            Whether to include eigenvectors in the saved file. If False,
+            only eigenvalues are saved even if eigenvectors are present
+            in the cached spectra.
         hdf5_options : dict, optional
             HDF5 compression options. Default: gzip level 4.
 
@@ -311,7 +316,7 @@ class HodgeLaplacianSpectra:
                 'num_eigenvalues': spc.num_eigenvalues,
             }
 
-            if spc.eigenvectors is not None:
+            if spc.eigenvectors is not None and save_eigenvectors:
                 spc_datasets['eigenvectors'] = spc.eigenvectors
 
             save_h5(
@@ -456,12 +461,15 @@ class HodgeLaplacianSpectra:
         lines = []
 
         lines.append('Hodge Laplacian Spectra:')
-        lines.append('-' * 80)
+        lines.append('-' * 60)
         lines.append(
+            f"{'':<20} (num_eig, dim_ker)\n{indent}"
             f"{'k':<4} {'N_k':<6} "
-            f"{'lower':<20} {'upper':<20} {'full':<20}"
+            f"{'L^low':<16} {'L^upp':<16} {'L^full':<16}"
+            # f"{'L^low':<12} {'L^upp':<12} {'L^full':<10}(num_eig, dim_ker)"
+            # f"\n{'':<20} (num_eig, dim_ker)"
         )
-        lines.append('-' * 80)
+        lines.append('-' * 60)
 
         for k in self.degrees:
             N_k = self.dimensions[k]
@@ -470,17 +478,16 @@ class HodgeLaplacianSpectra:
                 key = (k, comp)
                 if key in self._spectrum_cache:
                     spc = self._spectrum_cache[key]
-                    dk = spc.dim_ker()
-                    parts.append(f"num_eig={spc.num_eigenvalues}, dim_ker={spc.dim_ker()}")
+                    parts.append(f"({spc.num_eigenvalues}, {spc.dim_ker()})")
                 else:
                     parts.append('--')
 
             lines.append(
                 f"{k:<4} {N_k:<6} "
-                f"{parts[0]:<20} {parts[1]:<20} {parts[2]:<20}"
+                f"{parts[0]:<16} {parts[1]:<16} {parts[2]:<16}"
             )
 
-        lines.append('-' * 80)
+        lines.append('-' * 60)
         lines.append(
             f"solver: {self._solver}, "
             f"eigenvectors: {self._compute_eigenvectors}"
