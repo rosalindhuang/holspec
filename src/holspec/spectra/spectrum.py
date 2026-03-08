@@ -127,7 +127,9 @@ class Spectrum:
         -------
         int
         """
-        pass
+        # Eigenvalues are sorted ascending, so searchsorted gives the
+        # count of values <= tol in O(log n).
+        return int(np.searchsorted(self._eigenvalues, tol, side='right'))
 
     def nonzero_eigenvalues(self, tol: float = ZERO_EIGENVALUE_TOL) -> np.ndarray:
         """
@@ -144,7 +146,7 @@ class Spectrum:
             Nonzero eigenvalues, sorted ascending. Empty array if all
             eigenvalues are at or below tol.
         """
-        pass
+        return self._eigenvalues[self._eigenvalues > tol]
 
     def nonzero_eigenvectors(self, tol: float = ZERO_EIGENVALUE_TOL) -> np.ndarray:
         """
@@ -168,7 +170,12 @@ class Spectrum:
         ValueError
             If eigenvectors were not provided at construction.
         """
-        pass
+        if self._eigenvectors is None:
+            raise ValueError(
+                "Eigenvectors were not provided at construction."
+            )
+        mask = self._eigenvalues > tol
+        return self._eigenvectors[:, mask]
 
     def moment(
         self,
@@ -201,8 +208,20 @@ class Spectrum:
         float
             The spectral moment. Returns 0.0 if the selected eigenvalue
             set is empty.
+
+        Notes
+        -----
+        When nonzero=False and p < 0, zero eigenvalues produce inf terms
+        (0^p = inf for p < 0). Use nonzero=True to restrict to the
+        positive part of the spectrum for negative exponents.
         """
-        pass
+        selected = self.nonzero_eigenvalues(tol) if nonzero else self._eigenvalues
+        n = len(selected)
+        if n == 0:
+            return 0.0
+
+        total = float(np.sum(selected ** p))
+        return total / n if normalized else total
 
     def heat_trace(self, t: float | np.ndarray) -> float | np.ndarray:
         """
@@ -222,13 +241,22 @@ class Spectrum:
         float or ndarray
             Scalar t returns float; array t returns ndarray of matching
             shape.
-        
+
         Notes
         -----
         To obtain the heat trace restricted to the nonzero spectrum,
         subtract dim_ker: ``spectrum.heat_trace(t) - spectrum.dim_ker()``.
         """
-        pass
+        t = np.asarray(t, dtype=np.float64)
+        scalar_input = t.ndim == 0
+
+        # t[..., newaxis] broadcasts against eigenvalues: (..., num_eigenvalues)
+        # sum over last axis collapses to (...)
+        result = np.exp(-t[..., np.newaxis] * self._eigenvalues).sum(axis=-1)
+
+        if scalar_input:
+            return float(result)
+        return result
 
     # =========================================================================
     # Utilities

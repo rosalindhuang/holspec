@@ -85,7 +85,26 @@ class HodgeLaplacianSpectra:
         compute_eigenvectors: bool = False,
         metadata: dict | None = None,
     ):
-        pass
+        # Validate solver
+        if solver not in VALID_SOLVER_NAMES:
+            raise ValueError(
+                f"Unknown solver '{solver}'. "
+                f"Valid solvers: {VALID_SOLVER_NAMES}."
+            )
+
+        self._hl = hl
+        self._solver = solver
+        self._compute_eigenvectors = compute_eigenvectors
+
+        # Initialize metadata
+        self.metadata: dict = metadata if metadata is not None else {}
+        if 'creation_time' not in self.metadata:
+            self.metadata['creation_time'] = datetime.now().isoformat()
+
+        # Lazy cache: keyed by (k, component) tuples
+        self._spectrum_cache: dict[tuple[int, str], Spectrum] = {}
+
+        self._hash_cache: str | None = None
 
     # =========================================================================
     # Properties
@@ -94,39 +113,39 @@ class HodgeLaplacianSpectra:
     @property
     def hodge_laplacian(self) -> HodgeLaplacian:
         """Live reference to the source HodgeLaplacian."""
-        pass
+        return self._hl
 
     hl = hodge_laplacian    # Alias
 
     @property
     def max_dim(self) -> int:
         """Maximum simplex dimension n."""
-        pass
+        return self._hl.max_dim
 
     @property
     def degrees(self) -> list[int]:
         """Sorted list of degrees [0, 1, ..., n]."""
-        pass
+        return self._hl.degrees
 
     @property
     def f_vector(self) -> list[int]:
         """Face vector [N_0, N_1, ..., N_n] from the simplicial complex."""
-        pass
+        return self._hl.f_vector
 
     @property
     def dimensions(self) -> dict[int, int]:
         """Cochain space dimensions {k: N_k} at each degree."""
-        pass
+        return self._hl.dimensions
 
     @property
     def solver(self) -> str:
         """Eigensolver backend name."""
-        pass
+        return self._solver
 
     @property
     def compute_eigenvectors(self) -> bool:
         """Whether eigenvectors are computed alongside eigenvalues."""
-        pass
+        return self._compute_eigenvectors
 
     @property
     def content_hash(self) -> str:
@@ -136,7 +155,9 @@ class HodgeLaplacianSpectra:
         Computed lazily and cached. Uniquely identifies the spectra since
         they are a deterministic function of the Hodge Laplacian inputs.
         """
-        pass
+        if self._hash_cache is None:
+            self._hash_cache = self._compute_content_hash()
+        return self._hash_cache
 
     # =========================================================================
     # Spectrum Access Methods
@@ -161,7 +182,13 @@ class HodgeLaplacianSpectra:
         Spectrum
             Spectrum with dimension N_k.
         """
-        pass
+        self._validate_degree(k)
+        self._validate_component(component)
+
+        if (k, component) not in self._spectrum_cache:
+            self._compute_spectrum(k, component)
+
+        return self._spectrum_cache[(k, component)]
 
     def eigenvalues(self, k: int, component: str = 'full') -> np.ndarray:
         """
@@ -181,7 +208,7 @@ class HodgeLaplacianSpectra:
         ndarray, shape (N_k,)
             Eigenvalues sorted ascending, non-negative.
         """
-        pass
+        return self.spectrum(k, component).eigenvalues
 
     def eigenvectors(self, k: int, component: str = 'full') -> np.ndarray | None:
         """
@@ -202,7 +229,7 @@ class HodgeLaplacianSpectra:
             Eigenvector matrix of shape (N_k, N_k), or None if
             compute_eigenvectors is False.
         """
-        pass
+        return self.spectrum(k, component).eigenvectors
 
     # =========================================================================
     # I/O Methods
@@ -246,7 +273,57 @@ class HodgeLaplacianSpectra:
           num_eigenvalues attributes, and optionally eigenvectors
           dataset.
         """
-        pass
+        filepath = Path(filepath)
+        if hdf5_options is None:
+            hdf5_options = {'compression': 'gzip', 'compression_opts': 4}
+
+        # Serialize cached keys for metadata
+        cached_keys = [
+            f'{k}_{comp}' for k, comp in sorted(self._spectrum_cache.keys())
+        ]
+
+        # Root-level attributes
+        root_attributes = {
+            'max_dim': self.max_dim,
+            'content_hash': self.content_hash,
+            'hl_content_hash': self._hl.content_hash,
+            'solver': self._solver,
+            'compute_eigenvectors': self._compute_eigenvectors,
+            'cached_keys': cached_keys,
+            'metadata': self.metadata,
+        }
+        save_h5(
+            filepath,
+            datasets=None,
+            attributes=root_attributes,
+            mode=mode,
+            group=group,
+            hdf5_options=hdf5_options,
+        )
+
+        # Per-degree, per-component subgroups
+        for (k, comp), spc in self._spectrum_cache.items():
+            subgroup = join_h5_group(group, f'degree_{k}/component_{comp}')
+
+            spc_datasets = {'eigenvalues': spc.eigenvalues}
+            spc_attributes = {
+                'dimension': spc.dimension,
+                'num_eigenvalues': spc.num_eigenvalues,
+            }
+
+            if spc.eigenvectors is not None:
+                spc_datasets['eigenvectors'] = spc.eigenvectors
+
+            save_h5(
+                filepath,
+                datasets=spc_datasets,
+                attributes=spc_attributes,
+                mode=mode,
+                group=subgroup,
+                hdf5_options=hdf5_options,
+            )
+
+        return self.content_hash
 
     def load_cache(
         self,
@@ -287,7 +364,36 @@ class HodgeLaplacianSpectra:
         whatever data is present; extra or missing eigenvector data is
         harmless. The important validation is the hl_content_hash.
         """
-        pass
+        filepath = Path(filepath)
+        _, root_attributes = read_h5(filepath, group=group)
+
+        # Hash validation
+        if validate_hash:
+            stored_hl_hash = str(root_attributes.get('hl_content_hash', ''))
+            if stored_hl_hash != self._hl.content_hash:
+                raise ValueError(
+                    f"HL content hash mismatch: stored {stored_hl_hash[:8]}, "
+                    f"live {self._hl.content_hash[:8]}"
+                )
+
+        # Discover and load cached spectra from the stored key list
+        cached_keys = root_attributes.get('cached_keys', [])
+        for key_str in cached_keys:
+            # Parse "k_component" format
+            k_str, comp = key_str.split('_', 1)
+            k = int(k_str)
+
+            subgroup = join_h5_group(group, f'degree_{k}/component_{comp}')
+            spc_datasets, spc_attributes = read_h5(filepath, group=subgroup)
+
+            dimension = int(spc_attributes['dimension'])
+            eigenvalues = spc_datasets['eigenvalues']
+
+            eigenvectors = spc_datasets.get('eigenvectors', None)
+
+            self._spectrum_cache[(k, comp)] = Spectrum(
+                eigenvalues, dimension, eigenvectors=eigenvectors,
+            )
 
     # =========================================================================
     # Protocols and Utilities
@@ -309,18 +415,26 @@ class HodgeLaplacianSpectra:
         dict with keys 'lower', 'upper', 'full', each mapping to a
         Spectrum with dimension N_k.
         """
-        pass
+        return {comp: self.spectrum(k, comp) for comp in LAPLACIAN_COMPONENT_NAMES}
 
     def __len__(self) -> int:
         """Number of degrees (= max_dim + 1)."""
-        pass
+        return self.max_dim + 1
 
     def __iter__(self):
         """Iterate over degrees."""
-        pass
+        return iter(range(self.max_dim + 1))
 
     def __repr__(self) -> str:
-        pass
+        n_cached = len(self._spectrum_cache)
+        sizes = list(self.dimensions.values())
+        return (
+            f"HodgeLaplacianSpectra(max_dim={self.max_dim}, "
+            f"dimensions={sizes}, "
+            f"solver='{self._solver}', "
+            f"cached={n_cached}, "
+            f"hash={self.content_hash[:8]})"
+        )
 
     def summary(self, indent: str = '') -> str:
         """
@@ -339,7 +453,42 @@ class HodgeLaplacianSpectra:
         -------
         summary : str
         """
-        pass
+        lines = []
+
+        lines.append('Hodge Laplacian Spectra:')
+        lines.append('-' * 80)
+        lines.append(
+            f"{'k':<4} {'N_k':<6} "
+            f"{'lower':<20} {'upper':<20} {'full':<20}"
+        )
+        lines.append('-' * 80)
+
+        for k in self.degrees:
+            N_k = self.dimensions[k]
+            parts = []
+            for comp in LAPLACIAN_COMPONENT_NAMES:
+                key = (k, comp)
+                if key in self._spectrum_cache:
+                    spc = self._spectrum_cache[key]
+                    dk = spc.dim_ker()
+                    parts.append(f"num_eig={spc.num_eigenvalues}, dim_ker={spc.dim_ker()}")
+                else:
+                    parts.append('--')
+
+            lines.append(
+                f"{k:<4} {N_k:<6} "
+                f"{parts[0]:<20} {parts[1]:<20} {parts[2]:<20}"
+            )
+
+        lines.append('-' * 80)
+        lines.append(
+            f"solver: {self._solver}, "
+            f"eigenvectors: {self._compute_eigenvectors}"
+        )
+        lines.append(f"content_hash: {self.content_hash[:16]}")
+        lines.append('')
+
+        return '\n'.join(indent + line for line in lines)
 
     # =========================================================================
     # Private Methods
@@ -347,23 +496,39 @@ class HodgeLaplacianSpectra:
 
     def _validate_degree(self, k: int) -> None:
         """Validate that k is a valid degree."""
-        pass
+        if k < 0 or k > self.max_dim:
+            raise ValueError(
+                f"Degree k={k} out of range. "
+                f"Valid range: 0 <= k <= {self.max_dim}."
+            )
 
     @staticmethod
     def _validate_component(component: str) -> None:
         """Validate that component is a recognized name."""
-        pass
+        if component not in LAPLACIAN_COMPONENT_NAMES:
+            raise ValueError(
+                f"Unknown component '{component}'. "
+                f"Valid components: {LAPLACIAN_COMPONENT_NAMES}."
+            )
 
     def _compute_spectrum(self, k: int, component: str) -> None:
         """Compute eigendecomposition at (k, component) and cache the result."""
-        pass
+        L = self._hl.to_matrix(k, component)
+        G_k = self._hl.cm[k]
+
+        eigenvalues, eigenvectors = compute_eigendecomposition(
+            L, G_k,
+            solver=self._solver,
+            compute_eigenvectors=self._compute_eigenvectors,
+        )
+
+        N_k = self.dimensions[k]
+        self._spectrum_cache[(k, component)] = Spectrum(
+            eigenvalues, N_k, eigenvectors=eigenvectors,
+        )
 
     def _compute_content_hash(self) -> str:
         """Compute SHA-256 hash from the HodgeLaplacian content hash."""
-        pass
-
-
-
-
-
-
+        hasher = hashlib.sha256()
+        hasher.update(self._hl.content_hash.encode('utf-8'))
+        return hasher.hexdigest()
