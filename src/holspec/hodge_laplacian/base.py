@@ -141,7 +141,7 @@ class HodgeLaplacian:
         return self._sc.f_vector
 
     @property
-    def dimensions(self) -> list[int]:
+    def dimensions(self) -> dict[int, int]:
         """Dimension N_k = dim(C^k) of the cochain spaces at each degree."""
         return self._cm.dimensions
 
