@@ -10,7 +10,7 @@ from scipy.spatial import Delaunay
 import gudhi
 
 from .simplex import compute_simplicial_closure
-from holspec.utilities.validation import validate_positions, validate_distances
+from holspec.point_data.validation import validate_positions, validate_distances
 from holspec.utilities import format_float_str
 
 

@@ -14,6 +14,7 @@ from .base import PointData
 from .ensemble import PointDataEnsemble
 from .point_generators import *
 from .data_loaders import *
+from .validation import validate_positions, validate_distances
 
 
 # Define public API of the module
@@ -21,6 +22,10 @@ __all__ = [
     # Core classes (used in pipeline)
     'PointData',
     'PointDataEnsemble',
+
+    # validation.py
+    'validate_positions',
+    'validate_distances',
 
     # Utilities (for data creation/loading)
     # generators.py

@@ -14,7 +14,7 @@ import h5py
 
 from holspec.point_data.base import PointData
 from holspec.point_data.point_generators import generate_points_from_config
-from holspec.utilities import save_h5, read_h5, initialize_h5, add_noise
+from holspec.utilities import save_h5, read_h5, add_noise
 
 
 class PointDataEnsemble:
@@ -94,10 +94,9 @@ class PointDataEnsemble:
     # =========================================================================
     
     def save(
-        self, 
-        filepath: str | Path, 
-        overwrite: bool = True, 
-        verbose: bool = False
+        self,
+        filepath: str | Path,
+        mode: str = 'replace',
     ) -> None:
         """
         Save ensemble to HDF5 file.
@@ -106,12 +105,8 @@ class PointDataEnsemble:
         ----------
         filepath : str or Path
             Path to HDF5 file.
-        overwrite : bool, default=True
-            If True, overwrite existing file. If False, appends to existing file.
-            Groups for each member are replaced if they already exist through
-            PointData.save() with mode='replace'.
-        verbose : bool, default=False
-            If True, print file operation message.
+        mode : str, default='replace'
+            Write mode passed to save_h5. One of 'replace', 'update', or 'create'.
         
         Notes
         -----
@@ -119,11 +114,8 @@ class PointDataEnsemble:
         - Root attributes: ensemble_size, base_config, noise_config, metadata
         - Groups: member_0000, member_0001, ... (one per ensemble member)
         
-        Each member saved using PointData.save() with group parameter.
+        Each member saved using PointData.save() with mode='replace'.
         """
-        # Initialize file
-        filepath = initialize_h5(filepath, overwrite=overwrite, verbose=verbose)
-        
         # Prepare ensemble-level attributes
         attributes = {
             'ensemble_size': self.size,
@@ -138,8 +130,8 @@ class PointDataEnsemble:
         if self.metadata:
             attributes['metadata'] = self.metadata
         
-        # Save root-level attributes using utility
-        save_h5(filepath, attributes=attributes)
+        # Save root-level attributes
+        save_h5(filepath, attributes=attributes, group=None, mode=mode)
         
         # Save each member to a numbered group
         for i, point_data in enumerate(self.members):

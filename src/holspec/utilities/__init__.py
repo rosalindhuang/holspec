@@ -20,8 +20,6 @@ __all__ = [
     
     # validation.py
     'check_raises',
-    'validate_positions',
-    'validate_distances',
 
     # numerical.py
     'compute_content_hash',
