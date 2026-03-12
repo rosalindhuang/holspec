@@ -15,7 +15,9 @@ from pathlib import Path
 import numpy as np
 import yaml
 
-from holspec.utilities import read_h5, save_h5, convert_relative_to_paths
+from holspec.utilities import (
+    read_h5, save_h5, convert_relative_to_paths, get_keys_h5,
+)
 from holspec.point_data import PointDataEnsemble
 from holspec.simplicial import SimplicialComplex
 from holspec.cochain_metric import CochainMetric
@@ -632,5 +634,319 @@ def run_geometry_metric(
                 output_filepaths.setdefault(ptd_label, {})[output_label] = (
                     output_filepath
                 )
+
+    return output_filepaths
+
+
+def run_hodge_laplacian(
+    config_path: str | Path,
+    project_root: str | Path,
+) -> dict[str, dict[str, Path]]:
+    """
+    Run pipeline Stage 3: Hodge Laplacians and Discrete Differential Operators.
+
+    Reads the stage config YAML, constructs a HodgeLaplacian for each
+    cochain metric file, and writes the results to HDF5 files. Upstream
+    SimplicialComplex files are resolved via provenance tracing.
+
+    When both ``cache_laplacians`` and ``validate_laplacians`` are False,
+    no Laplacian matrices are computed. The output file serves as a
+    provenance waypoint containing only metadata and content hashes.
+
+    Parameters
+    ----------
+    config_path : str or Path
+        Path to a YAML config file.
+    project_root : str or Path
+        Project root for resolving relative paths in the config.
+
+    Returns
+    -------
+    dict[str, dict[str, Path]]
+        Nested mapping ``{ptd_label: {cm_label: output_filepath}}``.
+        Same shape as ``inputs.filepaths`` in the next stage's config.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the config file or any input file does not exist.
+    AssertionError
+        If Laplacian property validation fails (when enabled).
+    """
+    config_path = Path(config_path)
+    project_root = Path(project_root)
+
+    # --- Validate config path ---
+    if not config_path.exists():
+        raise FileNotFoundError(f"Config file not found: {config_path}")
+
+    # --- Read and unpack config ---
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+
+    input_filepaths = convert_relative_to_paths(
+        config['inputs']['filepaths'], project_root,
+    )
+    output_data_dir = project_root / config['outputs']['data_dir']
+    created_by = config['summary']['created_by']
+    verbose = config['runtime']['verbose']
+    stage_name = config['outputs']['stage_name']
+
+    validate_laplacians = config['runtime']['validate_laplacians']
+    cache_laplacians = config['runtime']['cache_laplacians']
+
+    # --- Loop over inputs ---
+    output_filepaths: dict[str, dict[str, Path]] = {}
+
+    for ptd_label, cm_files in input_filepaths.items():
+
+        if verbose:
+            print(f"{'-'*60}")
+            print(f"{ptd_label}")
+            print(f"{'-'*60}")
+            print()
+
+        for cm_label, cm_filepath in cm_files.items():
+
+            # Trace provenance chain for file paths
+            provenance_chain = trace_provenance(cm_filepath, project_root)
+            sc_filepath = provenance_chain['topology_simplicial']
+
+            # Output file path
+            output_label = cm_label
+            output_filepath = (
+                output_data_dir / ptd_label / f"{output_label}.h5"
+            )
+
+            # Initialize file with pipeline metadata
+            _initialize_pipeline_file(
+                output_filepath, created_by, cm_filepath,
+                project_root, stage_name, {},
+            )
+
+            # Discover ensemble members from input file
+            member_keys = [
+                key for key in get_keys_h5(cm_filepath)
+                if key.startswith('member_')
+            ]
+
+            # Iterate computation over ensemble members
+            for member_key in member_keys:
+
+                # Load upstream objects for this member
+                sc = SimplicialComplex.load(
+                    sc_filepath, group=member_key,
+                    load_incidence=True,
+                )
+                cm = CochainMetric.load(
+                    cm_filepath, group=member_key,
+                )
+
+                # Construct Hodge Laplacian
+                hl = HodgeLaplacian(sc, cm)
+
+                # Compute Laplacian matrices (if caching)
+                if cache_laplacians:
+                    for k in range(hl.max_dim + 1):
+                        _ = hl[k]
+
+                # Validate Laplacian properties (also populates cache)
+                if validate_laplacians:
+                    validation_results = hl.validate_laplacians()
+                    for (k, comp), result_dict in validation_results.items():
+                        failed = [
+                            prop for prop, passed in result_dict.items()
+                            if not passed
+                        ]
+                        assert not failed, (
+                            f"Laplacian validation failed:\n"
+                            f"  point data        : {ptd_label}\n"
+                            f"  cochain metric    : {cm_label}\n"
+                            f"  member            : {member_key}\n"
+                            f"  degree            : k={k}\n"
+                            f"  component         : {comp}\n"
+                            f"  file              : "
+                            f"{output_filepath.relative_to(project_root)}\n"
+                            f"  failed properties : {failed}"
+                        )
+
+                # Save Hodge Laplacian to file
+                hl.save(
+                    output_filepath,
+                    save_laplacians=cache_laplacians,
+                    mode='replace',
+                    group=member_key,
+                )
+
+            # Verbose output
+            if verbose:
+                print(
+                    f"Constructed {len(member_keys)} Hodge Laplacians "
+                    f"for {ptd_label} / {cm_label}:"
+                )
+                print(f"  {hl}")
+                print(f"  hodge laplacian matrices:")
+                for k in range(hl.max_dim + 1):
+                    if (k, 'full') in hl._laplacian_cache:
+                        L_full = hl._laplacian_cache[(k, 'full')]
+                        print(
+                            f"    L^{k}: shape={L_full.shape}, "
+                            f"nnz={L_full.nnz}"
+                        )
+                    else:
+                        print(f"    L^{k}: (not cached)")
+                print(f"  file path: "
+                      f"{output_filepath.relative_to(project_root)}")
+                print(f"  file size: "
+                      f"{output_filepath.stat().st_size / 1024:.2f} KB")
+                print()
+
+            # Collect output filepaths
+            output_filepaths.setdefault(ptd_label, {})[output_label] = (
+                output_filepath
+            )
+
+    return output_filepaths
+
+
+def run_spectra(
+    config_path: str | Path,
+    project_root: str | Path,
+) -> dict[str, dict[str, Path]]:
+    """
+    Run pipeline Stage 4: Hodge Laplacian Spectra and Spectral Observables.
+
+    Reads the stage config YAML, computes eigendecompositions for each
+    HodgeLaplacian file, and writes the results to HDF5 files. Upstream
+    objects are reconstructed via ``load_hodge_laplacian`` per member.
+
+    This is the terminal pipeline stage. All spectra are computed eagerly
+    (no conditional computation flags).
+
+    Parameters
+    ----------
+    config_path : str or Path
+        Path to a YAML config file.
+    project_root : str or Path
+        Project root for resolving relative paths in the config.
+
+    Returns
+    -------
+    dict[str, dict[str, Path]]
+        Nested mapping ``{ptd_label: {hl_label: output_filepath}}``.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the config file or any input file does not exist.
+    """
+    config_path = Path(config_path)
+    project_root = Path(project_root)
+
+    # --- Validate config path ---
+    if not config_path.exists():
+        raise FileNotFoundError(f"Config file not found: {config_path}")
+
+    # --- Read and unpack config ---
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+
+    input_filepaths = convert_relative_to_paths(
+        config['inputs']['filepaths'], project_root,
+    )
+    output_data_dir = project_root / config['outputs']['data_dir']
+    created_by = config['summary']['created_by']
+    verbose = config['runtime']['verbose']
+    stage_name = config['outputs']['stage_name']
+
+    solver = config['configs']['solver']
+    compute_eigenvectors = config['configs']['compute_eigenvectors']
+
+    # --- Loop over inputs ---
+    output_filepaths: dict[str, dict[str, Path]] = {}
+
+    for ptd_label, hl_files in input_filepaths.items():
+
+        if verbose:
+            print(f"{'-'*60}")
+            print(f"{ptd_label}")
+            print(f"{'-'*60}")
+            print()
+
+        for hl_label, hl_filepath in hl_files.items():
+
+            # Output file path
+            output_label = hl_label
+            output_filepath = (
+                output_data_dir / ptd_label / f"{output_label}.h5"
+            )
+
+            # Initialize file with pipeline metadata
+            _initialize_pipeline_file(
+                output_filepath, created_by, hl_filepath,
+                project_root, stage_name,
+                {'solver': solver,
+                 'compute_eigenvectors': compute_eigenvectors},
+            )
+
+            # Discover ensemble members from input file
+            member_keys = [
+                key for key in get_keys_h5(hl_filepath)
+                if key.startswith('member_')
+            ]
+
+            # Iterate computation over ensemble members
+            for member_key in member_keys:
+
+                # Load upstream HodgeLaplacian for this member
+                hl = load_hodge_laplacian(
+                    hl_filepath, project_root, group=member_key,
+                )
+
+                # Construct HodgeLaplacianSpectra
+                hlsp = HodgeLaplacianSpectra(
+                    hl,
+                    solver=solver,
+                    compute_eigenvectors=compute_eigenvectors,
+                )
+
+                # Compute all components at every degree
+                for k in range(hlsp.max_dim + 1):
+                    _ = hlsp[k]
+
+                # Save spectra to file
+                hlsp.save(
+                    output_filepath,
+                    mode='replace',
+                    group=member_key,
+                    save_eigenvectors=True,
+                )
+
+            # Verbose output
+            if verbose:
+                print(
+                    f"Computed {len(member_keys)} spectra "
+                    f"for {ptd_label} / {hl_label}:"
+                )
+                print(f"  {hlsp}")
+                print(f"  solver: {solver}")
+                print(f"  compute_eigenvectors: {compute_eigenvectors}")
+                print(f"  hodge laplacian spectra:")
+                for k in hlsp.degrees:
+                    spc = hlsp[k]['full']
+                    print(
+                        f"    L^{k},full: num_eig={spc.num_eigenvalues}, "
+                        f"dim_ker={spc.dim_ker()}"
+                    )
+                print(f"  file path: "
+                      f"{output_filepath.relative_to(project_root)}")
+                print(f"  file size: "
+                      f"{output_filepath.stat().st_size / 1024:.2f} KB")
+                print()
+
+            # Collect output filepaths
+            output_filepaths.setdefault(ptd_label, {})[output_label] = (
+                output_filepath
+            )
 
     return output_filepaths
