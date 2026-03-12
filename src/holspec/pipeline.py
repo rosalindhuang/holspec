@@ -466,6 +466,7 @@ def run_topology_simplicial(
                     f"complexes for {ptd_label} / {sc_label}:"
                 )
                 print(f"  {sc}")
+                print(f"  simplicial construction: {sc_label}")
                 print(f"  incidence matrices:")
                 for k in range(sc.max_dim + 1):
                     if k in sc._incidence_cache:
@@ -489,3 +490,147 @@ def run_topology_simplicial(
     return output_filepaths
 
 
+def run_geometry_metric(
+    config_path: str | Path,
+    project_root: str | Path,
+) -> dict[str, dict[str, Path]]:
+    """
+    Run pipeline Stage 2: Geometric Structure via Discrete Cochain Metrics.
+
+    Reads the stage config YAML, constructs a CochainMetric for each
+    (simplicial complex, metric model) pair, and writes the results to
+    HDF5 files. Upstream point data is resolved via provenance tracing.
+
+    Parameters
+    ----------
+    config_path : str or Path
+        Path to a YAML config file.
+    project_root : str or Path
+        Project root for resolving relative paths in the config.
+
+    Returns
+    -------
+    dict[str, dict[str, Path]]
+        Nested mapping
+        ``{ptd_label: {sc_label__cm_label: output_filepath}}``.
+        Same shape as ``inputs.filepaths`` in the next stage's config.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the config file or any input file does not exist.
+    ValueError
+        If metric validation fails (when enabled).
+    """
+    config_path = Path(config_path)
+    project_root = Path(project_root)
+
+    # --- Validate config path ---
+    if not config_path.exists():
+        raise FileNotFoundError(f"Config file not found: {config_path}")
+
+    # --- Read and unpack config ---
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+
+    input_filepaths = convert_relative_to_paths(
+        config['inputs']['filepaths'], project_root,
+    )
+    output_data_dir = project_root / config['outputs']['data_dir']
+    created_by = config['summary']['created_by']
+    verbose = config['runtime']['verbose']
+    stage_name = config['outputs']['stage_name']
+
+    metric_models = config['configs']['metric_models']
+    validate_metric = config['runtime']['validate_metric']
+
+    # --- Loop over inputs ---
+    output_filepaths: dict[str, dict[str, Path]] = {}
+
+    for ptd_label, sc_files in input_filepaths.items():
+
+        if verbose:
+            print(f"{'-'*60}")
+            print(f"{ptd_label}")
+            print(f"{'-'*60}")
+            print()
+
+        for sc_label, sc_filepath in sc_files.items():
+
+            # Trace provenance chain for file paths
+            provenance_chain = trace_provenance(sc_filepath, project_root)
+            ptd_filepath = provenance_chain['point_data']
+
+            # Load point data from file
+            point_data_ensemble = PointDataEnsemble.load(ptd_filepath)
+
+            for cm_label, cm_config in metric_models.items():
+
+                # Output file path
+                output_label = f"{sc_label}__{cm_label}"
+                output_filepath = (
+                    output_data_dir / ptd_label / f"{output_label}.h5"
+                )
+
+                # Initialize file with pipeline metadata
+                # (input_file points to SC file, the immediate predecessor)
+                _initialize_pipeline_file(
+                    output_filepath, created_by, sc_filepath,
+                    project_root, stage_name, cm_config,
+                )
+
+                # Iterate computation over ensemble members
+                for member_index, ptd in enumerate(point_data_ensemble):
+
+                    member_group = f"member_{member_index:04d}"
+
+                    # Load simplicial complex for this member
+                    sc = SimplicialComplex.load(
+                        sc_filepath, group=member_group,
+                        load_incidence=True,
+                    )
+
+                    # Construct cochain metric
+                    cm = CochainMetric.from_simplicial_complex_and_point_data(
+                        sc, ptd, cm_config,
+                        metadata={'member_index': member_index},
+                    )
+
+                    # Validate metric dimensions against simplicial complex
+                    if validate_metric:
+                        cm.validate(sc.num_simplices)
+
+                    # Save cochain metric to file
+                    cm.save(
+                        output_filepath,
+                        mode='replace',
+                        group=member_group,
+                    )
+
+                # Verbose output
+                if verbose:
+                    print(
+                        f"Constructed {point_data_ensemble.size} cochain "
+                        f"metrics for {ptd_label} / {output_label}:"
+                    )
+                    print(f"  {cm}")
+                    print(f"  cochain metric model: {cm_label}")
+                    print(f"  metric tensors:")
+                    for k in range(cm.max_dim + 1):
+                        G_k = cm[k]
+                        print(
+                            f"    G_{k}: size={G_k.size}, "
+                            f"is_diagonal={G_k.is_diagonal}"
+                        )
+                    print(f"  file path: "
+                          f"{output_filepath.relative_to(project_root)}")
+                    print(f"  file size: "
+                          f"{output_filepath.stat().st_size / 1024:.2f} KB")
+                    print()
+
+                # Collect output filepaths
+                output_filepaths.setdefault(ptd_label, {})[output_label] = (
+                    output_filepath
+                )
+
+    return output_filepaths
