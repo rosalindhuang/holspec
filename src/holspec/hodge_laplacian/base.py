@@ -264,6 +264,58 @@ class HodgeLaplacian:
         )
 
     # =========================================================================
+    # Validation
+    # =========================================================================
+
+    def validate_laplacians(
+        self, tol: float = 1e-10,
+    ) -> dict[tuple[int, str], dict[str, bool]]:
+        """
+        Validate Hodge Laplacian properties for all degrees and components.
+
+        Checks is_square, is_self_adjoint, and is_positive_semidefinite for
+        every (k, component) pair. Populates _laplacian_cache as a side
+        effect.
+
+        Parameters
+        ----------
+        tol : float, default=1e-10
+            Numerical tolerance for property checks.
+
+        Returns
+        -------
+        results : dict[tuple[int, str], dict[str, bool]]
+            {(k, component): {'is_square': bool, 'is_self_adjoint': bool,
+            'is_positive_semidefinite': bool}} for all valid (k, component)
+            pairs.
+
+        Notes
+        -----
+        - Computationally expensive: computes all Laplacian matrices and runs
+          dense eigendecompositions for positive-semidefiniteness checks.
+        - Primarily useful for testing correctness of implementation.
+        - NOT called during construction.
+        - Pre-populates _laplacian_cache before validation to avoid redundant
+          computation.
+        """
+        from .validation import validate_laplacian_properties
+
+        # Pre-compute all Laplacian matrices to populate cache
+        for k in range(self.max_dim + 1):
+            _ = self[k]
+
+        # Validate all (k, component) pairs
+        results = {}
+        for k in range(self.max_dim + 1):
+            for comp in LAPLACIAN_COMPONENT_NAMES:
+                L = self.to_matrix(k, comp)
+                results[(k, comp)] = validate_laplacian_properties(
+                    L, self._cm[k], tol=tol
+                )
+
+        return results
+
+    # =========================================================================
     # I/O Methods
     # =========================================================================
 

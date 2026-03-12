@@ -1,9 +1,11 @@
 """
 Pipeline orchestration for holspec.
 
-Provides stage metadata, provenance tracing across pipeline output files,
-and loading functions for derived-quantity objects that require live
-references to upstream objects.
+Provides stage metadata, provenance tracing, loading functions for 
+objects that require live references to upstream objects.
+
+Provides pipeline stage functions ``run_{stage}`` that formalize the
+pipeline computations into callable functions.
 """
 from __future__ import annotations
 
@@ -11,8 +13,10 @@ from datetime import datetime
 from pathlib import Path
 
 import numpy as np
+import yaml
 
-from holspec.utilities import read_h5, save_h5
+from holspec.utilities import read_h5, save_h5, convert_relative_to_paths
+from holspec.point_data import PointDataEnsemble
 from holspec.simplicial import SimplicialComplex
 from holspec.cochain_metric import CochainMetric
 from holspec.hodge_laplacian import HodgeLaplacian
@@ -289,11 +293,11 @@ def load_spectra(
 
 def _initialize_pipeline_file(
     output_filepath: Path,
+    created_by: str,
     input_filepath: Path,
     project_root: Path,
     stage_name: str,
     stage_config: dict,
-    created_by: str,
 ) -> None:
     """
     Write root-level pipeline metadata to a new output file.
@@ -301,12 +305,14 @@ def _initialize_pipeline_file(
     Creates (or replaces) the output HDF5 file with the five standard
     file-level metadata attributes that every pipeline output carries.
     Called once per output file at the start of each ``run_{stage}``
-    function, before any per-member data is written.
+    function, before any data is written.
 
     Parameters
     ----------
     output_filepath : Path
         Path to the output HDF5 file.
+    created_by : str
+        Identifier for the notebook or script that produced this file.
     input_filepath : Path
         Path to the immediate input file for this stage.
     project_root : Path
@@ -316,8 +322,6 @@ def _initialize_pipeline_file(
     stage_config : dict
         Stage-specific configuration recorded for provenance. Empty dict
         for stages with no mathematical parameters.
-    created_by : str
-        Identifier for the notebook or script that produced this file.
     """
     save_h5(
         output_filepath,
@@ -331,3 +335,157 @@ def _initialize_pipeline_file(
         group=None,
         mode='replace',
     )
+
+
+# =============================================================================
+# Pipeline Stage Functions
+# =============================================================================
+
+def run_topology_simplicial(
+    config_path: str | Path,
+    project_root: str | Path,
+) -> dict[str, dict[str, Path]]:
+    """
+    Run pipeline Stage 1: Topological Structure via Simplicial Complexes.
+
+    Reads the stage config YAML, constructs a SimplicialComplex for each
+    (point data ensemble, simplicial construction) pair, and writes the
+    results to HDF5 files. 
+
+    Parameters
+    ----------
+    config_path : str or Path
+        Path to a YAML config file
+    project_root : str or Path
+        Project root for resolving relative paths in the config.
+
+    Returns
+    -------
+    dict[str, dict[str, Path]]
+        Nested mapping ``{ptd_label: {sc_label: output_filepath}}``.
+        Same shape as ``inputs.filepaths`` in the next stage's config.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the config file or any input file does not exist.
+    AssertionError
+        If boundary property validation fails (when enabled).
+    """
+    config_path = Path(config_path)
+    project_root = Path(project_root)
+
+    # --- Validate config path ---
+    if not config_path.exists():
+        raise FileNotFoundError(f"Config file not found: {config_path}")
+
+    # --- Read and unpack config ---
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+
+    input_filepaths = convert_relative_to_paths(
+        config['inputs']['filepaths'], project_root,
+    )
+    output_data_dir = project_root / config['outputs']['data_dir']
+    created_by = config['summary']['created_by']
+    verbose = config['runtime']['verbose']
+    stage_name = config['outputs']['stage_name']
+
+    simplicial_constructions = config['configs']['simplicial_constructions']
+    validate_boundary_property = config['runtime']['validate_boundary_property']
+    cache_incidence = config['runtime']['cache_incidence']
+
+    # --- Loop over inputs ---
+    output_filepaths: dict[str, dict[str, Path]] = {}
+
+    for ptd_label, ptd_filepath in input_filepaths.items():
+
+        # Load ensemble once per point data label
+        point_data_ensemble = PointDataEnsemble.load(ptd_filepath)
+
+        if verbose:
+            print(f"{'-'*60}")
+            print(f"{ptd_label}")
+            print(f"{'-'*60}")
+            print()
+
+        for sc_label, sc_config in simplicial_constructions.items():
+
+            # Output file path
+            output_filepath = output_data_dir / ptd_label / f"{sc_label}.h5"
+
+            # Initialize file with pipeline metadata
+            _initialize_pipeline_file(
+                output_filepath, created_by, ptd_filepath,
+                project_root, stage_name, sc_config,
+            )
+
+            # Iterate computation over ensemble members
+            for member_index, member in enumerate(point_data_ensemble):
+
+                # Construct simplicial complex
+                sc = SimplicialComplex.from_point_data(
+                    member, sc_config,
+                    metadata={'member_index': member_index},
+                )
+
+                # Compute incidence matrices (if caching)
+                if cache_incidence:
+                    for k in range(sc.max_dim + 1):
+                        sc.incidence_matrix(k)
+
+                # Validate boundary property (also populates cache)
+                if validate_boundary_property:
+                    boundary_results = sc.validate_boundary_property()
+                    failed = [
+                        k for k, passed in boundary_results.items()
+                        if not passed
+                    ]
+                    assert not failed, (
+                        f"Boundary property D_{{k-1}} @ D_k = 0 failed:\n"
+                        f"  point data             : {ptd_label}\n"
+                        f"  simplicial construction: {sc_label}\n"
+                        f"  member                 : member_{member_index:04d}\n"
+                        f"  file                   : "
+                        f"{output_filepath.relative_to(project_root)}\n"
+                        f"  failed at k            : {failed}"
+                    )
+
+                # Save simplicial complex to file
+                sc.save(
+                    output_filepath,
+                    save_incidence=cache_incidence,
+                    mode='replace',
+                    group=f"member_{member_index:04d}",
+                )
+
+            # Verbose output
+            if verbose:
+                print(
+                    f"Constructed {point_data_ensemble.size} simplicial "
+                    f"complexes for {ptd_label} / {sc_label}:"
+                )
+                print(f"  {sc}")
+                print(f"  incidence matrices:")
+                for k in range(sc.max_dim + 1):
+                    if k in sc._incidence_cache:
+                        D_k = sc._incidence_cache[k]
+                        print(
+                            f"    D_{k}: shape={D_k.shape}, nnz={D_k.nnz}"
+                        )
+                    else:
+                        print(f"    D_{k}: (not cached)")
+                print(f"  file path: "
+                      f"{output_filepath.relative_to(project_root)}")
+                print(f"  file size: "
+                      f"{output_filepath.stat().st_size / 1024:.2f} KB")
+                print()
+
+            # Collect output filepaths
+            output_filepaths.setdefault(ptd_label, {})[sc_label] = (
+                output_filepath
+            )
+
+    return output_filepaths
+
+

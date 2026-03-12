@@ -35,6 +35,6 @@ __all__ = [
     # validation.py
     'validate_simplices_structure',
     'validate_face_closure',
-    'check_boundary_property',
+    'validate_boundary_property',
     
 ]
