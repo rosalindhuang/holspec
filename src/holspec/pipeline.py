@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
+
 from holspec.utilities import read_h5
 from holspec.simplicial import SimplicialComplex
 from holspec.cochain_metric import CochainMetric
@@ -259,7 +261,13 @@ def load_spectra(
     # Read group-level attributes for constructor params
     _, group_attributes = read_h5(filepath, group=group, dataset_names=[])
     solver = str(group_attributes.get('solver', 'dense'))
-    compute_eigenvectors = bool(group_attributes.get('compute_eigenvectors', False))
+    raw_eigvec = group_attributes.get('compute_eigenvectors', False)
+    if isinstance(raw_eigvec, (bool, np.bool_)):
+        compute_eigenvectors = bool(raw_eigvec)
+    elif hasattr(raw_eigvec, '__iter__'):
+        compute_eigenvectors = [(int(k), str(comp)) for k, comp in raw_eigvec]
+    else:
+        compute_eigenvectors = bool(raw_eigvec)
     metadata = group_attributes.get('metadata', {})
 
     # Construct HodgeLaplacianSpectra and populate cache from file
