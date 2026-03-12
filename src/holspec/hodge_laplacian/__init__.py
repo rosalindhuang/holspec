@@ -5,7 +5,7 @@ Provides HodgeLaplacian, the primary Stage 3 pipeline output, along with
 pure operator construction functions and validation utilities.
 """
 
-from .base import HodgeLaplacian
+from .base import HodgeLaplacian, LAPLACIAN_COMPONENT_NAMES
 from .operators import (
     compute_coboundary_matrix,
     compute_dual_coboundary_matrix,

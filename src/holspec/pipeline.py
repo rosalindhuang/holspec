@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
+import warnings
 
 import numpy as np
 import yaml
@@ -21,7 +22,7 @@ from holspec.utilities import (
 from holspec.point_data import PointDataEnsemble
 from holspec.simplicial import SimplicialComplex
 from holspec.cochain_metric import CochainMetric
-from holspec.hodge_laplacian import HodgeLaplacian
+from holspec.hodge_laplacian import HodgeLaplacian, LAPLACIAN_COMPONENT_NAMES
 from holspec.spectra import HodgeLaplacianSpectra
 
 
@@ -820,8 +821,10 @@ def run_spectra(
     HodgeLaplacian file, and writes the results to HDF5 files. Upstream
     objects are reconstructed via ``load_hodge_laplacian`` per member.
 
-    This is the terminal pipeline stage. All spectra are computed eagerly
-    (no conditional computation flags).
+    Which spectra are computed is controlled by ``compute_spectra`` in
+    the config: True computes all (k, component) pairs, a list computes
+    only the specified pairs, and False skips computation. Eigenvector
+    computation is further controlled by ``compute_eigenvectors``.
 
     Parameters
     ----------
@@ -859,8 +862,23 @@ def run_spectra(
     verbose = config['runtime']['verbose']
     stage_name = config['outputs']['stage_name']
 
+    compute_spectra = config['configs'].get('compute_spectra', True)
     solver = config['configs']['solver']
     compute_eigenvectors = config['configs']['compute_eigenvectors']
+
+    # Warn if compute_eigenvectors requests pairs outside compute_spectra
+    if (isinstance(compute_spectra, list)
+            and isinstance(compute_eigenvectors, list)):
+        spectra_keys = {(k, comp) for k, comp in compute_spectra}
+        eigenvector_keys = {(k, comp) for k, comp in compute_eigenvectors}
+        unreachable = eigenvector_keys - spectra_keys
+        if unreachable:
+            warnings.warn(
+                f"compute_eigenvectors contains pairs not in "
+                f"compute_spectra: {sorted(unreachable)}. "
+                f"Eigenvectors for these pairs will not be computed.",
+                stacklevel=2,
+            )
 
     # --- Loop over inputs ---
     output_filepaths: dict[str, dict[str, Path]] = {}
@@ -885,7 +903,8 @@ def run_spectra(
             _initialize_pipeline_file(
                 output_filepath, created_by, hl_filepath,
                 project_root, stage_name,
-                {'solver': solver,
+                {'compute_spectra': compute_spectra,
+                 'solver': solver,
                  'compute_eigenvectors': compute_eigenvectors},
             )
 
@@ -910,9 +929,14 @@ def run_spectra(
                     compute_eigenvectors=compute_eigenvectors,
                 )
 
-                # Compute all components at every degree
-                for k in range(hlsp.max_dim + 1):
-                    _ = hlsp[k]
+                # Compute spectra for requested (k, component) pairs
+                if compute_spectra is True:
+                    for k in range(hlsp.max_dim + 1):
+                        _ = hlsp[k]
+                elif isinstance(compute_spectra, list):
+                    for k, comp in compute_spectra:
+                        hlsp.spectrum(k, comp)
+                # compute_spectra is False: no computation
 
                 # Save spectra to file
                 hlsp.save(
@@ -929,15 +953,21 @@ def run_spectra(
                     f"for {ptd_label} / {hl_label}:"
                 )
                 print(f"  {hlsp}")
+                print(f"  compute_spectra: {compute_spectra}")
                 print(f"  solver: {solver}")
                 print(f"  compute_eigenvectors: {compute_eigenvectors}")
                 print(f"  hodge laplacian spectra:")
                 for k in hlsp.degrees:
-                    spc = hlsp[k]['full']
-                    print(
-                        f"    L^{k},full: num_eig={spc.num_eigenvalues}, "
-                        f"dim_ker={spc.dim_ker()}"
-                    )
+                    for comp in LAPLACIAN_COMPONENT_NAMES:
+                        if (k, comp) in hlsp._spectrum_cache:
+                            spc = hlsp._spectrum_cache[(k, comp)]
+                            print(
+                                f"    L^{k},{comp}: "
+                                f"num_eig={spc.num_eigenvalues}, "
+                                f"dim_ker={spc.dim_ker()}"
+                            )
+                        else:
+                            print(f"    L^{k},{comp}: (not computed)")
                 print(f"  file path: "
                       f"{output_filepath.relative_to(project_root)}")
                 print(f"  file size: "
