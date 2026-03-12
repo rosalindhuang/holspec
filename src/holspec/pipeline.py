@@ -7,11 +7,12 @@ references to upstream objects.
 """
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 
 import numpy as np
 
-from holspec.utilities import read_h5
+from holspec.utilities import read_h5, save_h5
 from holspec.simplicial import SimplicialComplex
 from holspec.cochain_metric import CochainMetric
 from holspec.hodge_laplacian import HodgeLaplacian
@@ -280,3 +281,53 @@ def load_spectra(
     hlsp.load_cache(filepath, group=group, validate_hash=validate_hash)
 
     return hlsp
+
+
+# =============================================================================
+# Pipeline File Initialization
+# =============================================================================
+
+def _initialize_pipeline_file(
+    output_filepath: Path,
+    input_filepath: Path,
+    project_root: Path,
+    stage_name: str,
+    stage_config: dict,
+    created_by: str,
+) -> None:
+    """
+    Write root-level pipeline metadata to a new output file.
+
+    Creates (or replaces) the output HDF5 file with the five standard
+    file-level metadata attributes that every pipeline output carries.
+    Called once per output file at the start of each ``run_{stage}``
+    function, before any per-member data is written.
+
+    Parameters
+    ----------
+    output_filepath : Path
+        Path to the output HDF5 file.
+    input_filepath : Path
+        Path to the immediate input file for this stage.
+    project_root : Path
+        Project root for computing the relative input path.
+    stage_name : str
+        Name of the pipeline stage producing this file.
+    stage_config : dict
+        Stage-specific configuration recorded for provenance. Empty dict
+        for stages with no mathematical parameters.
+    created_by : str
+        Identifier for the notebook or script that produced this file.
+    """
+    save_h5(
+        output_filepath,
+        attributes={
+            'created_by': created_by,
+            'creation_time': datetime.now().isoformat(),
+            'input_file': str(input_filepath.relative_to(project_root)),
+            'stage_name': stage_name,
+            'stage_config': stage_config,
+        },
+        group=None,
+        mode='replace',
+    )
