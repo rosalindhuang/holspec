@@ -272,9 +272,9 @@ class HodgeLaplacianSpectra:
     def save(
         self,
         filepath: str | Path,
+        save_eigenvectors: bool = True,
         mode: str = 'replace',
         group: str | None = None,
-        save_eigenvectors: bool = True,
         hdf5_options: dict | None = None,
     ) -> str:
         """
@@ -287,14 +287,14 @@ class HodgeLaplacianSpectra:
         ----------
         filepath : str or Path
             Output file path.
-        mode : {'replace', 'update', 'create'}, default='replace'
-            How to handle an existing file/group.
-        group : str, optional
-            HDF5 group path for the data. If None, saves at root level.
         save_eigenvectors : bool, default=True
             Whether to include eigenvectors in the saved file. If False,
             only eigenvalues are saved even if eigenvectors are present
             in the cached spectra.
+        mode : {'replace', 'update', 'create'}, default='replace'
+            How to handle an existing file/group.
+        group : str, optional
+            HDF5 group path for the data. If None, saves at root level.
         hdf5_options : dict, optional
             HDF5 compression options. Default: gzip level 4.
 

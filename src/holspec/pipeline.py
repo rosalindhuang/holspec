@@ -350,24 +350,29 @@ def run_topology_simplicial(
 ) -> dict[str, dict[str, Path]]:
     """
     Run pipeline Stage 1: Topological Structure via Simplicial Complexes.
-
+ 
     Reads the stage config YAML, constructs a SimplicialComplex for each
     (point data ensemble, simplicial construction) pair, and writes the
-    results to HDF5 files. 
-
+    results to HDF5 files.
+ 
+    Which incidence matrices are cached is controlled by ``cache_incidence``
+    in the config runtime: True caches all degrees, a list caches only the
+    specified degrees, and False skips caching. Validation independently
+    populates the cache for the degrees it checks.
+ 
     Parameters
     ----------
     config_path : str or Path
         Path to a YAML config file
     project_root : str or Path
         Project root for resolving relative paths in the config.
-
+ 
     Returns
     -------
     dict[str, dict[str, Path]]
         Nested mapping ``{ptd_label: {sc_label: output_filepath}}``.
         Same shape as ``inputs.filepaths`` in the next stage's config.
-
+ 
     Raises
     ------
     FileNotFoundError
@@ -377,15 +382,15 @@ def run_topology_simplicial(
     """
     config_path = Path(config_path)
     project_root = Path(project_root)
-
+ 
     # --- Validate config path ---
     if not config_path.exists():
         raise FileNotFoundError(f"Config file not found: {config_path}")
-
+ 
     # --- Read and unpack config ---
     with open(config_path, 'r') as f:
         config = yaml.safe_load(f)
-
+ 
     input_filepaths = convert_relative_to_paths(
         config['inputs']['filepaths'], project_root,
     )
@@ -393,50 +398,54 @@ def run_topology_simplicial(
     created_by = config['summary']['created_by']
     verbose = config['runtime']['verbose']
     stage_name = config['outputs']['stage_name']
-
+ 
     simplicial_constructions = config['configs']['simplicial_constructions']
-    validate_boundary_property = config['runtime']['validate_boundary_property']
     cache_incidence = config['runtime']['cache_incidence']
-
+    validate_boundary_property = config['runtime']['validate_boundary_property']
+ 
     # --- Loop over inputs ---
     output_filepaths: dict[str, dict[str, Path]] = {}
-
+ 
     for ptd_label, ptd_filepath in input_filepaths.items():
-
+ 
         # Load ensemble once per point data label
         point_data_ensemble = PointDataEnsemble.load(ptd_filepath)
-
+ 
         if verbose:
             print(f"{'-'*60}")
             print(f"{ptd_label}")
             print(f"{'-'*60}")
             print()
-
+ 
         for sc_label, sc_config in simplicial_constructions.items():
-
+ 
             # Output file path
             output_filepath = output_data_dir / ptd_label / f"{sc_label}.h5"
-
+ 
             # Initialize file with pipeline metadata
             _initialize_pipeline_file(
                 output_filepath, created_by, ptd_filepath,
                 project_root, stage_name, sc_config,
             )
-
+ 
             # Iterate computation over ensemble members
             for member_index, member in enumerate(point_data_ensemble):
-
+ 
                 # Construct simplicial complex
                 sc = SimplicialComplex.from_point_data(
                     member, sc_config,
                     metadata={'member_index': member_index},
                 )
-
-                # Compute incidence matrices (if caching)
-                if cache_incidence:
+ 
+                # Cache incidence matrices for requested degrees
+                if cache_incidence is True:
                     for k in range(sc.max_dim + 1):
                         sc.incidence_matrix(k)
-
+                elif isinstance(cache_incidence, list):
+                    for k in cache_incidence:
+                        sc.incidence_matrix(k)
+                # cache_incidence is False: no caching
+ 
                 # Validate boundary property (also populates cache)
                 if validate_boundary_property:
                     boundary_results = sc.validate_boundary_property()
@@ -453,15 +462,15 @@ def run_topology_simplicial(
                         f"{output_filepath.relative_to(project_root)}\n"
                         f"  failed at k            : {failed}"
                     )
-
+ 
                 # Save simplicial complex to file
                 sc.save(
                     output_filepath,
-                    save_incidence=cache_incidence,
+                    save_incidence=True,
                     mode='replace',
                     group=f"member_{member_index:04d}",
                 )
-
+ 
             # Verbose output
             if verbose:
                 print(
@@ -484,12 +493,12 @@ def run_topology_simplicial(
                 print(f"  file size: "
                       f"{output_filepath.stat().st_size / 1024:.2f} KB")
                 print()
-
+ 
             # Collect output filepaths
             output_filepaths.setdefault(ptd_label, {})[sc_label] = (
                 output_filepath
             )
-
+ 
     return output_filepaths
 
 
@@ -645,28 +654,35 @@ def run_hodge_laplacian(
 ) -> dict[str, dict[str, Path]]:
     """
     Run pipeline Stage 3: Hodge Laplacians and Discrete Differential Operators.
-
+ 
     Reads the stage config YAML, constructs a HodgeLaplacian for each
     cochain metric file, and writes the results to HDF5 files. Upstream
     SimplicialComplex files are resolved via provenance tracing.
-
-    When both ``cache_laplacians`` and ``validate_laplacians`` are False,
-    no Laplacian matrices are computed. The output file serves as a
-    provenance waypoint containing only metadata and content hashes.
-
+ 
+    Which Laplacian matrices are cached is controlled by
+    ``cache_laplacians`` in the config runtime: True caches all
+    (k, component) pairs, a list caches only the specified pairs, and
+    False skips caching. Validation independently populates the cache
+    for the pairs it checks.
+ 
+    When neither ``cache_laplacians`` nor ``validate_laplacians``
+    triggers computation, no Laplacian matrices are computed. The output
+    file serves as a provenance waypoint containing only metadata and
+    content hashes.
+ 
     Parameters
     ----------
     config_path : str or Path
         Path to a YAML config file.
     project_root : str or Path
         Project root for resolving relative paths in the config.
-
+ 
     Returns
     -------
     dict[str, dict[str, Path]]
         Nested mapping ``{ptd_label: {cm_label: output_filepath}}``.
         Same shape as ``inputs.filepaths`` in the next stage's config.
-
+ 
     Raises
     ------
     FileNotFoundError
@@ -676,15 +692,15 @@ def run_hodge_laplacian(
     """
     config_path = Path(config_path)
     project_root = Path(project_root)
-
+ 
     # --- Validate config path ---
     if not config_path.exists():
         raise FileNotFoundError(f"Config file not found: {config_path}")
-
+ 
     # --- Read and unpack config ---
     with open(config_path, 'r') as f:
         config = yaml.safe_load(f)
-
+ 
     input_filepaths = convert_relative_to_paths(
         config['inputs']['filepaths'], project_root,
     )
@@ -693,47 +709,47 @@ def run_hodge_laplacian(
     verbose = config['runtime']['verbose']
     stage_name = config['outputs']['stage_name']
 
-    validate_laplacians = config['runtime']['validate_laplacians']
     cache_laplacians = config['runtime']['cache_laplacians']
-
+    validate_laplacians = config['runtime']['validate_laplacians']
+ 
     # --- Loop over inputs ---
     output_filepaths: dict[str, dict[str, Path]] = {}
-
+ 
     for ptd_label, cm_files in input_filepaths.items():
-
+ 
         if verbose:
             print(f"{'-'*60}")
             print(f"{ptd_label}")
             print(f"{'-'*60}")
             print()
-
+ 
         for cm_label, cm_filepath in cm_files.items():
-
+ 
             # Trace provenance chain for file paths
             provenance_chain = trace_provenance(cm_filepath, project_root)
             sc_filepath = provenance_chain['topology_simplicial']
-
+ 
             # Output file path
             output_label = cm_label
             output_filepath = (
                 output_data_dir / ptd_label / f"{output_label}.h5"
             )
-
+ 
             # Initialize file with pipeline metadata
             _initialize_pipeline_file(
                 output_filepath, created_by, cm_filepath,
                 project_root, stage_name, {},
             )
-
+ 
             # Discover ensemble members from input file
             member_keys = [
                 key for key in get_keys_h5(cm_filepath)
                 if key.startswith('member_')
             ]
-
+ 
             # Iterate computation over ensemble members
             for member_key in member_keys:
-
+ 
                 # Load upstream objects for this member
                 sc = SimplicialComplex.load(
                     sc_filepath, group=member_key,
@@ -742,15 +758,19 @@ def run_hodge_laplacian(
                 cm = CochainMetric.load(
                     cm_filepath, group=member_key,
                 )
-
+ 
                 # Construct Hodge Laplacian
                 hl = HodgeLaplacian(sc, cm)
-
-                # Compute Laplacian matrices (if caching)
-                if cache_laplacians:
+ 
+                # Cache Laplacian matrices for requested (k, component) pairs
+                if cache_laplacians is True:
                     for k in range(hl.max_dim + 1):
                         _ = hl[k]
-
+                elif isinstance(cache_laplacians, list):
+                    for k, comp in cache_laplacians:
+                        hl.to_matrix(k, comp)
+                # cache_laplacians is False: no caching
+ 
                 # Validate Laplacian properties (also populates cache)
                 if validate_laplacians:
                     validation_results = hl.validate_laplacians()
@@ -770,15 +790,15 @@ def run_hodge_laplacian(
                             f"{output_filepath.relative_to(project_root)}\n"
                             f"  failed properties : {failed}"
                         )
-
+ 
                 # Save Hodge Laplacian to file
                 hl.save(
                     output_filepath,
-                    save_laplacians=cache_laplacians,
+                    save_laplacians=True,
                     mode='replace',
                     group=member_key,
                 )
-
+ 
             # Verbose output
             if verbose:
                 print(
@@ -788,27 +808,28 @@ def run_hodge_laplacian(
                 print(f"  {hl}")
                 print(f"  hodge laplacian matrices:")
                 for k in range(hl.max_dim + 1):
-                    if (k, 'full') in hl._laplacian_cache:
-                        L_full = hl._laplacian_cache[(k, 'full')]
-                        print(
-                            f"    L^{k}: shape={L_full.shape}, "
-                            f"nnz={L_full.nnz}"
-                        )
-                    else:
-                        print(f"    L^{k}: (not cached)")
+                    for comp in LAPLACIAN_COMPONENT_NAMES:
+                        if (k, comp) in hl._laplacian_cache:
+                            L = hl._laplacian_cache[(k, comp)]
+                            print(
+                                f"    L^{k},{comp}: "
+                                f"shape={L.shape}, nnz={L.nnz}"
+                            )
+                        else:
+                            print(f"    L^{k},{comp}: (not cached)")
                 print(f"  file path: "
                       f"{output_filepath.relative_to(project_root)}")
                 print(f"  file size: "
                       f"{output_filepath.stat().st_size / 1024:.2f} KB")
                 print()
-
+ 
             # Collect output filepaths
             output_filepaths.setdefault(ptd_label, {})[output_label] = (
                 output_filepath
             )
-
+ 
     return output_filepaths
-
+ 
 
 def run_spectra(
     config_path: str | Path,
@@ -941,9 +962,9 @@ def run_spectra(
                 # Save spectra to file
                 hlsp.save(
                     output_filepath,
+                    save_eigenvectors=True,
                     mode='replace',
                     group=member_key,
-                    save_eigenvectors=True,
                 )
 
             # Verbose output
