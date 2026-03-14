@@ -30,7 +30,7 @@ from holspec.spectra import HodgeLaplacianSpectra
 # Pipeline Stage Metadata
 # =============================================================================
 
-PIPELINE_STAGES: dict[int, str] = {
+PIPELINE_STAGE_NAMES: dict[int, str] = {
     0: 'point_data',
     1: 'topology_simplicial',
     2: 'geometry_metric',
