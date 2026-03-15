@@ -10,7 +10,8 @@ from functools import lru_cache
 # Project paths
 # =============================================================================
 
-# Project root
+# --- Project root ---
+
 @lru_cache(maxsize=1)
 def get_project_root(start: Path | None = None, root_markers = ("pyproject.toml", ".git")) -> Path:
     """
@@ -30,7 +31,9 @@ def get_project_root(start: Path | None = None, root_markers = ("pyproject.toml"
 
 PROJECT_ROOT = get_project_root()
 
-# Other directories
+
+# --- Directories ---
+
 CONFIGS_DIR = PROJECT_ROOT / "configs"
 
 DATA_DIR = PROJECT_ROOT / "data"
@@ -43,6 +46,22 @@ OUTPUTS_DIR = PROJECT_ROOT / "outputs"
 
 SRC_DIR = PROJECT_ROOT / "src"
 
+# --- Pipeline directories ---
+
+from holspec.pipeline import PIPELINE_STAGE_NAMES
+
+PIPELINE_INPUT_DIRS: dict[int, Path] = {
+    1: DATA_RAW_DIR,
+    **{
+        n: DATA_INTERIM_DIR / PIPELINE_STAGE_NAMES[n - 1]
+        for n in (2, 3, 4)
+    },
+}
+
+PIPELINE_OUTPUT_DIRS: dict[int, Path] = {
+    n: DATA_INTERIM_DIR / name
+    for n, name in PIPELINE_STAGE_NAMES.items()
+}
 
 
 # =============================================================================
@@ -230,9 +249,11 @@ def print_directory_tree(root_path, include_files=True, ignore_dotfiles=True,
     except Exception as e:
         print(f"{_prefix}[Error: {e}]")
 
+
 # =============================================================================
 # Test code
 # =============================================================================
+
 if __name__ == "__main__":
     print("Project paths:")
     print("  PROJECT_ROOT:".ljust(15), PROJECT_ROOT)

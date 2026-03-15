@@ -28,7 +28,7 @@ from holspec.spectra import HodgeLaplacianSpectra
 
 
 # =============================================================================
-# Pipeline Stage Metadata
+# Pipeline Metadata
 # =============================================================================
 
 PIPELINE_STAGE_NAMES: dict[int, str] = {
@@ -41,7 +41,7 @@ PIPELINE_STAGE_NAMES: dict[int, str] = {
 
 
 # =============================================================================
-# Provenance
+# Pipeline Provenance
 # =============================================================================
 
 def trace_provenance(
@@ -123,176 +123,7 @@ def trace_provenance(
 
 
 # =============================================================================
-# Pipeline Loading
-# =============================================================================
-
-def load_hodge_laplacian(
-    filepath: str | Path,
-    project_root: str | Path,
-    group: str | None = None,
-    validate_hash: bool = True,
-) -> HodgeLaplacian:
-    """
-    Load a HodgeLaplacian by retracing the provenance chain.
-
-    Reads the HodgeLaplacian pipeline file to locate the upstream
-    CochainMetric and SimplicialComplex files via provenance attributes,
-    loads both upstream objects, constructs a HodgeLaplacian from them,
-    and populates its cache from the file.
-
-    Parameters
-    ----------
-    filepath : str or Path
-        Path to an HDF5 pipeline file containing HodgeLaplacian data.
-        Must have root-level ``input_file`` and ``stage_name`` attributes.
-    project_root : str or Path
-        Project root for resolving relative provenance paths.
-    group : str, optional
-        HDF5 group for all three objects (HL, CM, SC). Typically
-        ``'member_{i:04d}'`` for pipelines based on point data ensembles.
-    validate_hash : bool, default=True
-        Whether to verify content hashes during loading. Passed through
-        to ``SimplicialComplex.load()``, ``CochainMetric.load()``, and
-        ``HodgeLaplacian.load_cache()``.
-
-    Returns
-    -------
-    HodgeLaplacian
-        Fully constructed instance with cache populated from file.
-
-    Raises
-    ------
-    KeyError
-        If the provenance chain does not contain the required upstream
-        stages (``'geometry_metric'`` and ``'topology_simplicial'``).
-    FileNotFoundError
-        If any file in the provenance chain does not exist.
-    ValueError
-        If hash validation fails at any loading step.
-    """
-    filepath = Path(filepath)
-    project_root = Path(project_root)
-
-    # Trace provenance to locate upstream files
-    provenance_chain = trace_provenance(filepath, project_root)
-
-    required_stages = ('geometry_metric', 'topology_simplicial')
-    missing_stages = [s for s in required_stages if s not in provenance_chain]
-    if missing_stages:
-        raise KeyError(
-            f"Provenance chain missing required stages: {missing_stages}. "
-            f"Found stages: {list(provenance_chain.keys())}"
-        )
-
-    cm_filepath = provenance_chain['geometry_metric']
-    sc_filepath = provenance_chain['topology_simplicial']
-
-    # Load upstream objects
-    sc = SimplicialComplex.load(
-        sc_filepath, group=group, validate_hash=validate_hash, load_incidence=True,
-    )
-    cm = CochainMetric.load(
-        cm_filepath, group=group, validate_hash=validate_hash,
-    )
-
-    # Read group-level attributes for constructor params
-    _, group_attributes = read_h5(filepath, group=group, dataset_names=[])
-    metadata = group_attributes.get('metadata', {})
-
-    # Construct HodgeLaplacian and populate cache from file
-    hl = HodgeLaplacian(sc, cm, metadata=metadata)
-    hl.load_cache(filepath, group=group, validate_hash=validate_hash)
-
-    return hl
-
-
-def load_spectra(
-    filepath: str | Path,
-    project_root: str | Path,
-    group: str | None = None,
-    validate_hash: bool = True,
-) -> HodgeLaplacianSpectra:
-    """
-    Load a HodgeLaplacianSpectra by retracing the provenance chain.
-
-    Reads the spectra pipeline file to locate the upstream HodgeLaplacian
-    file via provenance attributes, calls ``load_hodge_laplacian`` to
-    reconstruct the live HodgeLaplacian, reads solver configuration from
-    the file, constructs a HodgeLaplacianSpectra from the live HL, and
-    populates its cache from the file.
-
-    Parameters
-    ----------
-    filepath : str or Path
-        Path to an HDF5 pipeline file containing HodgeLaplacianSpectra
-        data.  Must have root-level ``input_file`` and ``stage_name``
-        attributes pointing back to the upstream HodgeLaplacian file.
-    project_root : str or Path
-        Project root for resolving relative provenance paths.
-    group : str, optional
-        HDF5 group for all objects (spectra, HL, CM, SC). Typically
-        ``'member_{i:04d}'`` for pipelines based on point data ensembles.
-    validate_hash : bool, default=True
-        Whether to verify content hashes during loading. Passed through
-        to ``load_hodge_laplacian`` and ``HodgeLaplacianSpectra.load_cache``.
-
-    Returns
-    -------
-    HodgeLaplacianSpectra
-        Fully constructed instance with cache populated from file.
-
-    Raises
-    ------
-    KeyError
-        If the provenance chain does not contain ``'hodge_laplacian'``.
-    FileNotFoundError
-        If any file in the provenance chain does not exist.
-    ValueError
-        If hash validation fails at any loading step.
-    """
-    filepath = Path(filepath)
-    project_root = Path(project_root)
-
-    # Trace provenance to locate the upstream HodgeLaplacian file
-    provenance_chain = trace_provenance(filepath, project_root)
-    if 'hodge_laplacian' not in provenance_chain:
-        raise KeyError(
-            f"Provenance chain missing required stage 'hodge_laplacian'. "
-            f"Found stages: {list(provenance_chain.keys())}"
-        )
-    hl_filepath = provenance_chain['hodge_laplacian']
-
-    # Load upstream HodgeLaplacian object
-    hl = load_hodge_laplacian(
-        hl_filepath, project_root, group=group, validate_hash=validate_hash,
-    )
-    
-    # Read group-level attributes for constructor params
-    _, group_attributes = read_h5(filepath, group=group, dataset_names=[])
-    solver = str(group_attributes.get('solver', 'dense'))
-    raw_eigvec = group_attributes.get('compute_eigenvectors', False)
-    if isinstance(raw_eigvec, (bool, np.bool_)):
-        compute_eigenvectors = bool(raw_eigvec)
-    elif hasattr(raw_eigvec, '__iter__'):
-        compute_eigenvectors = [(int(k), str(comp)) for k, comp in raw_eigvec]
-    else:
-        compute_eigenvectors = bool(raw_eigvec)
-    metadata = group_attributes.get('metadata', {})
-
-    # Construct HodgeLaplacianSpectra and populate cache from file
-    hlsp = HodgeLaplacianSpectra(
-        hl,
-        solver=solver,
-        compute_eigenvectors=compute_eigenvectors,
-        metadata=metadata,
-    )
-    hlsp.load_cache(filepath, group=group, validate_hash=validate_hash)
-
-    return hlsp
-
-
-# =============================================================================
-# Pipeline File Initialization
+# Pipeline Stage Functions
 # =============================================================================
 
 def _initialize_pipeline_file(
@@ -340,10 +171,6 @@ def _initialize_pipeline_file(
         mode='replace',
     )
 
-
-# =============================================================================
-# Pipeline Stage Functions
-# =============================================================================
 
 def run_topology_simplicial(
     config: dict,
@@ -402,12 +229,6 @@ def run_topology_simplicial(
         # Load ensemble once per point data label
         point_data_ensemble = PointDataEnsemble.load(ptd_filepath)
  
-        if verbose:
-            print(f"{'-'*60}")
-            print(f"{ptd_label}")
-            print(f"{'-'*60}")
-            print()
- 
         for sc_label, sc_config in simplicial_constructions.items():
  
             # Output file path
@@ -462,12 +283,12 @@ def run_topology_simplicial(
                     group=f"member_{member_index:04d}",
                 )
  
-            # Verbose output
+            # Completion
+            print(
+                f"Constructed {point_data_ensemble.size} simplicial "
+                f"complexes for {ptd_label} / {sc_label}"
+            )
             if verbose:
-                print(
-                    f"Constructed {point_data_ensemble.size} simplicial "
-                    f"complexes for {ptd_label} / {sc_label}:"
-                )
                 print(f"  {sc}")
                 print(f"  simplicial construction: {sc_label}")
                 print(f"  incidence matrices:")
@@ -543,12 +364,6 @@ def run_geometry_metric(
 
     for ptd_label, sc_files in input_filepaths.items():
 
-        if verbose:
-            print(f"{'-'*60}")
-            print(f"{ptd_label}")
-            print(f"{'-'*60}")
-            print()
-
         for sc_label, sc_filepath in sc_files.items():
 
             # Trace provenance chain for file paths
@@ -601,12 +416,12 @@ def run_geometry_metric(
                         group=member_group,
                     )
 
-                # Verbose output
+                # Completion
+                print(
+                    f"Constructed {point_data_ensemble.size} cochain "
+                    f"metrics for {ptd_label} / {output_label}"
+                )
                 if verbose:
-                    print(
-                        f"Constructed {point_data_ensemble.size} cochain "
-                        f"metrics for {ptd_label} / {output_label}:"
-                    )
                     print(f"  {cm}")
                     print(f"  cochain metric model: {cm_label}")
                     print(f"  metric tensors:")
@@ -690,12 +505,6 @@ def run_hodge_laplacian(
  
     for ptd_label, cm_files in input_filepaths.items():
  
-        if verbose:
-            print(f"{'-'*60}")
-            print(f"{ptd_label}")
-            print(f"{'-'*60}")
-            print()
- 
         for cm_label, cm_filepath in cm_files.items():
  
             # Trace provenance chain for file paths
@@ -772,12 +581,12 @@ def run_hodge_laplacian(
                     group=member_key,
                 )
  
-            # Verbose output
+            # Completion
+            print(
+                f"Constructed {len(member_keys)} Hodge Laplacians "
+                f"for {ptd_label} / {cm_label}"
+            )
             if verbose:
-                print(
-                    f"Constructed {len(member_keys)} Hodge Laplacians "
-                    f"for {ptd_label} / {cm_label}:"
-                )
                 print(f"  {hl}")
                 print(f"  hodge laplacian matrices:")
                 for k in range(hl.max_dim + 1):
@@ -870,12 +679,6 @@ def run_spectra(
 
     for ptd_label, hl_files in input_filepaths.items():
 
-        if verbose:
-            print(f"{'-'*60}")
-            print(f"{ptd_label}")
-            print(f"{'-'*60}")
-            print()
-
         for hl_label, hl_filepath in hl_files.items():
 
             # Output file path
@@ -931,12 +734,12 @@ def run_spectra(
                     group=member_key,
                 )
 
-            # Verbose output
+            # Completion
+            print(
+                f"Computed {len(member_keys)} spectra "
+                f"for {ptd_label} / {hl_label}"
+            )
             if verbose:
-                print(
-                    f"Computed {len(member_keys)} spectra "
-                    f"for {ptd_label} / {hl_label}:"
-                )
                 print(f"  {hlsp}")
                 print(f"  compute_spectra: {compute_spectra}")
                 print(f"  solver: {solver}")
@@ -1179,10 +982,9 @@ def run_pipeline(
     for ptd_label, ptd_filepath in input_filepaths.items():
 
         if verbose:
-            print(f"{'=' * 62}")
+            print(f"{'=' * 60}")
             print(f"{ptd_label}")
-            print(f"{'=' * 62}")
-            print()
+            print(f"{'=' * 60}")
 
         # Stage 1 input: flat {ptd_label: filepath}
         prev_output = {ptd_label: ptd_filepath}
@@ -1191,9 +993,10 @@ def run_pipeline(
             stage_name = PIPELINE_STAGE_NAMES[stage_num]
 
             if verbose:
-                print(f"{'-' * 62}")
+                print()
+                print(f"{'-' * 60}")
                 print(f"Stage {stage_num}: {stage_name}")
-                print(f"{'-' * 62}")
+                print(f"{'-' * 60}")
                 print()
 
             # Assemble per-stage config for this single input
@@ -1227,3 +1030,173 @@ def run_pipeline(
         )
 
     return results
+
+
+# =============================================================================
+# Pipeline Loading
+# =============================================================================
+
+def load_hodge_laplacian(
+    filepath: str | Path,
+    project_root: str | Path,
+    group: str | None = None,
+    validate_hash: bool = True,
+) -> HodgeLaplacian:
+    """
+    Load a HodgeLaplacian by retracing the provenance chain.
+
+    Reads the HodgeLaplacian pipeline file to locate the upstream
+    CochainMetric and SimplicialComplex files via provenance attributes,
+    loads both upstream objects, constructs a HodgeLaplacian from them,
+    and populates its cache from the file.
+
+    Parameters
+    ----------
+    filepath : str or Path
+        Path to an HDF5 pipeline file containing HodgeLaplacian data.
+        Must have root-level ``input_file`` and ``stage_name`` attributes.
+    project_root : str or Path
+        Project root for resolving relative provenance paths.
+    group : str, optional
+        HDF5 group for all three objects (HL, CM, SC). Typically
+        ``'member_{i:04d}'`` for pipelines based on point data ensembles.
+    validate_hash : bool, default=True
+        Whether to verify content hashes during loading. Passed through
+        to ``SimplicialComplex.load()``, ``CochainMetric.load()``, and
+        ``HodgeLaplacian.load_cache()``.
+
+    Returns
+    -------
+    HodgeLaplacian
+        Fully constructed instance with cache populated from file.
+
+    Raises
+    ------
+    KeyError
+        If the provenance chain does not contain the required upstream
+        stages (``'geometry_metric'`` and ``'topology_simplicial'``).
+    FileNotFoundError
+        If any file in the provenance chain does not exist.
+    ValueError
+        If hash validation fails at any loading step.
+    """
+    filepath = Path(filepath)
+    project_root = Path(project_root)
+
+    # Trace provenance to locate upstream files
+    provenance_chain = trace_provenance(filepath, project_root)
+
+    required_stages = ('geometry_metric', 'topology_simplicial')
+    missing_stages = [s for s in required_stages if s not in provenance_chain]
+    if missing_stages:
+        raise KeyError(
+            f"Provenance chain missing required stages: {missing_stages}. "
+            f"Found stages: {list(provenance_chain.keys())}"
+        )
+
+    cm_filepath = provenance_chain['geometry_metric']
+    sc_filepath = provenance_chain['topology_simplicial']
+
+    # Load upstream objects
+    sc = SimplicialComplex.load(
+        sc_filepath, group=group, validate_hash=validate_hash, load_incidence=True,
+    )
+    cm = CochainMetric.load(
+        cm_filepath, group=group, validate_hash=validate_hash,
+    )
+
+    # Read group-level attributes for constructor params
+    _, group_attributes = read_h5(filepath, group=group, dataset_names=[])
+    metadata = group_attributes.get('metadata', {})
+
+    # Construct HodgeLaplacian and populate cache from file
+    hl = HodgeLaplacian(sc, cm, metadata=metadata)
+    hl.load_cache(filepath, group=group, validate_hash=validate_hash)
+
+    return hl
+
+
+def load_spectra(
+    filepath: str | Path,
+    project_root: str | Path,
+    group: str | None = None,
+    validate_hash: bool = True,
+) -> HodgeLaplacianSpectra:
+    """
+    Load a HodgeLaplacianSpectra by retracing the provenance chain.
+
+    Reads the spectra pipeline file to locate the upstream HodgeLaplacian
+    file via provenance attributes, calls ``load_hodge_laplacian`` to
+    reconstruct the live HodgeLaplacian, reads solver configuration from
+    the file, constructs a HodgeLaplacianSpectra from the live HL, and
+    populates its cache from the file.
+
+    Parameters
+    ----------
+    filepath : str or Path
+        Path to an HDF5 pipeline file containing HodgeLaplacianSpectra
+        data.  Must have root-level ``input_file`` and ``stage_name``
+        attributes pointing back to the upstream HodgeLaplacian file.
+    project_root : str or Path
+        Project root for resolving relative provenance paths.
+    group : str, optional
+        HDF5 group for all objects (spectra, HL, CM, SC). Typically
+        ``'member_{i:04d}'`` for pipelines based on point data ensembles.
+    validate_hash : bool, default=True
+        Whether to verify content hashes during loading. Passed through
+        to ``load_hodge_laplacian`` and ``HodgeLaplacianSpectra.load_cache``.
+
+    Returns
+    -------
+    HodgeLaplacianSpectra
+        Fully constructed instance with cache populated from file.
+
+    Raises
+    ------
+    KeyError
+        If the provenance chain does not contain ``'hodge_laplacian'``.
+    FileNotFoundError
+        If any file in the provenance chain does not exist.
+    ValueError
+        If hash validation fails at any loading step.
+    """
+    filepath = Path(filepath)
+    project_root = Path(project_root)
+
+    # Trace provenance to locate the upstream HodgeLaplacian file
+    provenance_chain = trace_provenance(filepath, project_root)
+    if 'hodge_laplacian' not in provenance_chain:
+        raise KeyError(
+            f"Provenance chain missing required stage 'hodge_laplacian'. "
+            f"Found stages: {list(provenance_chain.keys())}"
+        )
+    hl_filepath = provenance_chain['hodge_laplacian']
+
+    # Load upstream HodgeLaplacian object
+    hl = load_hodge_laplacian(
+        hl_filepath, project_root, group=group, validate_hash=validate_hash,
+    )
+    
+    # Read group-level attributes for constructor params
+    _, group_attributes = read_h5(filepath, group=group, dataset_names=[])
+    solver = str(group_attributes.get('solver', 'dense'))
+    raw_eigvec = group_attributes.get('compute_eigenvectors', False)
+    if isinstance(raw_eigvec, (bool, np.bool_)):
+        compute_eigenvectors = bool(raw_eigvec)
+    elif hasattr(raw_eigvec, '__iter__'):
+        compute_eigenvectors = [(int(k), str(comp)) for k, comp in raw_eigvec]
+    else:
+        compute_eigenvectors = bool(raw_eigvec)
+    metadata = group_attributes.get('metadata', {})
+
+    # Construct HodgeLaplacianSpectra and populate cache from file
+    hlsp = HodgeLaplacianSpectra(
+        hl,
+        solver=solver,
+        compute_eigenvectors=compute_eigenvectors,
+        metadata=metadata,
+    )
+    hlsp.load_cache(filepath, group=group, validate_hash=validate_hash)
+
+    return hlsp
+
