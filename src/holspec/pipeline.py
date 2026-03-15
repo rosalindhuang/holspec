@@ -17,7 +17,8 @@ import numpy as np
 import yaml
 
 from holspec.utilities import (
-    read_h5, save_h5, convert_relative_to_paths, get_keys_h5,
+    read_h5, save_h5, convert_relative_to_paths, convert_paths_to_relative,
+    get_keys_h5,
 )
 from holspec.point_data import PointDataEnsemble
 from holspec.simplicial import SimplicialComplex
@@ -345,15 +346,14 @@ def _initialize_pipeline_file(
 # =============================================================================
 
 def run_topology_simplicial(
-    config_path: str | Path,
+    config: dict,
     project_root: str | Path,
 ) -> dict[str, dict[str, Path]]:
     """
     Run pipeline Stage 1: Topological Structure via Simplicial Complexes.
  
-    Reads the stage config YAML, constructs a SimplicialComplex for each
-    (point data ensemble, simplicial construction) pair, and writes the
-    results to HDF5 files.
+    Constructs a SimplicialComplex for each (point data ensemble, simplicial
+    construction) pair, and writes the results to HDF5 files.
  
     Which incidence matrices are cached is controlled by ``cache_incidence``
     in the config runtime: True caches all degrees, a list caches only the
@@ -362,8 +362,8 @@ def run_topology_simplicial(
  
     Parameters
     ----------
-    config_path : str or Path
-        Path to a YAML config file
+    config : dict
+        Stage config dictionary.
     project_root : str or Path
         Project root for resolving relative paths in the config.
  
@@ -376,20 +376,11 @@ def run_topology_simplicial(
     Raises
     ------
     FileNotFoundError
-        If the config file or any input file does not exist.
+        If any input file does not exist.
     AssertionError
         If boundary property validation fails (when enabled).
     """
-    config_path = Path(config_path)
     project_root = Path(project_root)
- 
-    # --- Validate config path ---
-    if not config_path.exists():
-        raise FileNotFoundError(f"Config file not found: {config_path}")
- 
-    # --- Read and unpack config ---
-    with open(config_path, 'r') as f:
-        config = yaml.safe_load(f)
  
     input_filepaths = convert_relative_to_paths(
         config['inputs']['filepaths'], project_root,
@@ -503,20 +494,20 @@ def run_topology_simplicial(
 
 
 def run_geometry_metric(
-    config_path: str | Path,
+    config: dict,
     project_root: str | Path,
 ) -> dict[str, dict[str, Path]]:
     """
     Run pipeline Stage 2: Geometric Structure via Discrete Cochain Metrics.
 
-    Reads the stage config YAML, constructs a CochainMetric for each
-    (simplicial complex, metric model) pair, and writes the results to
-    HDF5 files. Upstream point data is resolved via provenance tracing.
+    Constructs a CochainMetric for each (simplicial complex, metric model)
+    pair, and writes the results to HDF5 files. Upstream point data is
+    resolved via provenance tracing.
 
     Parameters
     ----------
-    config_path : str or Path
-        Path to a YAML config file.
+    config : dict
+        Stage config dictionary.
     project_root : str or Path
         Project root for resolving relative paths in the config.
 
@@ -530,20 +521,11 @@ def run_geometry_metric(
     Raises
     ------
     FileNotFoundError
-        If the config file or any input file does not exist.
+        If any input file does not exist.
     ValueError
         If metric validation fails (when enabled).
     """
-    config_path = Path(config_path)
     project_root = Path(project_root)
-
-    # --- Validate config path ---
-    if not config_path.exists():
-        raise FileNotFoundError(f"Config file not found: {config_path}")
-
-    # --- Read and unpack config ---
-    with open(config_path, 'r') as f:
-        config = yaml.safe_load(f)
 
     input_filepaths = convert_relative_to_paths(
         config['inputs']['filepaths'], project_root,
@@ -649,15 +631,15 @@ def run_geometry_metric(
 
 
 def run_hodge_laplacian(
-    config_path: str | Path,
+    config: dict,
     project_root: str | Path,
 ) -> dict[str, dict[str, Path]]:
     """
     Run pipeline Stage 3: Hodge Laplacians and Discrete Differential Operators.
  
-    Reads the stage config YAML, constructs a HodgeLaplacian for each
-    cochain metric file, and writes the results to HDF5 files. Upstream
-    SimplicialComplex files are resolved via provenance tracing.
+    Constructs a HodgeLaplacian for each cochain metric file, and writes
+    the results to HDF5 files. Upstream SimplicialComplex files are
+    resolved via provenance tracing.
  
     Which Laplacian matrices are cached is controlled by
     ``cache_laplacians`` in the config runtime: True caches all
@@ -672,8 +654,8 @@ def run_hodge_laplacian(
  
     Parameters
     ----------
-    config_path : str or Path
-        Path to a YAML config file.
+    config : dict
+        Stage config dictionary.
     project_root : str or Path
         Project root for resolving relative paths in the config.
  
@@ -686,20 +668,11 @@ def run_hodge_laplacian(
     Raises
     ------
     FileNotFoundError
-        If the config file or any input file does not exist.
+        If any input file does not exist.
     AssertionError
         If Laplacian property validation fails (when enabled).
     """
-    config_path = Path(config_path)
     project_root = Path(project_root)
- 
-    # --- Validate config path ---
-    if not config_path.exists():
-        raise FileNotFoundError(f"Config file not found: {config_path}")
- 
-    # --- Read and unpack config ---
-    with open(config_path, 'r') as f:
-        config = yaml.safe_load(f)
  
     input_filepaths = convert_relative_to_paths(
         config['inputs']['filepaths'], project_root,
@@ -832,15 +805,15 @@ def run_hodge_laplacian(
  
 
 def run_spectra(
-    config_path: str | Path,
+    config: dict,
     project_root: str | Path,
 ) -> dict[str, dict[str, Path]]:
     """
     Run pipeline Stage 4: Hodge Laplacian Spectra and Spectral Observables.
 
-    Reads the stage config YAML, computes eigendecompositions for each
-    HodgeLaplacian file, and writes the results to HDF5 files. Upstream
-    objects are reconstructed via ``load_hodge_laplacian`` per member.
+    Computes eigendecompositions for each HodgeLaplacian file, and writes
+    the results to HDF5 files. Upstream objects are reconstructed via
+    ``load_hodge_laplacian`` per member.
 
     Which spectra are computed is controlled by ``compute_spectra`` in
     the config: True computes all (k, component) pairs, a list computes
@@ -849,8 +822,8 @@ def run_spectra(
 
     Parameters
     ----------
-    config_path : str or Path
-        Path to a YAML config file.
+    config : dict
+        Stage config dictionary.
     project_root : str or Path
         Project root for resolving relative paths in the config.
 
@@ -862,18 +835,9 @@ def run_spectra(
     Raises
     ------
     FileNotFoundError
-        If the config file or any input file does not exist.
+        If any input file does not exist.
     """
-    config_path = Path(config_path)
     project_root = Path(project_root)
-
-    # --- Validate config path ---
-    if not config_path.exists():
-        raise FileNotFoundError(f"Config file not found: {config_path}")
-
-    # --- Read and unpack config ---
-    with open(config_path, 'r') as f:
-        config = yaml.safe_load(f)
 
     input_filepaths = convert_relative_to_paths(
         config['inputs']['filepaths'], project_root,
@@ -1001,3 +965,15 @@ def run_spectra(
             )
 
     return output_filepaths
+
+
+# =============================================================================
+# Pipeline Orchestration
+# =============================================================================
+
+PIPELINE_STAGE_FUNCTIONS: dict[int, callable] = {
+    1: run_topology_simplicial,
+    2: run_geometry_metric,
+    3: run_hodge_laplacian,
+    4: run_spectra,
+}
