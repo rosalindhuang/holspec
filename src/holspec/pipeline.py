@@ -977,3 +977,253 @@ PIPELINE_STAGE_FUNCTIONS: dict[int, callable] = {
     3: run_hodge_laplacian,
     4: run_spectra,
 }
+
+
+def _assemble_stage_config(
+    pipeline_config: dict,
+    stage_num: int,
+    input_filepaths: dict,
+    project_root: Path,
+) -> dict:
+    """
+    Build a per-stage config dict from the pipeline config.
+
+    Assembles the standard five-key per-stage schema (``summary``,
+    ``inputs``, ``configs``, ``runtime``, ``outputs``) by combining 
+    stage settings from the pipeline config with dynamically-wired 
+    input filepaths from the previous stage's output.
+
+    Parameters
+    ----------
+    pipeline_config : dict
+        Full pipeline config dict.
+    stage_num : int
+        Stage number (1--4).
+    input_filepaths : dict
+        Input filepaths for this stage. Flat ``{ptd_label: path}`` for
+        Stage 1, nested ``{ptd_label: {label: path}}`` for Stages 2--4.
+        Values may be Path objects or relative path strings; Path objects
+        are converted to relative strings via ``convert_paths_to_relative``.
+    project_root : Path
+        Project root for converting absolute paths to relative strings.
+
+    Returns
+    -------
+    dict
+        Per-stage config dict with keys: ``summary``, ``inputs``,
+        ``configs``, ``runtime``, ``outputs``.
+    """
+    stage_name = PIPELINE_STAGE_NAMES[stage_num]
+    prev_stage_name = PIPELINE_STAGE_NAMES[stage_num - 1]
+    base_data_dir = pipeline_config['outputs']['data_dir']
+
+    # Input data directory: raw data for Stage 1, previous output dir
+    # for Stages 2--4
+    if stage_num == 1:
+        input_data_dir = pipeline_config['inputs']['data_dir']
+    else:
+        input_data_dir = f"{base_data_dir}/{prev_stage_name}"
+
+    return {
+        'summary': {
+            'created_by': pipeline_config['summary']['created_by'],
+            'creation_time': datetime.now().isoformat(),
+        },
+        'inputs': {
+            'stage_name': prev_stage_name,
+            'data_dir': input_data_dir,
+            'filepaths': convert_paths_to_relative(
+                input_filepaths, project_root,
+            ),
+        },
+        'configs': pipeline_config['stages'][stage_name]['configs'],
+        'runtime': pipeline_config['stages'][stage_name]['runtime'],
+        'outputs': {
+            'stage_name': stage_name,
+            'data_dir': f"{base_data_dir}/{stage_name}",
+        },
+    }
+
+
+def _save_stage_configs(
+    pipeline_config: dict,
+    results: dict,
+    project_root: Path,
+) -> None:
+    """
+    Save assembled per-stage configs as YAML files.
+
+    For each stage, assembles a complete standalone config dict
+    containing input filepaths for all point data labels, then writes
+    it as a YAML file. Saved configs can be passed directly to
+    ``run_{stage}`` functions for independent re-execution.
+
+    Parameters
+    ----------
+    pipeline_config : dict
+        Full pipeline config dict. Must have ``outputs.configs_dir``
+        specifying the directory for saved config files.
+    results : dict
+        Accumulated pipeline results with shape
+        ``{stage_name: {ptd_label: {output_label: Path}}}``.
+    project_root : Path
+        Project root for path resolution.
+    """
+    configs_dir = project_root / pipeline_config['outputs']['configs_dir']
+    configs_dir.mkdir(parents=True, exist_ok=True)
+
+    for stage_num in (1, 2, 3, 4):
+        stage_name = PIPELINE_STAGE_NAMES[stage_num]
+ 
+        # Collect full input filepaths for this stage
+        if stage_num == 1:
+            input_filepaths = convert_relative_to_paths(
+                pipeline_config['inputs']['filepaths'], project_root,
+            )
+        else:
+            prev_stage_name = PIPELINE_STAGE_NAMES[stage_num - 1]
+            input_filepaths = results[prev_stage_name]
+ 
+        # Assemble complete per-stage config and save
+        stage_config = _assemble_stage_config(
+            pipeline_config, stage_num, input_filepaths, project_root,
+        )
+ 
+        config_path = configs_dir / f"{stage_name}.yml"
+        with open(config_path, 'w') as f:
+            yaml.safe_dump(
+                stage_config, f,
+                default_flow_style=False, sort_keys=False,
+            )
+
+
+def run_pipeline(
+    config: dict,
+    project_root: str | Path,
+) -> dict[str, dict[str, dict[str, Path]]]:
+    """
+    Run the full pipeline end-to-end for all point data inputs.
+
+    Iterates over point data inputs (outer loop) and stages (inner loop),
+    wiring each stage's output filepaths into the next stage's input.
+    Reuses the ``run_{stage}`` functions for all computation; the
+    orchestrator handles config assembly and inter-stage wiring only.
+
+    All intermediate results are written to disk by the ``run_{stage}``
+    functions. Assembled per-stage configs can optionally be saved as
+    YAML files for reproducibility.
+
+    Parameters
+    ----------
+    config : dict
+        Pipeline config dict with keys: ``summary``, ``inputs``,
+        ``stages``, ``runtime``, ``outputs``. 
+    project_root : str or Path
+        Project root for resolving relative paths.
+
+    Returns
+    -------
+    dict[str, dict[str, dict[str, Path]]]
+        Nested mapping ``{stage_name: {ptd_label: {output_label: path}}}``
+        with absolute paths to all output files.
+
+    Raises
+    ------
+    ValueError
+        If the pipeline config is missing required stage entries or
+        ``configs_dir`` when ``save_stage_configs`` is enabled.
+    FileNotFoundError
+        If any point data input file does not exist.
+    """
+    project_root = Path(project_root)
+
+    # --- Extract settings ---
+
+    input_filepaths = convert_relative_to_paths(
+        config['inputs']['filepaths'], project_root,
+    )
+    verbose = config['runtime']['verbose']
+    save_stage_configs = config['runtime'].get('save_stage_configs', False)
+
+    # --- Validate inputs ---
+
+    # All four stages must be present in config
+    expected_stages = {PIPELINE_STAGE_NAMES[n] for n in (1, 2, 3, 4)}
+    provided_stages = set(config.get('stages', {}).keys())
+    missing_stages = expected_stages - provided_stages
+    if missing_stages:
+        raise ValueError(
+            f"Pipeline config 'stages' is missing entries: "
+            f"{sorted(missing_stages)}"
+        )
+
+    # All input files must exist
+    for ptd_label, ptd_filepath in input_filepaths.items():
+        if not ptd_filepath.exists():
+            raise FileNotFoundError(
+                f"Input file for '{ptd_label}' does not exist: "
+                f"{ptd_filepath}"
+            )
+
+    # configs_dir required when save_stage_configs is enabled
+    if save_stage_configs and 'configs_dir' not in config.get('outputs', {}):
+        raise ValueError(
+            "'outputs.configs_dir' must be specified when "
+            "'runtime.save_stage_configs' is true."
+        )
+
+    # --- Run pipeline ---
+
+    results: dict[str, dict[str, dict[str, Path]]] = {}
+
+    for ptd_label, ptd_filepath in input_filepaths.items():
+
+        if verbose:
+            print(f"{'=' * 62}")
+            print(f"{ptd_label}")
+            print(f"{'=' * 62}")
+            print()
+
+        # Stage 1 input: flat {ptd_label: filepath}
+        prev_output = {ptd_label: ptd_filepath}
+
+        for stage_num in (1, 2, 3, 4):
+            stage_name = PIPELINE_STAGE_NAMES[stage_num]
+
+            if verbose:
+                print(f"{'-' * 62}")
+                print(f"Stage {stage_num}: {stage_name}")
+                print(f"{'-' * 62}")
+                print()
+
+            # Assemble per-stage config for this single input
+            stage_config = _assemble_stage_config(
+                config, stage_num, prev_output, project_root,
+            )
+
+            # Run the stage
+            stage_output = PIPELINE_STAGE_FUNCTIONS[stage_num](
+                stage_config, project_root,
+            )
+
+            # Accumulate results and wire output to next stage
+            results.setdefault(stage_name, {}).update(stage_output)
+            prev_output = stage_output
+
+    # --- Save assembled per-stage configs ---
+
+    if save_stage_configs:
+        _save_stage_configs(config, results, project_root)
+
+    # --- Completion ---
+
+    if verbose:
+        num_inputs = len(input_filepaths)
+        print(
+            f"Pipeline complete. Outputs saved for "
+            f"{len(PIPELINE_STAGE_FUNCTIONS)} stages, "
+            f"{num_inputs} point data input"
+            f"{'s' if num_inputs != 1 else ''}."
+        )
+
+    return results
