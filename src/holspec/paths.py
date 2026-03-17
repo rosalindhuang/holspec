@@ -143,8 +143,15 @@ def prepare_directory(
         path.mkdir(parents=True, exist_ok=True)
 
 
-def print_directory_tree(root_path, include_files=True, ignore_dotfiles=True, 
-                         ignore_patterns=None, ignore_exact=None, _prefix="", _is_last=True):
+def print_directory_tree(
+    root_path, 
+    include_files=True, 
+    ignore_dotfiles=True, 
+    ignore_patterns=None, 
+    ignore_exact=None, 
+    _prefix="", 
+    _is_last=True
+):
     """
     Print directory structure in tree format with filtering options.
 
