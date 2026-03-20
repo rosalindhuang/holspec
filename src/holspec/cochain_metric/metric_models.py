@@ -108,12 +108,11 @@ def construct_combinatorial_cochain_metric(
         for k, n_k in sc.num_simplices.items()
     }
 
-# Future:
-# def construct_hodge_star_cochain_metric(
-#     sc: SimplicialComplex,
-#     point_data: PointData,
-# ) -> dict[int, MetricTensor]:
-#     pass
+def construct_hodge_star_cochain_metric(
+    sc: SimplicialComplex,
+    point_data: PointData,
+) -> dict[int, MetricTensor]:
+    pass
 
 # =============================================================================
 # Registry and Config-Driven Utilities
@@ -121,8 +120,7 @@ def construct_combinatorial_cochain_metric(
 
 COCHAIN_METRIC_MODEL_REGISTRY: dict[str, callable] = {
     'combinatorial': construct_combinatorial_cochain_metric,
-    # Future entries:
-    # 'hodge_star': construct_hodge_star_cochain_metric,
+    'hodge_star': construct_hodge_star_cochain_metric,
 }
 
 
@@ -181,7 +179,7 @@ def create_metric_model_label(
     Create a descriptive label from a metric model config.
 
     Label format: ``model_param1_param2...``
-    Parameter names are abbreviated to their first two non-underscore characters.
+    Parameter names are abbreviated to their first three non-underscore characters.
     Floats are formatted with ``float_fmt``. None values are omitted.
 
     Parameters
@@ -225,7 +223,7 @@ def create_metric_model_label(
         if value is None:
             continue
 
-        param_abbr = key.replace('_', '')[:2]
+        param_abbr = key.replace('_', '')[:3]
 
         if isinstance(value, bool):
             value_str = '1' if value else '0'
