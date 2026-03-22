@@ -294,7 +294,23 @@ def _build_coface_lookup(
         Mapping from each k-simplex index i to the list of (k+1)-simplex
         indices j such that simplices[k][i] is a face of simplices[k+1][j].
     """
-    pass
+    # Map each k-simplex to its local index
+    simplex_to_index = {
+        simplex: i for i, simplex in enumerate(simplices[k])
+    }
+
+    # Initialize lookup for all k-simplices
+    coface_lookup = {
+        i: [] for i in range(len(simplices[k]))
+    }
+
+    # Record reverse face-to-coface relation
+    for j, coface in enumerate(simplices[k + 1]):
+        for face in itertools.combinations(coface, k + 1):
+            i = simplex_to_index[face]
+            coface_lookup[i].append(j)
+
+    return coface_lookup
  
  
 def _compute_halfspace_sign(
@@ -307,19 +323,17 @@ def _compute_halfspace_sign(
  
     Given a hyperplane defined by the affine hull of hyperplane_points,
     determines whether point and test_point are on the same side (+1) or
-    opposite sides (-1) of the hyperplane, working within the affine
-    subspace spanned by hyperplane_points and test_point.
+    opposite sides (-1) of the hyperplane.
  
     Parameters
     ----------
     point : ndarray, shape (d,)
-        Point to classify (typically a circumcenter).
+        Point whose side of the hyperplane is to be classified.
     test_point : ndarray, shape (d,)
-        Reference point of known sidedness (typically the opposite vertex
-        not in the face).
+        Reference point used to determine the positive side for the local sign
+        convention.
     hyperplane_points : ndarray, shape (m, d)
-        Points defining the hyperplane (typically vertices of the face
-        sigma^{(i)}).
+        Points defining the hyperplane.
  
     Returns
     -------
@@ -327,7 +341,30 @@ def _compute_halfspace_sign(
         +1 if point and test_point are on the same side, -1 if on
         opposite sides.
     """
-    pass
+    # Translate so the affine hull passes through the origin
+    origin = hyperplane_points[0]
+    point_vec = point - origin
+    test_vec = test_point - origin
+
+    # Basis for the hyperplane direction space
+    basis = (hyperplane_points[1:] - origin).T
+
+    # Remove the component tangential to the hyperplane to get the normal component
+    if basis.shape[1] == 0:
+        # Hyperplane is a single point
+        point_vec_normal = point_vec
+        test_vec_normal = test_vec
+    else:
+        # Solve least squares to find the hyperplane component of each vector
+        point_coeffs = np.linalg.lstsq(basis, point_vec, rcond=None)[0]
+        test_coeffs = np.linalg.lstsq(basis, test_vec, rcond=None)[0]
+
+        point_vec_normal = point_vec - basis @ point_coeffs
+        test_vec_normal = test_vec - basis @ test_coeffs
+
+    # Compare the signs of the normal components
+    projection = np.dot(point_vec_normal, test_vec_normal)
+    return 1 if projection >= 0.0 else -1
  
  
 def compute_dual_volumes(
