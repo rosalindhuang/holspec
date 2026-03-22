@@ -374,7 +374,6 @@ def compute_dual_volumes(
     """
     Compute signed circumcentric dual volumes for all simplices at all degrees.
 
- 
     Parameters
     ----------
     simplices : dict[int, list[tuple]]
@@ -382,22 +381,22 @@ def compute_dual_volumes(
         of vertex indices.
     positions : ndarray, shape (num_vertices, d)
         Vertex positions in R^d.
- 
+
     Returns
     -------
     dict[int, ndarray]
         Mapping from degree k to array of shape (N_k,) containing the
         signed (n-k)-volume of the dual cell for each k-simplex.
         Top-degree simplices (k=n) have dual volume 1 by convention.
- 
+
     Notes
     -----
     For each k-simplex sigma^{(k)}, the circumcentric dual cell volume is
     the sum of signed elementary dual simplex volumes over all flags
     (maximal chains) containing sigma:
- 
+
         |*sigma^{(k)}| = sum over flags  s(flag) * vol(dual simplex)
- 
+
     where each flag is a chain sigma^{(k)} < sigma^{(k+1)} < ... <
     sigma^{(n)} through the coface structure, and the elementary dual
     simplex has vertices given by the circumcenter sequence
@@ -411,13 +410,111 @@ def compute_dual_volumes(
 
     References
     ----------
-    .. [1] A. N. Hirani, K. Kalyanaraman, and E. B. VanderZee, “Delaunay 
-    Hodge star,” Computer-Aided Design, vol. 45, no. 2, pp. 540–544, Feb. 
+    .. [1] A. N. Hirani, K. Kalyanaraman, and E. B. VanderZee, “Delaunay
+    Hodge star,” Computer-Aided Design, vol. 45, no. 2, pp. 540–544, Feb.
     2013, doi: 10.1016/j.cad.2012.10.038.
 
     """
-    pass
- 
+    n = max(simplices)
+
+    # Precompute circumcenters and local coface relations
+    circumcenters = compute_circumcenters(simplices, positions)
+    coface_lookups = {
+        k: _build_coface_lookup(simplices, k) for k in range(n)
+    }
+
+    # Precompute simplex vertex sets for opposite-vertex lookup
+    simplex_sets = {
+        k: [set(simplex) for simplex in simplices[k]]
+        for k in simplices
+    }
+
+    # Accumulate signed elementary dual volumes over all flags
+    def accumulate_elementary_duals(
+        curr_degree: int,
+        curr_index: int,
+        dual_vertices: list[np.ndarray],
+        sign_product: int,
+    ) -> float:
+        """
+        Recursively accumulate signed elementary dual volumes over all flags
+        of the current simplex, where each flag is a nested sequence of
+        incident cofaces sigma^(k) < sigma^(k+1) < ... < sigma^(n) from the 
+        current simplex up to a top-dimensional simplex.
+
+        Each recursive step extends the flag by one coface sigma^(j+1),
+        appends its circumcenter c(sigma^(j+1)), and updates the sign
+        product by the corresponding local halfspace sign s_j.
+
+        At a top-dimensional simplex sigma^(n), return the signed volume
+        of the resulting elementary dual simplex determined by the
+        accumulated circumcenter sequence.
+        """
+        # Reached a full chain, so the current circumcenter sequence 
+        # forms one elementary dual simplex
+        if curr_degree == n:
+            return (
+                sign_product
+                * compute_simplex_volume(
+                    np.array(dual_vertices, dtype=float)
+                )
+            )
+
+        sigma_curr = simplices[curr_degree][curr_index]
+        sigma_curr_set = simplex_sets[curr_degree][curr_index]
+        hyperplane_points = positions[list(sigma_curr)]
+
+        total = 0.0
+        # Iterate over each coface and accumulate its signed contribution
+        for next_index in coface_lookups[curr_degree][curr_index]:
+            tau = simplices[curr_degree + 1][next_index]
+            tau_cc = circumcenters[curr_degree + 1][next_index]
+
+            # Vertex added when extending sigma_curr to tau
+            opposite_vertex = next(
+                v for v in tau if v not in sigma_curr_set
+            )
+
+            # Compute the local halfspace sign for this step
+            step_sign = _compute_halfspace_sign(
+                point=tau_cc,
+                test_point=positions[opposite_vertex],
+                hyperplane_points=hyperplane_points,
+            )
+
+            total += accumulate_elementary_duals(
+                curr_degree=curr_degree + 1,
+                curr_index=next_index,
+                dual_vertices=dual_vertices + [tau_cc],
+                sign_product=sign_product * step_sign,
+            )
+
+        return total
+
+    dual_volumes = {}
+
+    for k, k_simplices in sorted(simplices.items()):
+        # Top-degree dual cells are 0-cells with volume 1 by convention
+        if k == n:
+            dual_volumes[k] = np.ones(len(k_simplices), dtype=float)
+            continue
+
+        dual_volumes_k = np.zeros(len(k_simplices), dtype=float)
+
+        for i in range(len(k_simplices)):
+            # Accumulate all flag contributions rooted at this simplex
+            dual_volumes_k[i] = accumulate_elementary_duals(
+                curr_degree=k,
+                curr_index=i,
+                dual_vertices=[circumcenters[k][i]],
+                sign_product=1,
+            )
+
+        dual_volumes[k] = dual_volumes_k
+
+    return dual_volumes
+
+
  
 # =============================================================================
 # Hodge Star Assembly
