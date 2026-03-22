@@ -341,6 +341,10 @@ def _compute_halfspace_sign(
         +1 if point and test_point are on the same side, -1 if on
         opposite sides.
     """
+    point = np.asarray(point, dtype=float)
+    test_point = np.asarray(test_point, dtype=float)
+    hyperplane_points = np.asarray(hyperplane_points, dtype=float)
+    
     # Translate so the affine hull passes through the origin
     origin = hyperplane_points[0]
     point_vec = point - origin
@@ -349,21 +353,17 @@ def _compute_halfspace_sign(
     # Basis for the hyperplane direction space
     basis = (hyperplane_points[1:] - origin).T
 
-    # Remove the component tangential to the hyperplane to get the normal component
+    # Remove the component tangential to the hyperplane to get the normal
     if basis.shape[1] == 0:
-        # Hyperplane is a single point
-        point_vec_normal = point_vec
+        # Hyperplane is a single point; normal direction is the test vector
         test_vec_normal = test_vec
     else:
-        # Solve least squares to find the hyperplane component of each vector
-        point_coeffs = np.linalg.lstsq(basis, point_vec, rcond=None)[0]
-        test_coeffs = np.linalg.lstsq(basis, test_vec, rcond=None)[0]
+        # Solve least squares to find the component of test_vec in the hyperplane
+        coeffs = np.linalg.lstsq(basis, test_vec, rcond=None)[0]
+        test_vec_normal = test_vec - basis @ coeffs
 
-        point_vec_normal = point_vec - basis @ point_coeffs
-        test_vec_normal = test_vec - basis @ test_coeffs
-
-    # Compare the signs of the normal components
-    projection = np.dot(point_vec_normal, test_vec_normal)
+    # Classify point by the sign of its projection onto the test point normal
+    projection = np.dot(point_vec, test_vec_normal)
     return 1 if projection >= 0.0 else -1
  
  
