@@ -16,13 +16,23 @@ if TYPE_CHECKING:
 
 
 # =============================================================================
+# Constants
+# =============================================================================
+
+# Numerical tolerance for metric tensor positivity validation. Diagonal entries
+# below this threshold are treated as non-positive (degenerate or numerical noise).
+METRIC_POSITIVITY_TOL = 1e-10
+
+
+# =============================================================================
 # Validation Functions
 # =============================================================================
 
 def validate_metric_tensor(
     matrix: sparse.spmatrix,
     is_diagonal: bool,
-    check_positive_definite: bool = True,
+    check_spd: bool = True,
+    tol: float = METRIC_POSITIVITY_TOL,
 ) -> None:
     """
     Validate a sparse matrix against the mathematical contract of a metric tensor.
@@ -35,11 +45,14 @@ def validate_metric_tensor(
         Whether the matrix is diagonal. When True, performs a diagonal
         positivity check. When False, raises NotImplementedError (non-diagonal
         validation is not yet implemented).
-    check_positive_definite : bool, default=True
-        Whether to check positive definiteness. For the diagonal case, the
-        diagonal positivity check is always performed regardless of this flag.
-        Reserved for the non-diagonal case (Cholesky-based check), not yet
-        implemented.
+    check_spd : bool, default=True
+        Whether to check the SPD (symmetric positive definite) contract. For
+        the diagonal case, the diagonal positivity check is always performed
+        regardless of this flag. Reserved for the non-diagonal case
+        (Cholesky-based check), not yet implemented.
+    tol : float, default=METRIC_POSITIVITY_TOL
+        Positivity tolerance. Diagonal entries below this threshold are
+        rejected as non-positive. Must be non-negative.
 
     Raises
     ------
@@ -58,8 +71,9 @@ def validate_metric_tensor(
     - Shape: must be square. Size-0 (0x0) matrices are permitted as the
       unique metric on the zero vector space; all checks pass vacuously.
     - Values: all stored entries must be finite (NaN and Inf not allowed).
-    - Positive definiteness: all diagonal entries must be strictly positive.
-      For a diagonal matrix, this is equivalent to the full SPD contract.
+    - SPD contract: all diagonal entries must satisfy ``diag >= tol``.
+      For a diagonal matrix, diagonal positivity implies the full SPD contract
+      (symmetric and positive definite).
 
     Non-diagonal case raises NotImplementedError. Extension path: full symmetry
     check and Cholesky-based positive definiteness check (attempting the
@@ -90,20 +104,21 @@ def validate_metric_tensor(
             "Metric tensor contains non-finite values (NaN or Inf)"
         )
 
-    # --- Positive definiteness ---
+    # --- SPD contract ---
     if is_diagonal:
         diag = matrix.diagonal()
-        non_positive = np.sum(diag <= 0)
+        non_positive = np.sum(diag < tol)
         if non_positive > 0:
             raise ValueError(
-                f"Diagonal metric tensor must have strictly positive diagonal entries: "
-                f"{non_positive} non-positive {'entry' if non_positive == 1 else 'entries'} found"
+                f"Diagonal metric tensor must have strictly positive diagonal entries "
+                f"(tol={tol}): {non_positive} non-positive "
+                f"{'entry' if non_positive == 1 else 'entries'} found"
             )
     else:
         raise NotImplementedError(
             "Validation for non-diagonal metric tensors is not yet implemented. "
             "Extension path: full symmetry check and Cholesky-based positive "
-            "definiteness check (check_positive_definite=True)."
+            "definiteness check (check_spd=True)."
         )
 
 

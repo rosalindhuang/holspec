@@ -353,11 +353,12 @@ class CochainMetric:
         To record the file path of the source complex for downstream
         provenance, pass ``metadata={'input_file': str(sc_filepath)}``.
         """
-        metric_tensors = construct_cochain_metric_from_config(config, sc, ptd)
+        metric_tensors, diagnostics = construct_cochain_metric_from_config(config, sc, ptd)
 
         cm_metadata = {
             'metric_model': config['model'],
             'metric_model_config': config,
+            'metric_model_diagnostics': diagnostics,
             'input_hash': sc.content_hash,
         }
         if metadata is not None:

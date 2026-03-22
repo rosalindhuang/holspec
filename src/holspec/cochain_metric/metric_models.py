@@ -12,6 +12,7 @@ import numpy as np
 from scipy import sparse
 
 from .metric_tensor import MetricTensor
+from .validation import METRIC_POSITIVITY_TOL
 from holspec.utilities import format_float_str
 
 if TYPE_CHECKING:
@@ -23,27 +24,10 @@ if TYPE_CHECKING:
 # Per-Degree Construction Functions
 # =============================================================================
 
-def construct_identity_metric(size: int) -> MetricTensor:
-    """
-    Construct an identity metric tensor on an N-dimensional vector space.
-
-    Parameters
-    ----------
-    size : int
-        Dimension N of the vector space. Must be a non-negative integer.
-        N=0 is permitted and returns the unique metric on the zero vector space.
-
-    Returns
-    -------
-    MetricTensor
-        Diagonal metric with all weights equal to 1.
-    """
-    if not isinstance(size, (int, np.integer)) or size < 0:
-        raise ValueError(f"size must be a non-negative integer, got {size!r}")
-    return MetricTensor(sparse.eye(size, format='csr'), is_diagonal=True)
-
-
-def construct_diagonal_metric(diagonal_elements: np.ndarray) -> MetricTensor:
+def construct_diagonal_metric(
+    diagonal_elements: np.ndarray,
+    tol: float = METRIC_POSITIVITY_TOL,
+) -> MetricTensor:
     """
     Construct a diagonal metric tensor from explicit weights.
 
@@ -53,6 +37,8 @@ def construct_diagonal_metric(diagonal_elements: np.ndarray) -> MetricTensor:
         Strictly positive weights for each basis element. Validated against
         the SPD contract by MetricTensor at construction. An empty array
         (N=0) is permitted and returns the unique metric on the zero vector space.
+    tol : float, default=METRIC_POSITIVITY_TOL
+        Positivity tolerance passed through to MetricTensor validation.
 
     Returns
     -------
@@ -66,7 +52,7 @@ def construct_diagonal_metric(diagonal_elements: np.ndarray) -> MetricTensor:
             f"got shape {diagonal_elements.shape}"
         )
     return MetricTensor(
-        sparse.diags(diagonal_elements, format='csr'), is_diagonal=True
+        sparse.diags(diagonal_elements, format='csr'), is_diagonal=True, tol=tol
     )
 
 
@@ -78,7 +64,7 @@ def construct_combinatorial_cochain_metric(
     sc: SimplicialComplex,
     ptd: PointData | None = None,
     **params,
-) -> dict[int, MetricTensor]:
+) -> tuple[dict[int, MetricTensor], dict]:
     """
     Construct the combinatorial cochain metric for a simplicial complex.
 
@@ -92,7 +78,7 @@ def construct_combinatorial_cochain_metric(
     sc : SimplicialComplex
         Source simplicial complex. Only `num_simplices` is accessed.
     ptd : PointData, optional
-        Accepted for interface consistency with other metric model construction 
+        Accepted for interface consistency with other metric model construction
         functions; not used in the combinatorial special case.
     **params
         Accepted for interface consistency; no parameters are defined for
@@ -100,19 +86,26 @@ def construct_combinatorial_cochain_metric(
 
     Returns
     -------
-    dict[int, MetricTensor]
-        Identity metric tensor at each degree k = 0, ..., max_dim.
+    tuple[dict[int, MetricTensor], dict]
+        Metric tensors (identity at each degree k = 0, ..., max_dim) and
+        diagnostics dict (empty for the combinatorial model).
     """
-    return {
-        k: construct_identity_metric(n_k)
+    metric_tensors = {
+        k: construct_diagonal_metric(np.ones(n_k))
         for k, n_k in sc.num_simplices.items()
     }
+    return metric_tensors, {}
+
 
 def construct_hodge_star_cochain_metric(
     sc: SimplicialComplex,
-    point_data: PointData,
-) -> dict[int, MetricTensor]:
-    pass
+    ptd: PointData,
+    **params,
+) -> tuple[dict[int, MetricTensor], dict]:
+    """Construct the Hodge star cochain metric. Not yet implemented."""
+    raise NotImplementedError(
+        "Hodge star cochain metric construction is not yet implemented."
+    )
 
 # =============================================================================
 # Registry and Config-Driven Utilities
@@ -128,10 +121,10 @@ def construct_cochain_metric_from_config(
     config: dict,
     sc: SimplicialComplex,
     ptd: PointData,
-) -> dict[int, MetricTensor]:
+) -> tuple[dict[int, MetricTensor], dict]:
     """
     Construct cochain metric tensors G^k : C^k -> C^k for k = 0, ..., n
-    on the cochain spaces of a simplicial complex. 
+    on the cochain spaces of a simplicial complex.
 
     Parameters
     ----------
@@ -147,8 +140,9 @@ def construct_cochain_metric_from_config(
 
     Returns
     -------
-    dict[int, MetricTensor]
-        Metric tensor G^k at each degree k = 0, ..., max_dim.
+    tuple[dict[int, MetricTensor], dict]
+        Metric tensors at each degree k = 0, ..., max_dim, and a diagnostics
+        dict (empty for models with no diagnostics).
 
     Raises
     ------

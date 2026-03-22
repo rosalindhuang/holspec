@@ -1,33 +1,35 @@
-# Python bytecode / caches
+# Python
 __pycache__/
 *.py[cod]
 *.egg-info/
+.pytest_cache/
 
-# Jupyter notebook checkpoints
-.ipynb_checkpoints/
-
-# Local environments
+# Environments
 .venv/
 .conda/
 
 # System files
 .DS_Store
 
-# Data and model artifacts
+# Jupyter
+.ipynb_checkpoints/
+
+# Project files
 data/*
 !data/.gitkeep
 
 outputs/*
 !outputs/.gitkeep
 
+docs/pydec/
+docs/**/*.pdf
+
 # Miscellaneous
 archive/
-archive/*
-!archive/old_repo/
 
 *AI_*
 *ai_*
 *claude*
 *copilot*
+*chatgpt*
 .obsidian/
-.pytest_cache/

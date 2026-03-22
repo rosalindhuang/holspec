@@ -199,7 +199,7 @@ def compute_simplex_volume(vertices: np.ndarray) -> float:
  
  
 # =============================================================================
-# Per-Complex Batch Functions
+# Batch Functions for Simplicial Complexes
 # =============================================================================
  
 def compute_circumcenters(
@@ -223,7 +223,16 @@ def compute_circumcenters(
         Mapping from degree k to array of shape (N_k, d) containing
         the circumcenter of each k-simplex. 
     """
-    pass
+    circumcenters = {}
+    for k, k_simplices in sorted(simplices.items()):
+        if len(k_simplices) == 0:
+            circumcenters[k] = np.empty((0, positions.shape[1]), dtype=float)
+            continue
+
+        circumcenters[k] = np.array([
+            compute_circumcenter(positions[list(s)]) for s in k_simplices
+        ])
+    return circumcenters
  
  
 def compute_simplex_volumes(
@@ -247,7 +256,12 @@ def compute_simplex_volumes(
         Mapping from degree k to array of shape (N_k,) containing the
         unsigned k-volume of each k-simplex.
     """
-    pass
+    volumes = {}
+    for k, k_simplices in sorted(simplices.items()):
+        volumes[k] = np.array([
+            compute_simplex_volume(positions[list(s)]) for s in k_simplices
+        ])
+    return volumes
  
  
 # =============================================================================

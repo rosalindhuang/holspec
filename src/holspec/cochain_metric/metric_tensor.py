@@ -9,7 +9,7 @@ from __future__ import annotations
 import numpy as np
 from scipy import sparse
 
-from .validation import validate_metric_tensor
+from .validation import validate_metric_tensor, METRIC_POSITIVITY_TOL
 
 
 # =============================================================================
@@ -56,12 +56,13 @@ class MetricTensor:
     # =========================================================================
 
     def __init__(
-        self, 
-        matrix: sparse.spmatrix, 
-        is_diagonal: bool = False
-    ):  
+        self,
+        matrix: sparse.spmatrix,
+        is_diagonal: bool = False,
+        tol: float = METRIC_POSITIVITY_TOL,
+    ):
         # Validate provided matrix
-        validate_metric_tensor(matrix, is_diagonal)
+        validate_metric_tensor(matrix, is_diagonal, tol=tol)
 
         self._matrix = matrix.tocsr()
         self._is_diagonal = is_diagonal

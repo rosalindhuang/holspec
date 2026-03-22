@@ -6,7 +6,6 @@ Cochain metric construction and representation.
 from .base import CochainMetric
 from .metric_tensor import MetricTensor
 from .metric_models import (
-    construct_identity_metric,
     construct_diagonal_metric,
     construct_combinatorial_cochain_metric,
     construct_cochain_metric_from_config,
@@ -16,6 +15,7 @@ from .metric_models import (
 from .validation import (
     validate_metric_tensor,
     validate_cochain_metric,
+    METRIC_POSITIVITY_TOL,
 )
 
 __all__ = [
@@ -24,7 +24,6 @@ __all__ = [
     'MetricTensor',
 
     # metric_models.py
-    'construct_identity_metric',
     'construct_diagonal_metric',
     'construct_combinatorial_cochain_metric',
     'construct_cochain_metric_from_config',
@@ -34,4 +33,5 @@ __all__ = [
     # validation.py
     'validate_metric_tensor',
     'validate_cochain_metric',
+    'METRIC_POSITIVITY_TOL',
 ]
