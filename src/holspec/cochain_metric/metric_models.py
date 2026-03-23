@@ -13,6 +13,11 @@ from scipy import sparse
 
 from .metric_tensor import MetricTensor
 from .validation import METRIC_POSITIVITY_TOL
+from .dec_geometry import (
+    VOLUME_DEGENERACY_TOL,
+    compute_dual_volumes,
+    compute_simplex_volumes,
+)
 from holspec.utilities import format_float_str
 
 if TYPE_CHECKING:
@@ -100,12 +105,185 @@ def construct_combinatorial_cochain_metric(
 def construct_hodge_star_cochain_metric(
     sc: SimplicialComplex,
     ptd: PointData,
-    **params,
+    positivity: str = 'strict',
+    degeneracy_tol: float = VOLUME_DEGENERACY_TOL,
+    positivity_tol: float = METRIC_POSITIVITY_TOL,
 ) -> tuple[dict[int, MetricTensor], dict]:
-    """Construct the Hodge star cochain metric. Not yet implemented."""
-    raise NotImplementedError(
-        "Hodge star cochain metric construction is not yet implemented."
-    )
+    """
+    Construct the Hodge star cochain metric for a simplicial complex.
+
+    Assigns the circumcentric discrete Hodge star as the metric tensor at
+    each cochain degree: G^k = diag([*^k]), where the diagonal entries are
+    the ratio of signed dual cell volume to unsigned primal simplex volume.
+
+    Parameters
+    ----------
+    sc : SimplicialComplex
+        Source simplicial complex providing simplex structure.
+    ptd : PointData
+        Point data providing vertex positions.
+    positivity : {'strict', 'abs'}, default='strict'
+        How to handle negative raw Hodge star diagonal entries.
+        - 'strict': raise ValueError if any raw entry is negative
+        - 'abs': replace raw entries with their absolute values before
+          constructing the metric tensors
+    degeneracy_tol : float, default=VOLUME_DEGENERACY_TOL
+        Minimum acceptable volume magnitude for primal and dual volume
+        degeneracy checks.
+    positivity_tol : float, default=METRIC_POSITIVITY_TOL
+        Positivity tolerance passed to construct_diagonal_metric and
+        MetricTensor validation.
+
+    Returns
+    -------
+    tuple[dict[int, MetricTensor], dict]
+        Per-degree diagonal metric tensors and a diagnostics dict describing
+        the raw Hodge star computation before any positivity handling.
+
+    Raises
+    ------
+    ValueError
+        If positions are unavailable, the simplicial complex is not
+        full-dimensional, the ambient dimension is outside the current
+        supported scope, positivity is invalid, or raw Hodge star entries are
+        negative under positivity='strict'.
+    
+    References
+    ----------
+    .. [1] A. N. Hirani, K. Kalyanaraman, and E. B. VanderZee, "Delaunay
+    Hodge star," Computer-Aided Design, vol. 45, no. 2, pp. 540-544, Feb.
+    2013, doi: 10.1016/j.cad.2012.10.038.
+    """
+    # --- Validate preconditions ---
+
+    if not ptd.has_positions:
+        raise ValueError(
+            "Hodge star metric requires position data: "
+            "ptd.has_positions is False"
+        )
+
+    if sc.max_dim != ptd.dimension:
+        raise ValueError(
+            f"Hodge star metric requires a full-dimensional complex: "
+            f"sc.max_dim={sc.max_dim} != ptd.dimension={ptd.dimension}"
+        )
+
+    if ptd.dimension not in (2, 3):
+        raise ValueError(
+            f"Hodge star metric is currently supported for 2D and 3D "
+            f"complexes: ptd.dimension={ptd.dimension}"
+        )
+
+    if positivity not in ('strict', 'abs'):
+        raise ValueError(
+            f"positivity must be 'strict' or 'abs', got '{positivity}'"
+        )
+    
+
+    # --- Compute Hodge star from primal and dual volumes ---
+
+    simplices = sc.simplices
+    positions = ptd.get_positions()
+
+    # Compute primal volumes and check for degeneracy
+    primal_volumes = compute_simplex_volumes(simplices, positions)
+
+    for k, primal_vols_k in sorted(primal_volumes.items()):
+        degenerate_mask = primal_vols_k < degeneracy_tol
+        if np.any(degenerate_mask):
+            n_degenerate = int(np.sum(degenerate_mask))
+            raise ValueError(
+                f"Degenerate primal volumes at degree k={k}: "
+                f"{n_degenerate} of {len(primal_vols_k)} simplices have "
+                f"volume below degeneracy_tol={degeneracy_tol}"
+            )
+
+    # Compute signed dual volumes and check for degeneracy
+    dual_volumes = compute_dual_volumes(simplices, positions)
+
+    for k, dual_vols_k in sorted(dual_volumes.items()):
+        degenerate_mask = np.abs(dual_vols_k) < degeneracy_tol
+        if np.any(degenerate_mask):
+            n_degenerate = int(np.sum(degenerate_mask))
+            raise ValueError(
+                f"Degenerate dual volumes at degree k={k}: "
+                f"{n_degenerate} of {len(dual_vols_k)} simplices have "
+                f"absolute dual volume below degeneracy_tol={degeneracy_tol}"
+            )
+
+    # Assemble raw Hodge star diagonals
+    raw_diagonals = {
+        k: dual_volumes[k] / primal_volumes[k]
+        for k in sorted(primal_volumes)
+    }
+
+    # --- Compute diagnostics from raw values ---
+
+    per_degree = {}
+    total_negative = 0
+
+    for k in sorted(simplices):
+        primal_vols_k = primal_volumes[k]
+        dual_vols_k = dual_volumes[k]
+        raw_diags_k = raw_diagonals[k]
+
+        num_negative = int(np.sum(raw_diags_k < 0.0))
+        total_negative += num_negative
+
+        per_degree[k] = {
+            'num_simplices': len(simplices[k]),
+            'num_negative': num_negative,
+            'primal_volume_range': [
+                float(primal_vols_k.min()),
+                float(primal_vols_k.max()),
+            ],
+            'dual_volume_range': [
+                float(dual_vols_k.min()),
+                float(dual_vols_k.max()),
+            ],
+            'hodge_star_range': [
+                float(raw_diags_k.min()),
+                float(raw_diags_k.max()),
+            ],
+        }
+
+    diagnostics = {
+        'positivity': positivity,
+        'total_negative': total_negative,
+        'per_degree': per_degree,
+    }
+
+    # --- Apply positivity handling ---
+
+    if positivity == 'strict':
+        if total_negative > 0:
+            breakdown = ", ".join(
+                f"k={k}: {per_degree[k]['num_negative']}/{per_degree[k]['num_simplices']}"
+                for k in sorted(per_degree)
+                if per_degree[k]['num_negative'] > 0
+            )
+            raise ValueError(
+                f"Hodge star has {total_negative} negative "
+                f"{'entry' if total_negative == 1 else 'entries'} "
+                f"(positivity='strict'). Per-degree: {breakdown}"
+            )
+        diagonals = raw_diagonals
+
+    elif positivity == 'abs':
+        diagonals = {
+            k: np.abs(raw_diagonals[k])
+            for k in sorted(raw_diagonals)
+        }
+
+    # --- Construct diagonal metric tensors ---
+
+    metric_tensors = {
+        k: construct_diagonal_metric(diagonals[k], tol=positivity_tol)
+        for k in sorted(diagonals)
+    }
+
+    return metric_tensors, diagnostics
+
 
 # =============================================================================
 # Registry and Config-Driven Utilities
@@ -224,7 +402,7 @@ def create_metric_model_label(
         elif isinstance(value, float):
             value_str = format_float_str(value, float_fmt, strip_zeros=strip_zeros)
         elif isinstance(value, str):
-            value_str = value[:4].lower().replace('_', '')
+            value_str = value[:3].lower().replace('_', '')
         else:
             value_str = str(value).replace('.', 'p')
 

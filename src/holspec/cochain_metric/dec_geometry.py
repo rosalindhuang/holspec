@@ -535,9 +535,8 @@ def compute_hodge_star_diagonals(
     positions : ndarray, shape (num_vertices, d)
         Vertex positions in R^d.
     degeneracy_tol : float, default=VOLUME_DEGENERACY_TOL
-        Minimum acceptable volume magnitude. Primal volumes below this
-        threshold and dual volumes with absolute value below this threshold
-        raise ValueError.
+        Minimum acceptable volume magnitude. Primal volumes and dual volumes
+        with absolute value below this threshold raise ValueError.
  
     Returns
     -------
