@@ -515,7 +515,6 @@ def compute_dual_volumes(
     return dual_volumes
 
 
- 
 # =============================================================================
 # Hodge Star Assembly
 # =============================================================================
@@ -563,4 +562,38 @@ def compute_hodge_star_diagonals(
     dual cell volume. Performs degeneracy checks on both primal and dual
     volumes before division.
     """
-    pass
+    # Compute primal simplex volumes
+    primal_volumes = compute_simplex_volumes(simplices, positions)
+
+    # Degeneracy check: near-zero primal volumes
+    for k, primal_vols_k in primal_volumes.items():
+        degenerate_mask = primal_vols_k < degeneracy_tol
+        if np.any(degenerate_mask):
+            n_degenerate = int(np.sum(degenerate_mask))
+            raise ValueError(
+                f"Degenerate primal volumes at degree k={k}: "
+                f"{n_degenerate} of {len(primal_vols_k)} simplices have "
+                f"volume below degeneracy_tol={degeneracy_tol}"
+            )
+
+    # Compute signed dual volumes
+    dual_volumes = compute_dual_volumes(simplices, positions)
+
+    # Degeneracy check: near-zero dual volumes
+    for k, dual_vols_k in dual_volumes.items():
+        degenerate_mask = np.abs(dual_vols_k) < degeneracy_tol
+        if np.any(degenerate_mask):
+            n_degenerate = int(np.sum(degenerate_mask))
+            raise ValueError(
+                f"Degenerate dual volumes at degree k={k}: "
+                f"{n_degenerate} of {len(dual_vols_k)} simplices have "
+                f"absolute dual volume below degeneracy_tol={degeneracy_tol}"
+            )
+
+    # Assemble Hodge star diagonals
+    hodge_star = {
+        k: dual_volumes[k] / primal_volumes[k]
+        for k in sorted(primal_volumes)
+    }
+
+    return hodge_star
