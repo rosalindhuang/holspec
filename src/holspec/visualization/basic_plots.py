@@ -100,6 +100,237 @@ def plot_lines(
 
 
 # =============================================================================
+# Scatter plots
+# =============================================================================
+
+def plot_scatters(
+    xy_list: List[Tuple[np.ndarray, np.ndarray]],
+    # Figure properties
+    ax: Optional[Axes] = None,
+    figsize: Tuple[float, float] = (5, 4),
+    # Color styling
+    color: Optional[str] = None,
+    colors_list: Optional[List[str]] = None,
+    c: Optional[np.ndarray] = None,
+    c_list: Optional[List[np.ndarray]] = None,
+    cmap: Optional[str] = None,
+    # Legend and colorbar
+    legend_labels: Optional[List[str]] = None,
+    colorbar: bool = False,
+    **kwargs
+) -> Union[Tuple[Figure, Axes], Tuple[Figure, Axes, Colorbar]]:
+    """
+    Plot multiple scatter plots on a single axis.
+
+    Parameters
+    ----------
+    xy_list : list of (x, y) tuples
+        List of (x_array, y_array) tuples to plot.
+    ax : Axes, optional
+        Existing axes to plot on. If None, creates new figure.
+    figsize : tuple of float, default (5, 4)
+        Figure size as (width, height) in inches.
+    color : str, optional
+        Single color for all scatter plots (highest priority, overrides other color options).
+    colors_list : list of str, optional
+        List of colors for each scatter plot. If shorter than xy_list, extended with 'k'.
+    c : array-like, optional
+        Color values for colormap (applied to all scatter plots).
+    c_list : list of array-like, optional
+        List of color values for each scatter plot (for use with colormap).
+    cmap : str or Colormap, optional
+        Colormap to use with c/c_list.
+    legend_labels : list of str, optional
+        List of legend labels for each scatter plot.
+    colorbar : bool, default False
+        Whether to add a colorbar (only applicable when using colormap).
+    **kwargs
+        Additional keyword arguments passed to ax.scatter().
+
+    Returns
+    -------
+    tuple
+        (fig, ax) if no colorbar, or (fig, ax, cbar) if colorbar is added.
+
+    Raises
+    ------
+    ValueError
+        If xy_list is empty.
+
+    Notes
+    -----
+    Color priority (highest to lowest): color > colors_list > colormap (c/c_list).
+    """
+    if len(xy_list) == 0:
+        raise ValueError("xy_list must contain at least one (x, y) pair.")
+
+    n_plots = len(xy_list)
+
+    # Create figure if needed
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        fig = ax.figure
+
+    # Determine color strategy (priority: color > colors_list > colormap)
+    use_colormap = False
+    if color is not None:
+        # Single color for all
+        plot_colors = [color] * n_plots
+        plot_c_values = [None] * n_plots
+    elif colors_list is not None:
+        # Different colors for each scatter
+        plot_colors = _extend_list(colors_list, n_plots, 'k')
+        plot_c_values = [None] * n_plots
+    elif c is not None:
+        # Use colormap with single c values for all
+        plot_colors = [None] * n_plots
+        plot_c_values = [c] * n_plots
+        use_colormap = True
+    elif c_list is not None:
+        # Use colormap with different c values for each scatter
+        plot_colors = [None] * n_plots
+        plot_c_values = _extend_list(c_list, n_plots, None)
+        use_colormap = True
+    else:
+        # Default colors
+        plot_colors = ['k'] * n_plots
+        plot_c_values = [None] * n_plots
+
+    # Resolve legend labels
+    labels = None
+    if legend_labels is not None:
+        labels = _extend_list(legend_labels, n_plots, None)
+
+    # Plot scatter plots
+    scatter_plots = []
+    for i, (x, y) in enumerate(xy_list):
+        label = labels[i] if labels is not None else None
+
+        if use_colormap and plot_c_values[i] is not None:
+            sc = ax.scatter(x, y, c=plot_c_values[i], cmap=cmap, label=label, **kwargs)
+        else:
+            sc = ax.scatter(x, y, color=plot_colors[i], label=label, **kwargs)
+
+        scatter_plots.append(sc)
+
+    # Add colorbar if requested
+    cbar = None
+    if colorbar and use_colormap:
+        cbar = fig.colorbar(scatter_plots[-1], ax=ax)
+
+    # Add legend if labels exist
+    if legend_labels is not None:
+        ax.legend()
+
+    if cbar is None:
+        return fig, ax
+    return fig, ax, cbar
+
+
+# =============================================================================
+# Bar plots
+# =============================================================================
+
+def plot_bars(
+    xy_list: Optional[List[Tuple[np.ndarray, np.ndarray]]] = None,
+    y_list: Optional[List[np.ndarray]] = None,
+    # Figure properties
+    ax: Optional[Axes] = None,
+    figsize: Tuple[float, float] = (5, 4),
+    # Bar styling
+    color: Optional[str] = None,
+    colors_list: Optional[List[str]] = None,
+    # Legend
+    legend_labels: Optional[List[str]] = None,
+    **kwargs
+) -> Tuple[Figure, Axes]:
+    """
+    Plot multiple bar charts on a single axis.
+
+    Parameters
+    ----------
+    xy_list : list of (x, y) tuples, optional
+        List of (x_positions, heights) tuples to plot.
+    y_list : list of ndarray, optional
+        List of height arrays to plot. x positions default to np.arange(len(y)).
+        Mutually exclusive with xy_list.
+    ax : Axes, optional
+        Existing axes to plot on. If None, creates new figure.
+    figsize : tuple of float, default (5, 4)
+        Figure size as (width, height) in inches.
+    color : str, optional
+        Single color for all bars (overrides colors_list).
+    colors_list : list of str, optional
+        List of colors for each bar series. If shorter than data, extended with 'k'.
+    legend_labels : list of str, optional
+        List of legend labels. If provided, legend will be displayed.
+    **kwargs
+        Additional keyword arguments passed to ax.bar()
+        (e.g. width, bottom, align, alpha, edgecolor, linewidth).
+
+    Returns
+    -------
+    tuple
+        (fig, ax) - The figure and axes objects.
+
+    Raises
+    ------
+    ValueError
+        If both xy_list and y_list are provided, or neither is provided.
+
+    Notes
+    -----
+    For stacked subplots, use the ``ax`` parameter in a loop::
+
+        fig, axes = plt.subplots(3, 1, figsize=(6, 6), sharex=True)
+        for ax, y, c, lbl in zip(axes, y_list, colors, labels):
+            plot_bars(y_list=[y], ax=ax, color=c, legend_labels=[lbl], **kwargs)
+    """
+    if xy_list is not None and y_list is not None:
+        raise ValueError("Provide either xy_list or y_list, not both.")
+    if xy_list is None and y_list is None:
+        raise ValueError("Must provide either xy_list or y_list.")
+
+    # Convert y_list to xy_list
+    if y_list is not None:
+        xy_list = [(np.arange(len(y)), np.asarray(y)) for y in y_list]
+
+    if len(xy_list) == 0:
+        raise ValueError("Data list must contain at least one entry.")
+
+    # Create figure if needed
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        fig = ax.figure
+
+    # Resolve colors
+    if color is not None:
+        colors = [color] * len(xy_list)
+    elif colors_list is not None:
+        colors = _extend_list(colors_list, len(xy_list), 'k')
+    else:
+        colors = ['k'] * len(xy_list)
+
+    # Resolve legend labels
+    labels = None
+    if legend_labels is not None:
+        labels = _extend_list(legend_labels, len(xy_list), None)
+
+    # Plot bars
+    for i, (x, y) in enumerate(xy_list):
+        label = labels[i] if labels is not None else None
+        ax.bar(x, y, color=colors[i], label=label, **kwargs)
+
+    # Add legend if labels were provided
+    if legend_labels is not None:
+        ax.legend()
+
+    return fig, ax
+
+
+# =============================================================================
 # Stem plots
 # =============================================================================
 
@@ -215,6 +446,9 @@ def plot_stems(
             container.stemlines.set_color(colors[i])
         if markerfmt is None:
             container.markerline.set_color(colors[i])
+        # Force baseline black when using default basefmt, since linefmt=''
+        # causes matplotlib to auto-cycle colors which can bleed into the baseline
+        container.baseline.set_color('k')
 
         # Apply optional sizing
         if markersize is not None:
@@ -227,135 +461,6 @@ def plot_stems(
         ax.legend()
 
     return fig, ax
-
-
-# =============================================================================
-# Scatter plots
-# =============================================================================
-
-def plot_scatters(
-    xy_list: List[Tuple[np.ndarray, np.ndarray]],
-    # Figure properties
-    ax: Optional[Axes] = None,
-    figsize: Tuple[float, float] = (5, 4),
-    # Color styling
-    color: Optional[str] = None,
-    colors_list: Optional[List[str]] = None,
-    c: Optional[np.ndarray] = None,
-    c_list: Optional[List[np.ndarray]] = None,
-    cmap: Optional[str] = None,
-    # Legend and colorbar
-    legend_labels: Optional[List[str]] = None,
-    colorbar: bool = False,
-    **kwargs
-) -> Union[Tuple[Figure, Axes], Tuple[Figure, Axes, Colorbar]]:
-    """
-    Plot multiple scatter plots on a single axis.
-    
-    Parameters
-    ----------
-    xy_list : list of (x, y) tuples
-        List of (x_array, y_array) tuples to plot.
-    ax : Axes, optional
-        Existing axes to plot on. If None, creates new figure.
-    figsize : tuple of float, default (5, 4)
-        Figure size as (width, height) in inches.
-    color : str, optional
-        Single color for all scatter plots (highest priority, overrides other color options).
-    colors_list : list of str, optional
-        List of colors for each scatter plot. If shorter than xy_list, extended with 'k'.
-    c : array-like, optional
-        Color values for colormap (applied to all scatter plots).
-    c_list : list of array-like, optional
-        List of color values for each scatter plot (for use with colormap).
-    cmap : str or Colormap, optional
-        Colormap to use with c/c_list.
-    legend_labels : list of str, optional
-        List of legend labels for each scatter plot.
-    colorbar : bool, default False
-        Whether to add a colorbar (only applicable when using colormap).
-    **kwargs
-        Additional keyword arguments passed to ax.scatter().
-    
-    Returns
-    -------
-    tuple
-        (fig, ax) if no colorbar, or (fig, ax, cbar) if colorbar is added.
-    
-    Raises
-    ------
-    ValueError
-        If xy_list is empty.
-    
-    Notes
-    -----
-    Color priority (highest to lowest): color > colors_list > colormap (c/c_list).
-    """
-    if len(xy_list) == 0:
-        raise ValueError("xy_list must contain at least one (x, y) pair.")
-    
-    n_plots = len(xy_list)
-    
-    # Create figure if needed
-    if ax is None:
-        fig, ax = plt.subplots(figsize=figsize)
-    else:
-        fig = ax.figure
-    
-    # Determine color strategy (priority: color > colors_list > colormap)
-    use_colormap = False
-    if color is not None:
-        # Single color for all
-        plot_colors = [color] * n_plots
-        plot_c_values = [None] * n_plots
-    elif colors_list is not None:
-        # Different colors for each scatter
-        plot_colors = _extend_list(colors_list, n_plots, 'k')
-        plot_c_values = [None] * n_plots
-    elif c is not None:
-        # Use colormap with single c values for all
-        plot_colors = [None] * n_plots
-        plot_c_values = [c] * n_plots
-        use_colormap = True
-    elif c_list is not None:
-        # Use colormap with different c values for each scatter
-        plot_colors = [None] * n_plots
-        plot_c_values = _extend_list(c_list, n_plots, None)
-        use_colormap = True
-    else:
-        # Default colors
-        plot_colors = ['k'] * n_plots
-        plot_c_values = [None] * n_plots
-    
-    # Resolve legend labels
-    labels = None
-    if legend_labels is not None:
-        labels = _extend_list(legend_labels, n_plots, None)
-    
-    # Plot scatter plots
-    scatter_plots = []
-    for i, (x, y) in enumerate(xy_list):
-        label = labels[i] if labels is not None else None
-        
-        if use_colormap and plot_c_values[i] is not None:
-            sc = ax.scatter(x, y, c=plot_c_values[i], cmap=cmap, label=label, **kwargs)
-        else:
-            sc = ax.scatter(x, y, color=plot_colors[i], label=label, **kwargs)
-        
-        scatter_plots.append(sc)
-    
-    # Add colorbar if requested
-    cbar = None
-    if colorbar and use_colormap:
-        cbar = fig.colorbar(scatter_plots[-1], ax=ax)
-    
-    # Add legend if labels exist
-    if legend_labels is not None:
-        ax.legend()
-    
-    if cbar is None:
-        return fig, ax
-    return fig, ax, cbar
 
 
 # =============================================================================
