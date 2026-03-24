@@ -16,6 +16,7 @@ __all__ = [
     'make_movie',
 
     # From basic_plots.py
+    'plot_stems',
     'plot_matrix',
     'plot_circles',
     'plot_spheres',

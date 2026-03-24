@@ -56,16 +56,24 @@ def plot_lines(
     ------
     ValueError
         If xy_list is empty.
+
+    Notes
+    -----
+    For stacked subplots, use the ``ax`` parameter in a loop::
+
+        fig, axes = plt.subplots(3, 1, figsize=(6, 6), sharex=True)
+        for ax, (x, y), c, lbl in zip(axes, data_list, colors, labels):
+            plot_lines([(x, y)], ax=ax, color=c, legend_labels=[lbl], **kwargs)
     """
     if len(xy_list) == 0:
         raise ValueError("xy_list must contain at least one (x, y) pair.")
-    
+
     # Create figure if needed
     if ax is None:
         fig, ax = plt.subplots(figsize=figsize)
     else:
         fig = ax.figure
-    
+
     # Resolve colors
     if color is not None:
         colors = [color] * len(xy_list)
@@ -91,60 +99,97 @@ def plot_lines(
     return fig, ax
 
 
-def plot_lines_stack(
-    xy_list: List[Tuple[np.ndarray, np.ndarray]],
+# =============================================================================
+# Stem plots
+# =============================================================================
+
+def plot_stems(
+    xy_list: Optional[List[Tuple[np.ndarray, np.ndarray]]] = None,
+    y_list: Optional[List[np.ndarray]] = None,
     # Figure properties
-    figsize: Tuple[float, float] = (6, 6),
-    stack_direction: str = 'vertical',
-    sharex: bool = False,
-    sharey: bool = False,
-    # Line styling
+    ax: Optional[Axes] = None,
+    figsize: Tuple[float, float] = (5, 4),
+    # Stem styling
     color: Optional[str] = None,
     colors_list: Optional[List[str]] = None,
     # Legend
     legend_labels: Optional[List[str]] = None,
     **kwargs
-) -> Tuple[Figure, Union[Axes, np.ndarray]]:
+) -> Tuple[Figure, Axes]:
     """
-    Plot multiple lines on stacked subplots.
-    
+    Plot multiple stem (lollipop) plots on a single axis.
+
     Parameters
     ----------
-    xy_list : list of (x, y) tuples
-        List of (x_array, y_array) tuples to plot, one line per subplot.
-    figsize : tuple of float, default (6, 6)
+    xy_list : list of (x, y) tuples, optional
+        List of (x_array, y_array) tuples to plot.
+    y_list : list of ndarray, optional
+        List of y arrays to plot. x values default to np.arange(len(y)).
+        Mutually exclusive with xy_list.
+    ax : Axes, optional
+        Existing axes to plot on. If None, creates new figure.
+    figsize : tuple of float, default (5, 4)
         Figure size as (width, height) in inches.
-    stack_direction : str, default 'vertical'
-        Direction to stack subplots ('vertical' or 'horizontal').
-    sharex : bool, default False
-        Whether to share x-axis between subplots.
-    sharey : bool, default False
-        Whether to share y-axis between subplots.
     color : str, optional
-        Single color for all lines (overrides colors_list).
+        Single color for all stems (overrides colors_list).
     colors_list : list of str, optional
-        List of colors for each line/subplot. If shorter than xy_list, extended with 'k'.
+        List of colors for each stem series. If shorter than data, extended with 'k'.
     legend_labels : list of str, optional
-        List of legend labels for each line/subplot. If provided, legends will be displayed.
+        List of legend labels. If provided, legend will be displayed.
     **kwargs
-        Additional keyword arguments passed to ax.plot().
-    
+        Stem-specific keyword arguments popped before passing to ax.stem():
+        - linefmt (str): format string for stem lines; if set, overrides color for lines.
+        - markerfmt (str): format string for markers; if set, overrides color for markers.
+        - basefmt (str, default 'k-'): format string for the baseline.
+        - bottom (float, default 0): y-value for the baseline.
+        - markersize (float): marker size for stem tips (applied via StemContainer).
+        - linewidth (float): line width for stem lines (applied via StemContainer).
+        Remaining kwargs are passed to ax.stem().
+
     Returns
     -------
     tuple
-        (fig, axes) - The figure and axes objects. 
-        axes is an ndarray for multiple subplots, single Axes for one subplot.
-    
+        (fig, ax) - The figure and axes objects.
+
     Raises
     ------
     ValueError
-        If xy_list is empty or stack_direction is invalid.
+        If both xy_list and y_list are provided, or neither is provided.
+
+    Notes
+    -----
+    For stacked subplots, use the ``ax`` parameter in a loop::
+
+        fig, axes = plt.subplots(3, 1, figsize=(6, 6), sharex=True)
+        for ax, y, c, lbl in zip(axes, y_list, colors, labels):
+            plot_stems(y_list=[y], ax=ax, color=c, legend_labels=[lbl], **kwargs)
     """
+    if xy_list is not None and y_list is not None:
+        raise ValueError("Provide either xy_list or y_list, not both.")
+    if xy_list is None and y_list is None:
+        raise ValueError("Must provide either xy_list or y_list.")
+
+    # Convert y_list to xy_list
+    if y_list is not None:
+        xy_list = [(np.arange(len(y)), np.asarray(y)) for y in y_list]
+
     if len(xy_list) == 0:
-        raise ValueError("xy_list must contain at least one (x, y) pair.")
-    if stack_direction not in ['vertical', 'horizontal']:
-        raise ValueError("stack_direction must be 'vertical' or 'horizontal'")
-    
+        raise ValueError("Data list must contain at least one entry.")
+
+    # Pop stem-specific kwargs that need special routing
+    linefmt = kwargs.pop('linefmt', None)
+    markerfmt = kwargs.pop('markerfmt', None)
+    basefmt = kwargs.pop('basefmt', 'k-')
+    bottom = kwargs.pop('bottom', 0)
+    markersize = kwargs.pop('markersize', None)
+    linewidth = kwargs.pop('linewidth', None)
+
+    # Create figure if needed
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        fig = ax.figure
+
     # Resolve colors
     if color is not None:
         colors = [color] * len(xy_list)
@@ -152,31 +197,36 @@ def plot_lines_stack(
         colors = _extend_list(colors_list, len(xy_list), 'k')
     else:
         colors = ['k'] * len(xy_list)
-    
+
     # Resolve legend labels
     labels = None
     if legend_labels is not None:
         labels = _extend_list(legend_labels, len(xy_list), None)
-    
-    # Create subplots
-    if stack_direction == 'vertical':
-        fig, axes = plt.subplots(len(xy_list), 1, figsize=figsize, sharex=sharex, sharey=sharey)
-    else:  # horizontal
-        fig, axes = plt.subplots(1, len(xy_list), figsize=figsize, sharex=sharex, sharey=sharey)
-    
-    axes = np.atleast_1d(axes)
-    
-    # Plot lines
+
+    # Plot stems
     for i, (x, y) in enumerate(xy_list):
-        ax = axes[i]
         label = labels[i] if labels is not None else None
-        ax.plot(x, y, color=colors[i], label=label, **kwargs)
-        
-        # Add legend if label exists
-        if label is not None:
-            ax.legend()
-    
-    return fig, axes if len(xy_list) > 1 else axes[0]
+        bfmt = basefmt if i == 0 else ''
+        container = ax.stem(x, y, linefmt=linefmt or '', markerfmt=markerfmt or 'o',
+                            basefmt=bfmt, bottom=bottom, label=label, **kwargs)
+
+        # Apply color via container when format strings don't encode color
+        if linefmt is None:
+            container.stemlines.set_color(colors[i])
+        if markerfmt is None:
+            container.markerline.set_color(colors[i])
+
+        # Apply optional sizing
+        if markersize is not None:
+            container.markerline.set_markersize(markersize)
+        if linewidth is not None:
+            container.stemlines.set_linewidth(linewidth)
+
+    # Add legend if labels were provided
+    if legend_labels is not None:
+        ax.legend()
+
+    return fig, ax
 
 
 # =============================================================================
