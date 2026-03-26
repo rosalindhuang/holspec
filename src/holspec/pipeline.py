@@ -1628,3 +1628,45 @@ def load_spectra(
 
     return hlsp
 
+
+def split_pipeline_config(
+    pipeline_config: dict,
+    project_root: str | Path,
+) -> dict[int, dict]:
+    """
+    Split a unified pipeline config into per-stage config dicts.
+
+    Assembles standalone per-stage configs from the unified pipeline
+    config without writing any files. Stage 1 receives the pipeline's
+    input filepaths; Stages 2--4 receive empty filepaths (to be wired
+    at runtime from the previous stage's output).
+
+    Parameters
+    ----------
+    pipeline_config : dict
+        Full pipeline config dict (as loaded from ``pipeline.yml``).
+    project_root : str or Path
+        Project root for path resolution.
+
+    Returns
+    -------
+    dict[int, dict]
+        Mapping ``{stage_num: stage_config_dict}`` for stages 1--4.
+        Each value has the standard five-key per-stage schema
+        (``summary``, ``inputs``, ``configs``, ``runtime``, ``outputs``).
+    """
+    project_root = Path(project_root)
+    stage_configs = {}
+
+    for stage_num in (1, 2, 3, 4):
+        if stage_num == 1:
+            input_filepaths = pipeline_config['inputs']['filepaths']
+        else:
+            input_filepaths = {}
+
+        stage_configs[stage_num] = _assemble_stage_config(
+            pipeline_config, stage_num, input_filepaths, project_root,
+        )
+
+    return stage_configs
+
