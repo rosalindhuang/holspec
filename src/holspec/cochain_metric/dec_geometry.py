@@ -451,7 +451,7 @@ def compute_dual_volumes(
         accumulated circumcenter sequence.
         """
         # Reached a full chain, so the current circumcenter sequence 
-        # forms one elementary dual simplex
+        # forms an elementary dual simplex; return its signed volume
         if curr_degree == n:
             return (
                 sign_product
