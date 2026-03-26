@@ -18,6 +18,15 @@ if TYPE_CHECKING:
 
 
 # =============================================================================
+# Constants
+# =============================================================================
+
+# Numerical tolerance for Laplacian property checks (self-adjointness of GL
+# and positive semidefiniteness via eigenvalue threshold).
+LAPLACIAN_PROPERTY_TOL = 1e-10
+
+
+# =============================================================================
 # Validation Functions
 # =============================================================================
 
@@ -92,13 +101,14 @@ def validate_hodge_laplacian_inputs(
 def validate_laplacian_properties(
     laplacian_matrix: sparse.spmatrix,
     metric: MetricTensor,
-    tol: float = 1e-10,
-) -> dict[str, bool]:
+    tol: float = LAPLACIAN_PROPERTY_TOL,
+) -> None:
     """
-    Check mathematical properties of a Hodge Laplacian matrix.
+    Validate mathematical properties of a Hodge Laplacian matrix.
 
-    A diagnostic function for verifying that a computed Laplacian matrix
-    satisfies the expected mathematical properties.
+    Checks that a computed Laplacian matrix satisfies the expected
+    mathematical properties: square, self-adjoint w.r.t. the metric,
+    and positive semidefinite.
 
     Parameters
     ----------
@@ -107,18 +117,14 @@ def validate_laplacian_properties(
     metric : MetricTensor, size N
         Metric tensor G defining the inner product with respect to which
         the Laplacian should be self-adjoint.
-    tol : float, default=1e-10
+    tol : float, default=LAPLACIAN_PROPERTY_TOL
         Numerical tolerance for approximate checks.
 
-    Returns
-    -------
-    dict[str, bool]
-        Results for each property:
-        - 'is_square': matrix is square.
-        - 'is_self_adjoint': G L is symmetric (within tolerance), i.e.,
-          the Laplacian is self-adjoint w.r.t. the G inner product.
-        - 'is_positive_semidefinite': all eigenvalues >= -tol. Checked
-          via the symmetrized form G^{1/2} L G^{-1/2}.
+    Raises
+    ------
+    ValueError
+        If any property is violated. The error message identifies all
+        failing properties and their diagnostic values.
 
     Notes
     -----
@@ -127,32 +133,38 @@ def validate_laplacian_properties(
     case but impractical for very large matrices.
 
     For N=0 (boundary-degree Laplacians), all properties are vacuously
-    True.
+    satisfied.
     """
     N = laplacian_matrix.shape[0]
 
     # --- Vacuous case (N=0) ---
     if N == 0:
-        return {
-            'is_square': True,
-            'is_self_adjoint': True,
-            'is_positive_semidefinite': True,
-        }
-    
-    # --- Square ---
-    is_square = laplacian_matrix.shape[0] == laplacian_matrix.shape[1]
+        return
 
-    if not is_square or N != metric.size:
-        return {
-            'is_square': is_square,
-            'is_self_adjoint': False,
-            'is_positive_semidefinite': False,
-        }
+    # --- Square ---
+    if laplacian_matrix.shape[0] != laplacian_matrix.shape[1]:
+        raise ValueError(
+            f"Laplacian property violation: "
+            f"is_square: shape={laplacian_matrix.shape}"
+        )
+
+    if N != metric.size:
+        raise ValueError(
+            f"Laplacian property violation: "
+            f"matrix size N={N} does not match metric size={metric.size}"
+        )
+
+    failures = []
 
     # --- Self-adjoint w.r.t. G: G L should be symmetric ---
     GL = metric.to_matrix() @ laplacian_matrix
     GL_dense = GL.toarray()
-    is_self_adjoint = np.allclose(GL_dense, GL_dense.T, atol=tol, rtol=0)
+    if not np.allclose(GL_dense, GL_dense.T, atol=tol, rtol=0):
+        max_deviation = np.max(np.abs(GL_dense - GL_dense.T))
+        failures.append(
+            f"is_self_adjoint: max |G L - (G L)^T| = {max_deviation:.2e} "
+            f"(tol={tol})"
+        )
 
     # --- Positive semidefinite via symmetrized form ---
     L_sym = (
@@ -160,10 +172,17 @@ def validate_laplacian_properties(
         @ metric.to_matrix_power(-0.5)
     )
     eigenvalues = np.linalg.eigvalsh(L_sym.toarray())
-    is_positive_semidefinite = bool(np.all(eigenvalues >= -tol))
+    if not np.all(eigenvalues >= -tol):
+        min_eigenvalue = eigenvalues.min()
+        failures.append(
+            f"is_positive_semidefinite: min eigenvalue = {min_eigenvalue:.2e} "
+            f"(tol={tol})"
+        )
 
-    return {
-        'is_square': is_square,
-        'is_self_adjoint': is_self_adjoint,
-        'is_positive_semidefinite': is_positive_semidefinite,
-    }
+    if failures:
+        if len(failures) == 1:
+            raise ValueError(f"Laplacian property violation: {failures[0]}")
+        detail = "\n  ".join(failures)
+        raise ValueError(
+            f"Laplacian property violations:\n  {detail}"
+        )

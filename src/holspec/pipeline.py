@@ -260,20 +260,7 @@ def run_topology_simplicial(
  
                 # Validate boundary property (also populates cache)
                 if validate_boundary_property:
-                    boundary_results = sc.validate_boundary_property()
-                    failed = [
-                        k for k, passed in boundary_results.items()
-                        if not passed
-                    ]
-                    assert not failed, (
-                        f"Boundary property D_{{k-1}} @ D_k = 0 failed:\n"
-                        f"  point data             : {ptd_label}\n"
-                        f"  simplicial construction: {sc_label}\n"
-                        f"  member                 : member_{member_index:04d}\n"
-                        f"  file                   : "
-                        f"{output_filepath.relative_to(project_root)}\n"
-                        f"  failed at k            : {failed}"
-                    )
+                    sc.validate_boundary_property()
  
                 # Save simplicial complex to file
                 sc.save(
@@ -555,23 +542,7 @@ def run_hodge_laplacian(
  
                 # Validate Laplacian properties (also populates cache)
                 if validate_laplacians:
-                    validation_results = hl.validate_laplacians()
-                    for (k, comp), result_dict in validation_results.items():
-                        failed = [
-                            prop for prop, passed in result_dict.items()
-                            if not passed
-                        ]
-                        assert not failed, (
-                            f"Laplacian validation failed:\n"
-                            f"  point data        : {ptd_label}\n"
-                            f"  cochain metric    : {cm_label}\n"
-                            f"  member            : {member_key}\n"
-                            f"  degree            : k={k}\n"
-                            f"  component         : {comp}\n"
-                            f"  file              : "
-                            f"{output_filepath.relative_to(project_root)}\n"
-                            f"  failed properties : {failed}"
-                        )
+                    hl.validate_laplacians()
  
                 # Save Hodge Laplacian to file
                 hl.save(

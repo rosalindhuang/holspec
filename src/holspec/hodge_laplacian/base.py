@@ -17,6 +17,7 @@ from scipy import sparse
 
 from holspec.utilities import save_h5, read_h5, join_h5_group
 
+from .validation import LAPLACIAN_PROPERTY_TOL
 from .operators import (
     compute_coboundary_matrix,
     compute_dual_coboundary_matrix,
@@ -268,8 +269,8 @@ class HodgeLaplacian:
     # =========================================================================
 
     def validate_laplacians(
-        self, tol: float = 1e-10,
-    ) -> dict[tuple[int, str], dict[str, bool]]:
+        self, tol: float = LAPLACIAN_PROPERTY_TOL,
+    ) -> None:
         """
         Validate Hodge Laplacian properties for all degrees and components.
 
@@ -282,12 +283,11 @@ class HodgeLaplacian:
         tol : float, default=1e-10
             Numerical tolerance for property checks.
 
-        Returns
-        -------
-        results : dict[tuple[int, str], dict[str, bool]]
-            {(k, component): {'is_square': bool, 'is_self_adjoint': bool,
-            'is_positive_semidefinite': bool}} for all valid (k, component)
-            pairs.
+        Raises
+        ------
+        ValueError
+            If any (k, component) pair fails validation. All pairs are
+            checked and all failures are reported in a single error.
 
         Notes
         -----
@@ -304,16 +304,29 @@ class HodgeLaplacian:
         for k in range(self.max_dim + 1):
             _ = self[k]
 
-        # Validate all (k, component) pairs
-        results = {}
+        # Validate all (k, component) pairs, collecting failures
+        failures = []
+        total_pairs = 0
         for k in range(self.max_dim + 1):
             for comp in LAPLACIAN_COMPONENT_NAMES:
+                total_pairs += 1
                 L = self.to_matrix(k, comp)
-                results[(k, comp)] = validate_laplacian_properties(
-                    L, self._cm[k], tol=tol
-                )
+                try:
+                    validate_laplacian_properties(
+                        L, self._cm[k], tol=tol
+                    )
+                except ValueError as exc:
+                    failures.append((k, comp, str(exc)))
 
-        return results
+        if failures:
+            detail = "\n  ".join(
+                f"(k={k}, {comp}): {msg}"
+                for k, comp, msg in failures
+            )
+            raise ValueError(
+                f"Laplacian validation failed at {len(failures)} of "
+                f"{total_pairs} (k, component) pairs:\n  {detail}"
+            )
 
     # =========================================================================
     # I/O Methods

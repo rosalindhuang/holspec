@@ -13,6 +13,8 @@ from typing import TYPE_CHECKING
 import numpy as np
 from scipy import sparse
 
+from .validation import BOUNDARY_PROPERTY_TOL
+
 from holspec.utilities import save_h5, read_h5, convert_numpy_to_python, join_h5_group
 from .simplicial_constructions import construct_complex_from_config
 
@@ -221,7 +223,7 @@ class SimplicialComplex:
         validate_simplices_structure(self._simplices)
         validate_face_closure(self._simplices)
 
-    def validate_boundary_property(self, tol: float = 1e-10) -> dict[int, bool]:
+    def validate_boundary_property(self, tol: float = BOUNDARY_PROPERTY_TOL) -> None:
         """
         Verify D_k @ D_{k+1} = 0 for all k.
 
@@ -230,10 +232,10 @@ class SimplicialComplex:
         tol : float, default=1e-10
             Numerical tolerance for zero comparison.
 
-        Returns
-        -------
-        results : dict[int, bool]
-            {k: passed} for each applicable dimension.
+        Raises
+        ------
+        ValueError
+            If D_k @ D_{k+1} = 0 is violated at any degree.
 
         Notes
         -----
@@ -245,16 +247,15 @@ class SimplicialComplex:
           computation.
         """
         from .validation import validate_boundary_property
-        
+
         # Pre-compute all incidence matrices to populate cache and pass to validation
         for k in range(self.max_dim + 1):
             _ = self.incidence_matrix(k)
-        
-        # Pass cache to validation function
-        return validate_boundary_property(
-            self._simplices, 
+
+        validate_boundary_property(
+            self._simplices,
             tol,
-            incidence_matrices=self._incidence_cache
+            incidence_matrices=self._incidence_cache,
         )
 
     # =========================================================================

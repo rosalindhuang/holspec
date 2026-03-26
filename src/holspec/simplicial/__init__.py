@@ -33,6 +33,7 @@ __all__ = [
     'create_simplicial_construction_label',
 
     # validation.py
+    'BOUNDARY_PROPERTY_TOL',
     'validate_simplices_structure',
     'validate_face_closure',
     'validate_boundary_property',

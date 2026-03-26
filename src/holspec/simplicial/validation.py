@@ -8,6 +8,16 @@ import numpy as np
 from scipy import sparse
 
 
+# =============================================================================
+# Constants
+# =============================================================================
+
+# Numerical tolerance for the boundary property check D_k @ D_{k+1} = 0.
+# Max absolute entry in the product matrix below this threshold is treated
+# as numerical zero.
+BOUNDARY_PROPERTY_TOL = 1e-10
+
+
 def validate_simplices_structure(simplices: dict[int, list[tuple]]) -> None:
     """
     Validate basic structure of simplices dictionary.
@@ -121,61 +131,77 @@ def validate_face_closure(simplices: dict[int, list[tuple]]) -> None:
 
 
 def validate_boundary_property(
-    simplices: dict[int, list[tuple]], 
-    tol: float = 1e-10,
+    simplices: dict[int, list[tuple]],
+    tol: float = BOUNDARY_PROPERTY_TOL,
     incidence_matrices: dict[int, sparse.csr_matrix] | None = None
-) -> dict[int, bool]:
+) -> None:
     """
     Verify D_k @ D_{k+1} = 0 for all applicable dimensions.
-    
+
     Parameters
     ----------
     simplices : dict[int, list[tuple]]
         Dictionary mapping dimension to list of simplices.
-    tol : float, default=1e-10
+    tol : float, default=BOUNDARY_PROPERTY_TOL
         Numerical tolerance for zero comparison.
     incidence_matrices : dict[int, sparse.csr_matrix], optional
         Pre-computed incidence matrices. If provided, uses these instead
         of computing from scratch. Keys should be dimensions.
-    
-    Returns
-    -------
-    results : dict[int, bool]
-        Dictionary mapping dimension k to boolean indicating whether
-        D_k @ D_{k+1} = 0 (within tolerance).
-        
+
+    Raises
+    ------
+    ValueError
+        If D_k @ D_{k+1} = 0 is violated at any degree (within tolerance).
+        The error message identifies all failing degrees and their max
+        absolute entry values.
+
     Notes
     -----
     - Fundamental property of boundary operators in simplicial complexes
     - If incidence_matrices not provided, computes all needed matrices
-    - When called from SimplicialComplex.validate_boundary_property(), 
+    - When called from SimplicialComplex.validate_boundary_property(),
       pre-computed matrices are passed to avoid redundant computation
     """
     from .incidence import compute_incidence_matrix
-    
+
     # Helper to get incidence matrix (from cache or compute)
     def get_incidence_matrix(k: int) -> sparse.csr_matrix:
         if incidence_matrices is not None and k in incidence_matrices:
             return incidence_matrices[k]
         return compute_incidence_matrix(simplices, k)
-    
-    results = {}
+
+    failures = []
     max_dim = max(simplices.keys())
-    
+
     # Check D_k @ D_{k+1} = 0 for each applicable k
     for k in range(max_dim):
         D_k = get_incidence_matrix(k)
         D_kp1 = get_incidence_matrix(k + 1)
-        
+
         # Compute product
         product = D_k @ D_kp1
-        
+
         # Check if zero within tolerance
         if product.nnz > 0:
             max_entry = np.abs(product.data).max()
         else:
             max_entry = 0.0
-        
-        results[k] = (max_entry < tol)
-    
-    return results
+
+        if max_entry >= tol:
+            failures.append((k, max_entry))
+
+    if failures:
+        if len(failures) == 1:
+            k, max_entry = failures[0]
+            raise ValueError(
+                f"Boundary property D_k @ D_{{k+1}} = 0 violated at "
+                f"degree k={k} (max |entry| = {max_entry:.2e}, tol={tol})"
+            )
+        detail = "\n  ".join(
+            f"k={k}: max |entry| = {max_entry:.2e} (tol={tol})"
+            for k, max_entry in failures
+        )
+        raise ValueError(
+            f"Boundary property D_k @ D_{{k+1}} = 0 violated at "
+            f"degrees:\n  {detail}"
+        )

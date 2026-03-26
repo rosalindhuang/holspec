@@ -15,6 +15,7 @@ from .operators import (
     symmetrize_matrix,
 )
 from .validation import (
+    LAPLACIAN_PROPERTY_TOL,
     validate_hodge_laplacian_inputs,
     validate_laplacian_properties,
 )
