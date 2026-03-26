@@ -402,18 +402,17 @@ def inspect_dict(
             print(f"{prefix}{_indent}{indent}{key} {summary}")
 
 
-def print_pipeline_config(
-    config_path: str | Path,
+def print_dict(
+    data_dict: dict,
+    header: str | None = None,
     print_items: bool = True,
 ) -> None:
     """
-    Print a formatted summary of a pipeline stage config document.
+    Print a formatted section-based summary of a nested dictionary.
 
-    Reads the config from a YAML file and derives the stage name from
-    ``outputs.stage_name`` in the loaded config.
-
-    Handles the standard pipeline schema (summary / inputs / configs / runtime / outputs)
-    and generalises to any section structure. Within each section:
+    Treats each top-level key whose value is a dict as a named section.
+    Within each section, prints key-value pairs with aligned columns.
+    Non-dict top-level values are skipped.
 
     - Scalar values are printed as ``key: value``.
     - List values are printed as ``key (N items):`` followed by each item indented.
@@ -423,26 +422,22 @@ def print_pipeline_config(
 
     Parameters
     ----------
-    config_path : str or Path
-        Path to the YAML config file for the pipeline stage.
+    data_dict : dict
+        Dictionary to print.
+    header : str, optional
+        If provided, prints a header block with ``=`` separators.
     print_items : bool, default=True
         If True, print individual items within list/dict values.
     """
-    with open(config_path, 'r') as f:
-        configs_content = yaml.safe_load(f)
-    stage_name = configs_content.get('outputs', {}).get('stage_name', None)
-
     # Header
-    header = "Pipeline stage configs"
-    if stage_name is not None:
-        header += f" for {stage_name}"
-    print("=" * 60)
-    print(header)
-    print("=" * 60)
+    if header is not None:
+        print("=" * 60)
+        print(header)
+        print("=" * 60)
 
     # Sections
     sep = "-" * 60
-    for section_name, section in configs_content.items():
+    for section_name, section in data_dict.items():
         if not isinstance(section, dict):
             continue
 
@@ -479,6 +474,27 @@ def print_pipeline_config(
                 print(f"{key:{lw}s}: {value}")
 
         print()
+
+
+def print_pipeline_config(
+    config_path: str | Path,
+    print_items: bool = True,
+) -> None:
+    """
+    Print a formatted summary of a pipeline config loaded from a YAML file.
+
+    Convenience wrapper around ``print_dict`` that handles file loading.
+
+    Parameters
+    ----------
+    config_path : str or Path
+        Path to the YAML config file.
+    print_items : bool, default=True
+        If True, print individual items within list/dict values.
+    """
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+    print_dict(config, print_items=print_items)
 
 
 # =============================================================================
