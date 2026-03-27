@@ -8,7 +8,9 @@ import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.colorbar import Colorbar
-from typing import Optional, Tuple, List, Union, Dict, Any
+from matplotlib.cm import ScalarMappable
+import matplotlib.colors as mcolors
+from typing import Optional, Tuple, List, Union, Dict, Any, Sequence
 from itertools import combinations
 
 # =============================================================================
@@ -684,22 +686,24 @@ def plot_spheres(
 def plot_vertices_2d(
     vertices: List[Tuple],
     positions: np.ndarray,
-    color: str = 'C0',
+    color: Union[str, Sequence] = 'C0',
     radius: Optional[float] = None,
     ax: Optional[Axes] = None,
     **kwargs
 ) -> Tuple[Figure, Axes]:
     """
     Plot 0-simplices (vertices) as circles in 2D.
-    
+
     Parameters
     ----------
     vertices : List[Tuple]
         List of vertex simplices, each a tuple with 1 int index.
     positions : np.ndarray
         Array of shape (N, 2) with (x, y) vertex coordinates.
-    color : str, default='C0'
-        Fill color for vertices.
+    color : str or sequence of color-like, default='C0'
+        Fill color for vertices. Can be a single color string applied to all
+        vertices, or a sequence of colors (one per vertex) for individual
+        coloring.
     radius : float, optional
         Radius of circles. If None, auto-computed from data range.
     ax : Axes, optional
@@ -707,19 +711,19 @@ def plot_vertices_2d(
     **kwargs
         Additional keyword arguments passed to plot_circles().
         Can override circle_props, e.g., edgecolor='black'.
-    
+
     Returns
     -------
     fig : Figure
         The matplotlib figure object.
     ax : Axes
         The matplotlib axes object.
-    
+
     Examples
     --------
     >>> fig, ax = plot_vertices_2d(
-    ...     vertices, positions, 
-    ...     color='blue', 
+    ...     vertices, positions,
+    ...     color='blue',
     ...     circle_props={'edgecolor': 'black', 'linewidth': 2}
     ... )
     """
@@ -728,79 +732,102 @@ def plot_vertices_2d(
         fig, ax = plt.subplots()
     else:
         fig = ax.figure
-    
+
     # Extract vertex indices and get their positions
     vertex_indices = [v[0] for v in vertices]
     vertex_positions = positions[vertex_indices]
-    
+
     # Auto-compute radius if not provided
     if radius is None:
         data_range = np.ptp(positions, axis=0).max()
         radius = 0.02 * data_range if data_range > 0 else 0.05
-    
-    # Set up circle properties
-    default_circle_props = {
-        'facecolor': color,
-        'edgecolor': 'black',
-        'linewidth': 1,
-        'alpha': 1
-    }
-    
-    # Merge with user-provided circle_props if present
-    if 'circle_props' in kwargs:
-        user_props = kwargs.pop('circle_props')
-        if isinstance(user_props, dict):
-            default_circle_props.update(user_props)
-        else:
-            # If user provided list, use it directly
-            kwargs['circle_props'] = user_props
-            return plot_circles(vertex_positions, radius, ax=ax, **kwargs)
-    
-    # Plot using plot_circles
-    fig, ax = plot_circles(
-        vertex_positions,
-        radius,
-        circle_props=default_circle_props,
-        ax=ax,
-        **kwargs
-    )
-    
+
+    # Resolve per-vertex colors
+    colors = _resolve_colors(color, len(vertices))
+
+    if isinstance(color, str):
+        # Single color: build one props dict for all vertices
+        default_circle_props = {
+            'facecolor': color,
+            'edgecolor': 'black',
+            'linewidth': 1,
+            'alpha': 1
+        }
+
+        # Merge with user-provided circle_props if present
+        if 'circle_props' in kwargs:
+            user_props = kwargs.pop('circle_props')
+            if isinstance(user_props, dict):
+                default_circle_props.update(user_props)
+            else:
+                # If user provided list, use it directly
+                kwargs['circle_props'] = user_props
+                return plot_circles(vertex_positions, radius, ax=ax, **kwargs)
+
+        fig, ax = plot_circles(
+            vertex_positions, radius,
+            circle_props=default_circle_props, ax=ax, **kwargs
+        )
+    else:
+        # Per-vertex colors: build list of props dicts
+        props_list = [
+            {'facecolor': c, 'edgecolor': 'black', 'linewidth': 1, 'alpha': 1}
+            for c in colors
+        ]
+
+        # Merge with user-provided circle_props dict if present
+        if 'circle_props' in kwargs:
+            user_props = kwargs.pop('circle_props')
+            if isinstance(user_props, dict):
+                for p in props_list:
+                    p.update(user_props)
+            else:
+                # If user provided list, use it directly (overrides per-vertex colors)
+                kwargs['circle_props'] = user_props
+                return plot_circles(vertex_positions, radius, ax=ax, **kwargs)
+
+        fig, ax = plot_circles(
+            vertex_positions, radius,
+            circle_props=props_list, ax=ax, **kwargs
+        )
+
     return fig, ax
 
 
 def plot_edges_2d(
     edges: List[Tuple],
     positions: np.ndarray,
-    color: str = 'C1',
+    color: Union[str, Sequence] = 'C1',
     linewidth: float = 1.5,
     ax: Optional[Axes] = None,
     **kwargs
 ) -> Tuple[Figure, Axes]:
     """
     Plot 1-simplices (edges) as line segments in 2D.
-    
+
     Parameters
     ----------
     edges : List[Tuple]
         List of edge simplices, each a tuple of 2 vertex indices.
     positions : np.ndarray
         Array of shape (N, 2) with (x, y) vertex coordinates.
-    color : str, default='C1'
-        Line color for all edges.
+    color : str or sequence of color-like, default='C1'
+        Color for edges. Can be a single color string applied to all edges,
+        or a sequence of colors (one per edge) for individual coloring.
     linewidth : float, default=1.5
         Line width for edges.
     ax : Axes, optional
         Axes to plot on. If None, creates new figure.
     **kwargs
         Additional keyword arguments passed to ax.plot().
-    
+
     Returns
     -------
     fig : Figure
         The matplotlib figure object.
     ax : Axes
         The matplotlib axes object.
-    
+
     Examples
     --------
     >>> fig, ax = plot_edges_2d(edges, positions, color='blue', linewidth=2)
@@ -810,25 +837,28 @@ def plot_edges_2d(
         fig, ax = plt.subplots()
     else:
         fig = ax.figure
-    
+
     # Validate positions
     positions = np.asarray(positions)
     if positions.ndim != 2 or positions.shape[1] != 2:
         raise ValueError(f"positions must be shape (N, 2), got {positions.shape}")
-    
+
+    # Resolve per-edge colors
+    colors = _resolve_colors(color, len(edges))
+
     # Plot each edge
-    for edge in edges:
+    for edge, c in zip(edges, colors):
         edge_positions = positions[list(edge)]
         x, y = edge_positions.T
-        ax.plot(x, y, color=color, linewidth=linewidth, alpha=1, **kwargs)
-    
+        ax.plot(x, y, color=c, linewidth=linewidth, alpha=1, **kwargs)
+
     return fig, ax
 
 
 def plot_triangles_2d(
     triangles: List[Tuple],
     positions: np.ndarray,
-    color: str = 'C2',
+    color: Union[str, Sequence] = 'C2',
     alpha: float = 0.4,
     edgecolor: str = 'none',
     ax: Optional[Axes] = None,
@@ -836,15 +866,17 @@ def plot_triangles_2d(
 ) -> Tuple[Figure, Axes]:
     """
     Plot 2-simplices (triangles) as filled polygons in 2D.
-    
+
     Parameters
     ----------
     triangles : List[Tuple]
         List of triangle simplices, each a tuple of 3 vertex indices.
     positions : np.ndarray
         Array of shape (N, 2) with (x, y) vertex coordinates.
-    color : str, default='C2'
-        Fill color for all triangles.
+    color : str or sequence of color-like, default='C2'
+        Fill color for triangles. Can be a single color string applied to all
+        triangles, or a sequence of colors (one per triangle) for individual
+        coloring.
     alpha : float, default=0.4
         Transparency for triangles (0=transparent, 1=opaque).
     edgecolor : str, default='none'
@@ -853,44 +885,47 @@ def plot_triangles_2d(
         Axes to plot on. If None, creates new figure.
     **kwargs
         Additional keyword arguments passed to Polygon patches.
-    
+
     Returns
     -------
     fig : Figure
         The matplotlib figure object.
     ax : Axes
         The matplotlib axes object.
-    
+
     Examples
     --------
     >>> fig, ax = plot_triangles_2d(triangles, positions)
     """
     from matplotlib.patches import Polygon as PolygonPatch
-    
+
     # Create figure if needed
     if ax is None:
         fig, ax = plt.subplots()
     else:
         fig = ax.figure
-    
+
     # Validate positions
     positions = np.asarray(positions)
     if positions.ndim != 2 or positions.shape[1] != 2:
         raise ValueError(f"positions must be shape (N, 2), got {positions.shape}")
-    
+
+    # Resolve per-triangle colors
+    colors = _resolve_colors(color, len(triangles))
+
     # Plot each triangle
-    for triangle in triangles:
+    for triangle, c in zip(triangles, colors):
         tri_positions = positions[list(triangle)]
         polygon = PolygonPatch(
-            tri_positions, 
+            tri_positions,
             closed=True,
-            facecolor=color,
+            facecolor=c,
             edgecolor=edgecolor,
             alpha=alpha,
             **kwargs
         )
         ax.add_patch(polygon)
-    
+
     return fig, ax
 
 
@@ -901,29 +936,31 @@ def plot_triangles_2d(
 def plot_vertices_3d(
     vertices: List[Tuple],
     positions: np.ndarray,
-    color: str = 'C0',
+    color: Union[str, Sequence] = 'C0',
     radius: Optional[float] = None,
     ax: Optional[Axes] = None,
     **kwargs
 ) -> Tuple[Figure, Axes]:
     """
     Plot 0-simplices (vertices) as spheres in 3D.
-    
+
     Parameters
     ----------
     vertices : List[Tuple]
         List of vertex simplices, each a tuple with 1 int index.
     positions : np.ndarray
         Array of shape (N, 3) with (x, y, z) coordinates.
-    color : str, default='C0'
-        Fill color for vertices.
+    color : str or sequence of color-like, default='C0'
+        Fill color for vertices. Can be a single color string applied to all
+        vertices, or a sequence of colors (one per vertex) for individual
+        coloring.
     radius : float, optional
         Radius of spheres. If None, auto-computed from data range.
     ax : Axes, optional
         3D axes to plot on. If None, creates new figure.
     **kwargs
         Passed to plot_spheres(). Can override sphere_props.
-    
+
     Returns
     -------
     fig, ax : Figure, Axes
@@ -934,72 +971,95 @@ def plot_vertices_3d(
         ax = fig.add_subplot(111, projection='3d')
     else:
         fig = ax.figure
-    
+
     # Extract vertex indices and get their positions
     vertex_indices = [v[0] for v in vertices]
     vertex_positions = positions[vertex_indices]
-    
+
     # Auto-compute radius if not provided
     if radius is None:
         data_range = np.ptp(positions, axis=0).max()
         radius = 0.06 * data_range if data_range > 0 else 0.05
-    
-    # Set up sphere properties
-    default_sphere_props = {
-        'c': color,
-        'edgecolors': 'black',
-        'linewidths': 1,
-        'alpha': 1
-    }
-    
-    # Merge with user-provided sphere_props if present
-    if 'sphere_props' in kwargs:
-        user_props = kwargs.pop('sphere_props')
-        if isinstance(user_props, dict):
-            default_sphere_props.update(user_props)
-        else:
-            # If user provided list, use it directly
-            kwargs['sphere_props'] = user_props
-            return plot_spheres(vertex_positions, radius, ax=ax, **kwargs)
-    
-    # Plot using plot_spheres
-    fig, ax = plot_spheres(
-        vertex_positions,
-        radius,
-        sphere_props=default_sphere_props,
-        ax=ax,
-        **kwargs
-    )
-    
+
+    # Resolve per-vertex colors
+    colors = _resolve_colors(color, len(vertices))
+
+    if isinstance(color, str):
+        # Single color: build one props dict for all vertices
+        default_sphere_props = {
+            'c': color,
+            'edgecolors': 'black',
+            'linewidths': 1,
+            'alpha': 1
+        }
+
+        # Merge with user-provided sphere_props if present
+        if 'sphere_props' in kwargs:
+            user_props = kwargs.pop('sphere_props')
+            if isinstance(user_props, dict):
+                default_sphere_props.update(user_props)
+            else:
+                # If user provided list, use it directly
+                kwargs['sphere_props'] = user_props
+                return plot_spheres(vertex_positions, radius, ax=ax, **kwargs)
+
+        fig, ax = plot_spheres(
+            vertex_positions, radius,
+            sphere_props=default_sphere_props, ax=ax, **kwargs
+        )
+    else:
+        # Per-vertex colors: build list of props dicts
+        props_list = [
+            {'c': c, 'edgecolors': 'black', 'linewidths': 1, 'alpha': 1}
+            for c in colors
+        ]
+
+        # Merge with user-provided sphere_props dict if present
+        if 'sphere_props' in kwargs:
+            user_props = kwargs.pop('sphere_props')
+            if isinstance(user_props, dict):
+                for p in props_list:
+                    p.update(user_props)
+            else:
+                # If user provided list, use it directly (overrides per-vertex colors)
+                kwargs['sphere_props'] = user_props
+                return plot_spheres(vertex_positions, radius, ax=ax, **kwargs)
+
+        fig, ax = plot_spheres(
+            vertex_positions, radius,
+            sphere_props=props_list, ax=ax, **kwargs
+        )
+
     return fig, ax
 
 
 def plot_edges_3d(
     edges: List[Tuple],
     positions: np.ndarray,
-    color: str = 'C1',
+    color: Union[str, Sequence] = 'C1',
     linewidth: float = 2.0,
     ax: Optional[Axes] = None,
     **kwargs
 ) -> Tuple[Figure, Axes]:
     """
     Plot 1-simplices (edges) as line segments in 3D.
-    
+
     Parameters
     ----------
     edges : List[Tuple]
         List of edge simplices, each a tuple of 2 vertex indices.
     positions : np.ndarray
         Array of shape (N, 3) with (x, y, z) coordinates.
-    color : str, default='C1'
-        Line color.
+    color : str or sequence of color-like, default='C1'
+        Color for edges. Can be a single color string applied to all edges,
+        or a sequence of colors (one per edge) for individual coloring.
     linewidth : float, default=2.0
         Line width.
     ax : Axes, optional
         3D axes to plot on. If None, creates new figure.
     **kwargs
         Passed to ax.plot().
-    
+
     Returns
     -------
     fig, ax : Figure, Axes
@@ -1010,33 +1070,36 @@ def plot_edges_3d(
         ax = fig.add_subplot(111, projection='3d')
     else:
         fig = ax.figure
-    
+
     # Validate positions
     positions = np.asarray(positions)
     if positions.ndim != 2 or positions.shape[1] != 3:
         raise ValueError(f"positions must be shape (N, 3), got {positions.shape}")
-    
+
+    # Resolve per-edge colors
+    colors = _resolve_colors(color, len(edges))
+
     # Plot each edge
-    for edge in edges:
+    for edge, c in zip(edges, colors):
         p0 = positions[edge[0]]
         p1 = positions[edge[1]]
         ax.plot(
-            [p0[0], p1[0]], 
-            [p0[1], p1[1]], 
+            [p0[0], p1[0]],
+            [p0[1], p1[1]],
             [p0[2], p1[2]],
-            color=color, 
-            linewidth=linewidth, 
+            color=c,
+            linewidth=linewidth,
             alpha=1,
             **kwargs
         )
-    
+
     return fig, ax
 
 
 def plot_triangles_3d(
     triangles: List[Tuple],
     positions: np.ndarray,
-    color: str = 'C2',
+    color: Union[str, Sequence] = 'C2',
     alpha: float = 0.4,
     edgecolor: str = 'none',
     ax: Optional[Axes] = None,
@@ -1044,15 +1107,17 @@ def plot_triangles_3d(
 ) -> Tuple[Figure, Axes]:
     """
     Plot 2-simplices (triangles) as filled polygons in 3D.
-    
+
     Parameters
     ----------
     triangles : List[Tuple]
         List of triangle simplices, each a tuple of 3 vertex indices.
     positions : np.ndarray
         Array of shape (N, 3) with (x, y, z) coordinates.
-    color : str, default='C2'
-        Fill color.
+    color : str or sequence of color-like, default='C2'
+        Fill color for triangles. Can be a single color string applied to all
+        triangles, or a sequence of colors (one per triangle) for individual
+        coloring.
     alpha : float, default=0.4
         Transparency (0=transparent, 1=opaque).
     edgecolor : str, default='none'
@@ -1061,44 +1126,47 @@ def plot_triangles_3d(
         3D axes to plot on. If None, creates new figure.
     **kwargs
         Passed to Poly3DCollection.
-    
+
     Returns
     -------
     fig, ax : Figure, Axes
     """
     from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-    
+
     # Create 3D figure if needed
     if ax is None:
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
     else:
         fig = ax.figure
-    
+
     # Validate positions
     positions = np.asarray(positions)
     if positions.ndim != 2 or positions.shape[1] != 3:
         raise ValueError(f"positions must be shape (N, 3), got {positions.shape}")
-    
+
+    # Resolve per-triangle colors
+    colors = _resolve_colors(color, len(triangles))
+
     # Plot each triangle
-    for triangle in triangles:
+    for triangle, c in zip(triangles, colors):
         tri_positions = positions[list(triangle)]
         poly = Poly3DCollection(
             [tri_positions],
-            facecolor=color,
+            facecolor=c,
             edgecolor=edgecolor,
             alpha=alpha,
             **kwargs
         )
         ax.add_collection3d(poly)
-    
+
     return fig, ax
 
 
 def plot_tetrahedra_3d(
     tetrahedra: List[Tuple],
     positions: np.ndarray,
-    color: str = 'C3',
+    color: Union[str, Sequence] = 'C3',
     alpha: float = 0.2,
     edgecolor: str = 'none',
     ax: Optional[Axes] = None,
@@ -1106,17 +1174,19 @@ def plot_tetrahedra_3d(
 ) -> Tuple[Figure, Axes]:
     """
     Plot 3-simplices (tetrahedra) as collections of triangular facets in 3D.
-    
+
     Each tetrahedron is rendered as 4 triangular faces. Very low alpha recommended.
-    
+
     Parameters
     ----------
     tetrahedra : List[Tuple]
         List of tetrahedron simplices, each a tuple of 4 vertex indices.
     positions : np.ndarray
         Array of shape (N, 3) with (x, y, z) coordinates.
-    color : str, default='C3'
-        Fill color.
+    color : str or sequence of color-like, default='C3'
+        Fill color for tetrahedra. Can be a single color string applied to all
+        tetrahedra, or a sequence of colors (one per tetrahedron) for individual
+        coloring. All 4 facets of a tetrahedron share the same color.
     alpha : float, default=0.2
         Transparency (much lower than triangles for visibility).
     edgecolor : str, default='none'
@@ -1125,40 +1195,43 @@ def plot_tetrahedra_3d(
         3D axes to plot on. If None, creates new figure.
     **kwargs
         Passed to Poly3DCollection.
-    
+
     Returns
     -------
     fig, ax : Figure, Axes
     """
     from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-    
+
     # Create 3D figure if needed
     if ax is None:
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
     else:
         fig = ax.figure
-    
+
     # Validate positions
     positions = np.asarray(positions)
     if positions.ndim != 2 or positions.shape[1] != 3:
         raise ValueError(f"positions must be shape (N, 3), got {positions.shape}")
-    
+
+    # Resolve per-tetrahedron colors
+    colors = _resolve_colors(color, len(tetrahedra))
+
     # Plot each tetrahedron as 4 triangular facets
-    for tet in tetrahedra:
+    for tet, c in zip(tetrahedra, colors):
         # Generate all 4 facets (combinations of 3 vertices from 4)
         facets = list(combinations(tet, 3))
         for facet in facets:
             facet_positions = positions[list(facet)]
             poly = Poly3DCollection(
                 [facet_positions],
-                facecolor=color,
+                facecolor=c,
                 edgecolor=edgecolor,
                 alpha=alpha,
                 **kwargs
             )
             ax.add_collection3d(poly)
-    
+
     return fig, ax
 
 
@@ -1707,6 +1780,64 @@ def plot_matrix(
 
 
 # =============================================================================
+# Color utilities
+# =============================================================================
+
+def values_to_colors(
+    values: np.ndarray,
+    cmap: str = 'viridis',
+    vmin: Optional[float] = None,
+    vmax: Optional[float] = None,
+) -> Tuple[List, ScalarMappable]:
+    """
+    Map scalar values to RGBA colors via a matplotlib colormap.
+
+    Returns both the color list (for passing to plotting functions) and a
+    ScalarMappable (for creating colorbars via ``fig.colorbar()``).
+
+    Parameters
+    ----------
+    values : array-like
+        Scalar values to map. Shape (N,).
+    cmap : str, default='viridis'
+        Matplotlib colormap name.
+    vmin : float, optional
+        Lower bound for normalization. Defaults to min(values).
+    vmax : float, optional
+        Upper bound for normalization. Defaults to max(values).
+
+    Returns
+    -------
+    colors : list
+        List of RGBA tuples, one per value.
+    sm : ScalarMappable
+        A ScalarMappable with the same colormap and normalization.
+        Pass to ``fig.colorbar(sm, ax=ax)`` to add a colorbar.
+
+    Examples
+    --------
+    >>> colors, sm = values_to_colors(eigenvector[:, 0], cmap='RdBu_r')
+    >>> fig, ax = plot_triangles_2d(triangles, positions, color=colors)
+    >>> fig.colorbar(sm, ax=ax, label='Eigenfunction value')
+    """
+    values = np.asarray(values, dtype=float)
+
+    if vmin is None:
+        vmin = values.min()
+    if vmax is None:
+        vmax = values.max()
+
+    norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
+    cmap_obj = plt.get_cmap(cmap)
+
+    colors = [cmap_obj(norm(v)) for v in values]
+    sm = ScalarMappable(norm=norm, cmap=cmap_obj)
+    sm.set_array([])
+
+    return colors, sm
+
+
+# =============================================================================
 # Helper functions
 # =============================================================================
 
@@ -1731,3 +1862,35 @@ def _extend_list(lst: List, target_length: int, default_value) -> List:
     if len(lst) < target_length:
         return lst + [default_value] * (target_length - len(lst))
     return lst
+
+
+def _resolve_colors(color: Union[str, Sequence], n: int) -> List:
+    """
+    Resolve a single color or sequence of colors into a list of length n.
+
+    Parameters
+    ----------
+    color : str or sequence
+        Single color applied to all elements, or a sequence of per-element colors.
+    n : int
+        Expected number of colors.
+
+    Returns
+    -------
+    list
+        List of colors of length n.
+
+    Raises
+    ------
+    ValueError
+        If color is a sequence whose length does not match n.
+    """
+    if isinstance(color, str):
+        return [color] * n
+    colors = list(color)
+    if len(colors) != n:
+        raise ValueError(
+            f"color sequence length ({len(colors)}) must match "
+            f"expected count ({n})"
+        )
+    return colors

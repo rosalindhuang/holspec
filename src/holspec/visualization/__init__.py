@@ -32,6 +32,7 @@ __all__ = [
     'plot_tetrahedra_3d',
     'add_simplex_orientation_3d',
     'add_simplex_labels_3d',
+    'values_to_colors',
 
     # From framework_objects.py
     'plot_point_data',
