@@ -25,9 +25,11 @@ docs/literature/
 docs/**/*.pdf
 
 # Miscellaneous
-archive/
+*archive*
 *_2025-*
 *_2026-*
+
+*.code-workspace
 
 *AI_*
 *ai_*

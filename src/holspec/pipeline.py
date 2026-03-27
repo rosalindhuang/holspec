@@ -10,6 +10,7 @@ pipeline computations into callable functions.
 from __future__ import annotations
 
 from datetime import datetime
+from fnmatch import fnmatch
 from pathlib import Path
 import warnings
 
@@ -1804,6 +1805,119 @@ def load_spectra(
     hlsp.load_cache(filepath, group=group, validate_hash=validate_hash)
 
     return hlsp
+
+
+# =============================================================================
+# Pipeline Helpers
+# =============================================================================
+
+def select_stage_outputs(
+    stage_num: int,
+    project_root: str | Path,
+    select_categories: list[str] | None = None,
+    select_point_data: list[str] | None = None,
+    select_simplicial_complex: list[str] | None = None,
+    select_cochain_metric: list[str] | None = None,
+) -> dict[str, dict[str, Path]]:
+    """
+    Select pipeline stage output files by category and glob filters.
+
+    Scans the output directory for the given stage and returns file paths
+    matching the selection criteria. Supports stages 1--4.
+
+    Parameters
+    ----------
+    stage_num : int
+        Pipeline stage number (1--4).
+    project_root : str or Path
+        Project root directory.
+    select_categories : list of str, optional
+        Raw data category names to include (e.g. ``['lattice_2d', 'random']``).
+        Categories are derived from subdirectory names under ``data/raw/``.
+        If None or empty, all categories are included.
+    select_point_data : list of str, optional
+        Glob patterns for point data labels (e.g. ``['trilatthex*', 'randunif*']``).
+        If None or empty, all point data labels are included.
+    select_simplicial_complex : list of str, optional
+        Glob patterns for simplicial complex labels (e.g. ``['delaunay*']``).
+        Applies to stages 1--4. If None or empty, all are included.
+    select_cochain_metric : list of str, optional
+        Glob patterns for cochain metric labels (e.g. ``['combinatorial*']``).
+        Applies to stages 2--4 (ignored for stage 1). If None or empty, all
+        are included.
+
+    Returns
+    -------
+    dict[str, dict[str, Path]]
+        Nested dictionary ``{ptd_label: {output_label: filepath}}``, where
+        ``ptd_label`` is the point data subdirectory name and
+        ``output_label`` is the HDF5 file stem.
+    """
+    if stage_num not in PIPELINE_STAGE_NAMES or stage_num == 0:
+        raise ValueError(
+            f"stage_num must be 1--4, got {stage_num}"
+        )
+
+    project_root = Path(project_root)
+    stage_name = PIPELINE_STAGE_NAMES[stage_num]
+    output_data_dir = project_root / 'data' / 'interim' / stage_name
+    raw_data_dir = project_root / 'data' / 'raw'
+
+    # Build category mapping: point_data_label -> category
+    ptd_categories: dict[str, str] = {}
+    if select_categories:
+        for category_dir in sorted(raw_data_dir.iterdir()):
+            if not category_dir.is_dir():
+                continue
+            for raw_file in category_dir.glob('*.h5'):
+                ptd_categories[raw_file.stem] = category_dir.name
+
+    # Whether filenames have the {sc}__{cm} format (stage 2+)
+    has_metric_suffix = stage_num >= 2
+
+    filepaths: dict[str, dict[str, Path]] = {}
+
+    for ptd_subdir in sorted(output_data_dir.iterdir()):
+        if not ptd_subdir.is_dir():
+            continue
+        ptd_label = ptd_subdir.name
+
+        # Filter by category
+        if select_categories:
+            if ptd_categories.get(ptd_label) not in select_categories:
+                continue
+
+        # Filter by point data label
+        if select_point_data and not any(fnmatch(ptd_label, g) for g in select_point_data):
+            continue
+
+        # Collect matching output files
+        ptd_filepaths: dict[str, Path] = {}
+        for filepath in sorted(ptd_subdir.glob('*.h5')):
+            stem = filepath.stem
+
+            if has_metric_suffix:
+                parts = stem.split('__', 1)
+                sc_label = parts[0]
+                cm_label = parts[1] if len(parts) == 2 else ''
+            else:
+                sc_label = stem
+                cm_label = None
+
+            # Filter by simplicial complex label
+            if select_simplicial_complex and not any(fnmatch(sc_label, g) for g in select_simplicial_complex):
+                continue
+
+            # Filter by cochain metric label (stages 2+ only)
+            if has_metric_suffix and select_cochain_metric and not any(fnmatch(cm_label, g) for g in select_cochain_metric):
+                continue
+
+            ptd_filepaths[stem] = filepath
+
+        if ptd_filepaths:
+            filepaths[ptd_label] = ptd_filepaths
+
+    return filepaths
 
 
 def split_pipeline_config(
