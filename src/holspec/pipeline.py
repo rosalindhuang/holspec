@@ -1460,6 +1460,133 @@ def run_pipeline(
     return results
 
 
+def run_pipeline_stages(
+    config: dict,
+    project_root: str | Path,
+) -> dict[str, dict[str, dict[str, Path]]]:
+    """
+    Run the full pipeline stage-by-stage for all point data inputs.
+
+    Iterates over stages (outer loop) and processes all point data
+    inputs within each stage (inner loop handled by ``run_{stage}``).
+    Each stage completes for all inputs before the next stage begins.
+    Wires each stage's output filepaths into the next stage's input.
+
+    This is the stages-first complement to :func:`run_pipeline`, which
+    iterates files-first. Both produce identical results; the difference
+    is execution order and verbose output structure.
+
+    All intermediate results are written to disk by the ``run_{stage}``
+    functions. Assembled per-stage configs can optionally be saved as
+    YAML files for reproducibility.
+
+    Parameters
+    ----------
+    config : dict
+        Pipeline config dict with keys: ``summary``, ``inputs``,
+        ``stages``, ``runtime``, ``outputs``.
+    project_root : str or Path
+        Project root for resolving relative paths.
+
+    Returns
+    -------
+    dict[str, dict[str, dict[str, Path]]]
+        Nested mapping ``{stage_name: {ptd_label: {output_label: path}}}``
+        with absolute paths to all output files.
+
+    Raises
+    ------
+    ValueError
+        If the pipeline config is missing required stage entries or
+        ``configs_dir`` when ``save_stage_configs`` is enabled.
+    FileNotFoundError
+        If any point data input file does not exist.
+    """
+    project_root = Path(project_root)
+
+    # --- Extract settings ---
+
+    input_filepaths = convert_relative_to_paths(
+        config['inputs']['filepaths'], project_root,
+    )
+    verbose = config['runtime']['verbose']
+    save_stage_configs = config['runtime'].get('save_stage_configs', False)
+
+    # --- Validate inputs ---
+
+    # All four stages must be present in config
+    expected_stages = {PIPELINE_STAGE_NAMES[n] for n in (1, 2, 3, 4)}
+    provided_stages = set(config.get('stages', {}).keys())
+    missing_stages = expected_stages - provided_stages
+    if missing_stages:
+        raise ValueError(
+            f"Pipeline config 'stages' is missing entries: "
+            f"{sorted(missing_stages)}"
+        )
+
+    # All input files must exist
+    for ptd_label, ptd_filepath in input_filepaths.items():
+        if not ptd_filepath.exists():
+            raise FileNotFoundError(
+                f"Input file for '{ptd_label}' does not exist: "
+                f"{ptd_filepath}"
+            )
+
+    # configs_dir required when save_stage_configs is enabled
+    if save_stage_configs and 'configs_dir' not in config.get('outputs', {}):
+        raise ValueError(
+            "'outputs.configs_dir' must be specified when "
+            "'runtime.save_stage_configs' is true."
+        )
+
+    # --- Run pipeline stages-first ---
+
+    results: dict[str, dict[str, dict[str, Path]]] = {}
+    prev_output = input_filepaths
+
+    for stage_num in (1, 2, 3, 4):
+        stage_name = PIPELINE_STAGE_NAMES[stage_num]
+
+        if verbose:
+            print()
+            print(f"{'=' * 60}")
+            print(f"Stage {stage_num}: {stage_name}")
+            print(f"{'=' * 60}")
+            print()
+
+        # Assemble per-stage config for all inputs
+        stage_config = _assemble_stage_config(
+            config, stage_num, prev_output, project_root,
+        )
+
+        # Run the stage on all inputs at once
+        stage_output = PIPELINE_STAGE_FUNCTIONS[stage_num](
+            stage_config, project_root,
+        )
+
+        # Store results and wire output to next stage
+        results[stage_name] = stage_output
+        prev_output = stage_output
+
+    # --- Save assembled per-stage configs ---
+
+    if save_stage_configs:
+        _save_stage_configs(config, results, project_root)
+
+    # --- Completion ---
+
+    if verbose:
+        num_inputs = len(input_filepaths)
+        print(
+            f"Pipeline complete. Outputs saved for "
+            f"{len(PIPELINE_STAGE_FUNCTIONS)} stages, "
+            f"{num_inputs} point data input"
+            f"{'s' if num_inputs != 1 else ''}."
+        )
+
+    return results
+
+
 # =============================================================================
 # Pipeline Loading
 # =============================================================================
