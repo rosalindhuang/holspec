@@ -1463,6 +1463,8 @@ def run_pipeline(
 def run_pipeline_stages(
     config: dict,
     project_root: str | Path,
+    stage_nums: tuple[int, ...] = (1, 2, 3, 4),
+    input_filepaths: dict | None = None,
 ) -> dict[str, dict[str, dict[str, Path]]]:
     """
     Run the full pipeline stage-by-stage for all point data inputs.
@@ -1473,8 +1475,21 @@ def run_pipeline_stages(
     Wires each stage's output filepaths into the next stage's input.
 
     This is the stages-first complement to :func:`run_pipeline`, which
-    iterates files-first. Both produce identical results; the difference
-    is execution order and verbose output structure.
+    iterates files-first. Both produce identical results when run with
+    default arguments; the difference is execution order and verbose
+    output structure.
+
+    A subset of stages can be selected via ``stage_nums``. When the
+    first selected stage is not stage 1, ``input_filepaths`` must
+    supply the previous stage's output filepaths so the first selected
+    stage has inputs to consume. The return value contains results for
+    the selected stages only and can be chained across calls::
+
+        results_12 = run_pipeline_stages(cfg, root, stage_nums=(1, 2))
+        results_34 = run_pipeline_stages(
+            cfg, root, stage_nums=(3, 4),
+            input_filepaths=results_12['geometry_metric'],
+        )
 
     All intermediate results are written to disk by the ``run_{stage}``
     functions. Assembled per-stage configs can optionally be saved as
@@ -1487,35 +1502,56 @@ def run_pipeline_stages(
         ``stages``, ``runtime``, ``outputs``.
     project_root : str or Path
         Project root for resolving relative paths.
+    stage_nums : tuple of int, optional
+        Stage numbers to run, by default ``(1, 2, 3, 4)``.
+        Must be a subset of ``{1, 2, 3, 4}``.
+    input_filepaths : dict or None, optional
+        Input filepaths for the first selected stage. Required when
+        ``stage_nums`` does not start at 1. For stage 1, this should
+        be flat ``{ptd_label: path}``; for stages 2--4, nested
+        ``{ptd_label: {output_label: path}}``. Ignored (and
+        overridden by the pipeline config's input filepaths) when
+        the first selected stage is 1.
 
     Returns
     -------
     dict[str, dict[str, dict[str, Path]]]
         Nested mapping ``{stage_name: {ptd_label: {output_label: path}}}``
-        with absolute paths to all output files.
+        with absolute paths to all output files, for selected stages
+        only.
 
     Raises
     ------
     ValueError
-        If the pipeline config is missing required stage entries or
-        ``configs_dir`` when ``save_stage_configs`` is enabled.
+        If ``stage_nums`` contains invalid entries, if the pipeline
+        config is missing required stage entries, if ``input_filepaths``
+        is not provided when the first stage is not 1, or if
+        ``configs_dir`` is missing when ``save_stage_configs`` is
+        enabled.
     FileNotFoundError
-        If any point data input file does not exist.
+        If any point data input file does not exist (checked only
+        when starting from stage 1).
     """
     project_root = Path(project_root)
 
     # --- Extract settings ---
 
-    input_filepaths = convert_relative_to_paths(
-        config['inputs']['filepaths'], project_root,
-    )
     verbose = config['runtime']['verbose']
     save_stage_configs = config['runtime'].get('save_stage_configs', False)
 
-    # --- Validate inputs ---
+    # --- Validate stage_nums ---
 
-    # All four stages must be present in config
-    expected_stages = {PIPELINE_STAGE_NAMES[n] for n in (1, 2, 3, 4)}
+    valid_stage_nums = set(PIPELINE_STAGE_FUNCTIONS)
+    invalid_stage_nums = set(stage_nums) - valid_stage_nums
+    if invalid_stage_nums:
+        raise ValueError(
+            f"Invalid stage numbers: {sorted(invalid_stage_nums)}. "
+            f"Valid values are {sorted(valid_stage_nums)}."
+        )
+
+    # --- Validate stage configs ---
+
+    expected_stages = {PIPELINE_STAGE_NAMES[n] for n in stage_nums}
     provided_stages = set(config.get('stages', {}).keys())
     missing_stages = expected_stages - provided_stages
     if missing_stages:
@@ -1524,15 +1560,32 @@ def run_pipeline_stages(
             f"{sorted(missing_stages)}"
         )
 
-    # All input files must exist
-    for ptd_label, ptd_filepath in input_filepaths.items():
-        if not ptd_filepath.exists():
-            raise FileNotFoundError(
-                f"Input file for '{ptd_label}' does not exist: "
-                f"{ptd_filepath}"
-            )
+    # --- Resolve initial input filepaths ---
 
-    # configs_dir required when save_stage_configs is enabled
+    first_stage = stage_nums[0]
+
+    if first_stage == 1:
+        prev_output = convert_relative_to_paths(
+            config['inputs']['filepaths'], project_root,
+        )
+
+        # All input files must exist
+        for ptd_label, ptd_filepath in prev_output.items():
+            if not ptd_filepath.exists():
+                raise FileNotFoundError(
+                    f"Input file for '{ptd_label}' does not exist: "
+                    f"{ptd_filepath}"
+                )
+    else:
+        if input_filepaths is None:
+            raise ValueError(
+                f"'input_filepaths' is required when the first "
+                f"selected stage is not 1 (got stage_nums={stage_nums})."
+            )
+        prev_output = input_filepaths
+
+    # --- Validate save_stage_configs ---
+
     if save_stage_configs and 'configs_dir' not in config.get('outputs', {}):
         raise ValueError(
             "'outputs.configs_dir' must be specified when "
@@ -1542,9 +1595,8 @@ def run_pipeline_stages(
     # --- Run pipeline stages-first ---
 
     results: dict[str, dict[str, dict[str, Path]]] = {}
-    prev_output = input_filepaths
 
-    for stage_num in (1, 2, 3, 4):
+    for stage_num in stage_nums:
         stage_name = PIPELINE_STAGE_NAMES[stage_num]
 
         if verbose:
@@ -1576,12 +1628,10 @@ def run_pipeline_stages(
     # --- Completion ---
 
     if verbose:
-        num_inputs = len(input_filepaths)
         print(
             f"Pipeline complete. Outputs saved for "
-            f"{len(PIPELINE_STAGE_FUNCTIONS)} stages, "
-            f"{num_inputs} point data input"
-            f"{'s' if num_inputs != 1 else ''}."
+            f"{len(stage_nums)} stage"
+            f"{'s' if len(stage_nums) != 1 else ''}."
         )
 
     return results
