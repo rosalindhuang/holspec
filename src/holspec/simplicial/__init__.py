@@ -28,6 +28,7 @@ __all__ = [
     # simplicial_constructions.py
     'construct_delaunay_complex',
     'construct_alpha_complex',
+    'construct_del_vr_complex',
     'construct_vr_complex',
     'construct_complex_from_config',
     'create_simplicial_construction_label',

@@ -9,7 +9,7 @@ import numpy as np
 from scipy.spatial import Delaunay
 import gudhi
 
-from .simplex import compute_simplicial_closure
+from .simplex import compute_simplicial_closure, get_faces
 from holspec.point_data.validation import validate_positions, validate_distances
 from holspec.utilities import format_float_str
 
@@ -164,6 +164,124 @@ def construct_alpha_complex(
     )
     
     return simplices
+
+
+def construct_del_vr_complex(
+    positions: np.ndarray,
+    epsilon: float | None = None,
+    max_dim: int | None = None,
+) -> dict[int, list[tuple]]:
+    """
+    Construct VR-filtered Delaunay complex from point data.
+
+    The Del-VR complex is the subcomplex of the Delaunay triangulation
+    containing only simplices whose edges all have length at most epsilon.
+    Equivalently, it is the intersection of the Delaunay triangulation with
+    the Vietoris-Rips complex: Del_VR(epsilon) = Del(P) ∩ VR(epsilon).
+
+    Unlike the alpha complex (which filters by circumradius), this filters
+    by maximum edge length — the same criterion as Vietoris-Rips, but
+    restricted to Delaunay simplices.
+
+    Parameters
+    ----------
+    positions : np.ndarray, shape (N, d)
+        Point positions in d-dimensional Euclidean space.
+    epsilon : float
+        Maximum edge length threshold. A simplex is included if all its
+        edges have length at most epsilon. Must be non-negative.
+    max_dim : int, optional
+        Maximum simplex dimension to include. If None, includes all dimensions
+        up to the ambient dimension d.
+
+    Returns
+    -------
+    simplices : dict[int, list[tuple]]
+        Dictionary mapping dimension k to list of k-simplices as sorted tuples,
+        closed under taking faces, up to max_dim.
+
+    Raises
+    ------
+    ValueError
+        If positions array is malformed, insufficient points, epsilon is None,
+        or epsilon < 0.
+
+    Notes
+    -----
+    - Requires position data (not distances) since it builds on the Delaunay
+      triangulation, which needs ambient coordinates.
+    - Requires at least d+1 points in d dimensions for non-degenerate
+      triangulation.
+    - The filtration value of a simplex is its longest edge length.
+    - Face closure is automatically satisfied: if all edges of a simplex pass,
+      all edges of any face (a subset) also pass.
+    - Limiting behavior:
+        - epsilon = 0: only vertices (no edges have zero length unless points
+          coincide)
+        - epsilon -> infinity: recovers full Delaunay triangulation
+    - Vertices are indexed 0 to N-1 following the order in positions array.
+
+    Examples
+    --------
+    >>> positions = np.array([[0, 0], [1, 0], [0.5, 0.866]])
+    >>> simplices = construct_del_vr_complex(positions, epsilon=1.0)
+    >>> [len(s) for s in simplices.values()]
+    [3, 3, 1]
+    >>> simplices_small = construct_del_vr_complex(positions, epsilon=0.5)
+    >>> [len(s) for s in simplices_small.values()]
+    [3]
+    """
+    # Validate input positions
+    N, d = positions.shape
+    validate_positions(positions, min_points=d + 1)
+
+    # Validate epsilon parameter
+    if epsilon is None:
+        raise ValueError(
+            'epsilon is required. '
+            'Use construct_delaunay_complex for the unfiltered Delaunay triangulation.'
+        )
+    if epsilon < 0:
+        raise ValueError(f'epsilon must be non-negative, got {epsilon}')
+
+    # Compute full Delaunay triangulation with face closure
+    delaunay = Delaunay(positions)
+    top_simplices = {d: [tuple(sorted(row)) for row in delaunay.simplices]}
+    full_delaunay = compute_simplicial_closure(top_simplices)
+
+    # Extract all edges and compute lengths (vectorized)
+    edges = full_delaunay.get(1, [])
+    if edges:
+        src = np.array([e[0] for e in edges])
+        dst = np.array([e[1] for e in edges])
+        lengths = np.linalg.norm(positions[src] - positions[dst], axis=1)
+        passing_edges = {edges[i] for i in range(len(edges)) if lengths[i] <= epsilon}
+    else:
+        passing_edges = set()
+
+    # Filter every simplex at every dimension
+    filtered: dict[int, list[tuple]] = {}
+    for dim in sorted(full_delaunay.keys()):
+        if dim == 0:
+            # Vertices always included (vacuously true — no edges)
+            filtered[0] = full_delaunay[0]
+        elif dim == 1:
+            surviving = [e for e in full_delaunay[1] if e in passing_edges]
+            if surviving:
+                filtered[1] = surviving
+        else:
+            surviving = [
+                simplex for simplex in full_delaunay[dim]
+                if all(e in passing_edges for e in get_faces(simplex, 1))
+            ]
+            if surviving:
+                filtered[dim] = surviving
+
+    # Truncate to max_dim if specified
+    if max_dim is not None:
+        filtered = {k: simps for k, simps in filtered.items() if k <= max_dim}
+
+    return filtered
 
 
 def construct_vr_complex(
@@ -339,6 +457,7 @@ def _extract_simplices_from_gudhi_tree(
 SIMPLICIAL_CONSTRUCTION_REGISTRY: dict[str, callable] = {
     'delaunay': construct_delaunay_complex,
     'alpha': construct_alpha_complex,
+    'del_vr': construct_del_vr_complex,
     'vietoris_rips': construct_vr_complex,
 }
 
@@ -346,6 +465,7 @@ SIMPLICIAL_CONSTRUCTION_REGISTRY: dict[str, callable] = {
 SIMPLICIAL_CONSTRUCTION_ALIASES: dict[str, list[str]] = {
     'delaunay': ['del'],
     'alpha': ['alp'],
+    'del_vr': ['dvr'],
     'vietoris_rips': ['vr', 'rips'],
 }
 
