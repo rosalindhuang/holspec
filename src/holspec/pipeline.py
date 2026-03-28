@@ -1811,6 +1811,60 @@ def load_spectra(
 # Pipeline Helpers
 # =============================================================================
 
+def select_pipeline_inputs(
+    project_root: str | Path,
+    select_categories: list[str] | None = None,
+    select_point_data: list[str] | None = None,
+) -> dict[str, Path]:
+    """
+    Select raw point data files by category and glob filters.
+
+    Scans the raw data directory (``data/raw/``) for HDF5 files matching
+    the selection criteria. This is the entry point data for the pipeline
+    (stage 0 outputs / stage 1 inputs).
+
+    Parameters
+    ----------
+    project_root : str or Path
+        Project root directory.
+    select_categories : list of str, optional
+        Raw data category names to include (e.g. ``['lattice_2d', 'random']``).
+        Categories correspond to subdirectory names under ``data/raw/``.
+        If None or empty, all categories are included.
+    select_point_data : list of str, optional
+        Glob patterns for point data labels (e.g. ``['trilatthex*', 'randunif*']``).
+        If None or empty, all point data labels are included.
+
+    Returns
+    -------
+    dict[str, Path]
+        Dictionary ``{ptd_label: filepath}`` mapping point data labels
+        (file stems) to their absolute file paths.
+    """
+    raw_data_dir = Path(project_root) / 'data' / 'raw'
+
+    filepaths: dict[str, Path] = {}
+
+    for category_dir in sorted(raw_data_dir.iterdir()):
+        if not category_dir.is_dir():
+            continue
+
+        # Filter by category
+        if select_categories and category_dir.name not in select_categories:
+            continue
+
+        for filepath in sorted(category_dir.glob('*.h5')):
+            ptd_label = filepath.stem
+
+            # Filter by point data label
+            if select_point_data and not any(fnmatch(ptd_label, g) for g in select_point_data):
+                continue
+
+            filepaths[ptd_label] = filepath
+
+    return filepaths
+
+
 def select_stage_outputs(
     stage_num: int,
     project_root: str | Path,
