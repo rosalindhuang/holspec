@@ -22,6 +22,7 @@ outputs/*
 !outputs/.gitkeep
 
 docs/literature/
+docs/notes/
 docs/**/*.pdf
 
 # Miscellaneous
