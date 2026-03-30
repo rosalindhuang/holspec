@@ -330,7 +330,8 @@ class HodgeLaplacianSpectra:
         Format
         ------
         - Root attributes: max_dim, content_hash, hl_content_hash, solver,
-          compute_eigenvectors, cached_keys, metadata.
+          solver_params (when non-None), compute_eigenvectors, cached_keys,
+          metadata.
         - degree_{k}/component_{comp}/: subgroups for each cached
           spectrum, containing eigenvalues dataset, dimension and
           num_eigenvalues attributes, and optionally eigenvectors
@@ -508,7 +509,7 @@ class HodgeLaplacianSpectra:
 
         Shows per-degree information including cochain space dimensions
         and which component spectra are cached, along with key
-        observables (dim_ker, lambda_min, lambda_max) for cached entries.
+        observables (dim_ker, eigval_min_nz, eigval_max) for cached entries.
 
         Parameters
         ----------

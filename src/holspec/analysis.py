@@ -11,6 +11,7 @@ from __future__ import annotations
 import warnings
 from datetime import datetime
 from pathlib import Path
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -30,11 +31,14 @@ if TYPE_CHECKING:
 # Default set of scalar observables computed eagerly by EnsembleSpectraAnalysis
 STANDARD_OBSERVABLES = (
     'dim_ker',
-    'spectral_gap',
-    'lambda_max',
+    'eigval_min_nz',
+    'eigval_max',
+    'eigval_mean',
+    'eigval_mean_nz',
+    'eigval_var',
+    'eigval_var_nz',
+    'eigval_sum',
     'num_nonzero',
-    'mean_eigenvalue',
-    'trace',
 )
 
 _HISTOGRAM_DEFAULTS = {
@@ -195,8 +199,9 @@ class EnsembleSpectraAnalysis:
     Analysis of spectra across ensemble members from a single pipeline output.
 
     Wraps a collection of Spectrum objects organized by (k, component) pairs,
-    eagerly computes scalar observables (moments, kernel dimension, spectral
-    gap, etc.), and provides lazy-cached eigenvalue distribution estimation.
+    eagerly computes scalar observables (eigenvalue statistics, kernel
+    dimension, etc.), and provides lazy-cached eigenvalue distribution
+    estimation. Custom observables can be added via compute_member_observable.
 
     Parameters
     ----------
@@ -211,7 +216,7 @@ class EnsembleSpectraAnalysis:
     - Scalar observables in STANDARD_OBSERVABLES are computed eagerly at
       construction for all (k, component) pairs.
     - Eigenvalue distributions are computed lazily via
-      eigenvalue_distribution() and cached per (k, component).
+      eigenvalue_distribution() and cached per (k, component, nonzero).
     - The primary factory from_file() reads eigenvalues directly from
       pipeline HDF5 files without reconstructing upstream objects.
     """
@@ -277,8 +282,12 @@ class EnsembleSpectraAnalysis:
         self._observables_cache: dict[tuple[int, str], dict[str, np.ndarray]] = {}
         self._compute_all_observables()
 
-        # Lazy distribution cache
-        self._distribution_cache: dict[tuple[int, str], dict] = {}
+        # Distribution cache stores one active result per
+        # (k, component, nonzero). method and method_params are recorded
+        # in the cached payload but are not part of the cache key, so
+        # later calls with different settings replace the previous entry
+        # for that key.
+        self._distribution_cache: dict[tuple[int, str, bool], dict] = {}
 
     # =========================================================================
     # Factory Methods
@@ -542,8 +551,10 @@ class EnsembleSpectraAnalysis:
         Returns
         -------
         dict
-            {name: array of shape (num_members,)} for all standard
-            observables.
+            {name: array of shape (num_members,)} for all currently cached
+            observables at this (k, component) pair, including the standard
+            eager observables and any custom observables added via
+            ``compute_member_observable(..., cache_name=...)``.
         """
         self._validate_key(k, component)
         return self._observables_cache[(k, component)]
@@ -597,6 +608,51 @@ class EnsembleSpectraAnalysis:
 
         return summary
 
+    def compute_member_observable(
+        self,
+        k: int,
+        component: str = 'full',
+        *,
+        func: Callable[[Spectrum], float],
+        cache_name: str | None = None,
+    ) -> np.ndarray:
+        """
+        Compute a custom per-member observable from a function on Spectrum.
+
+        Parameters
+        ----------
+        k : int
+            Degree.
+        component : str, default='full'
+            Laplacian component.
+        func : callable (keyword-only)
+            Function mapping a Spectrum to a float.
+        cache_name : str, optional (keyword-only)
+            If provided, store the result in the observables cache under
+            this name. Raises ValueError if the name already exists.
+
+        Returns
+        -------
+        ndarray, shape (num_members,)
+        """
+        self._validate_key(k, component)
+
+        spectra_list = self._member_spectra[(k, component)]
+        result = np.array(
+            [func(spc) for spc in spectra_list], dtype=np.float64,
+        )
+
+        if cache_name is not None:
+            obs = self._observables_cache[(k, component)]
+            if cache_name in obs:
+                raise ValueError(
+                    f"Observable '{cache_name}' already exists for "
+                    f"(k={k}, component='{component}')."
+                )
+            obs[cache_name] = result
+
+        return result
+
     # =========================================================================
     # Distribution Methods
     # =========================================================================
@@ -633,6 +689,21 @@ class EnsembleSpectraAnalysis:
         dict
             Keys: 'x', 'density_mean', 'density_std', 'method',
             'method_params', 'num_members'.
+
+        Notes
+        -----
+        - Distribution cache semantics: cached distributions are keyed
+          only by (k, component, nonzero), not by method or
+          method_params.
+        - Accordingly, the cache stores at most one "active"
+          distribution for a given spectrum selection. A later call with
+          different distribution settings for the same
+          (k, component, nonzero) recomputes the result and replaces the
+          cached entry.
+        - This is intentional for the current workflow, where
+          zero-inclusive versus nonzero-only distributions may need to
+          coexist, but multiple histogram/KDE parameter variants for the
+          same selection are not yet cached simultaneously.
         """
         self._validate_key(k, component)
 
@@ -754,7 +825,11 @@ class EnsembleSpectraAnalysis:
             'degrees': self._degrees,
             'components': list(self._components),
             'max_dim': self._max_dim,
-            'observable_names': list(STANDARD_OBSERVABLES),
+            'observable_names': sorted({
+                name
+                for obs_dict in self._observables_cache.values()
+                for name in obs_dict
+            }),
             'metadata': self.metadata,
         }
         save_h5(
@@ -907,16 +982,16 @@ class EnsembleSpectraAnalysis:
         """
         lines = []
         lines.append('Ensemble Spectra Analysis:')
-        lines.append('-' * 60)
+        lines.append('-' * 80)
         lines.append(
             f"num_members: {self._num_members}, "
             f"degrees: {self._degrees}, "
             f"components: {self._components}"
         )
-        lines.append('-' * 60)
+        lines.append('-' * 80)
 
-        # Header row — show dim_ker, spectral_gap, lambda_max
-        display_obs = ('dim_ker', 'spectral_gap', 'lambda_max')
+        # Header row — show a compact subset of observables
+        display_obs = ('dim_ker', 'eigval_min_nz', 'eigval_max', 'eigval_mean_nz')
         multi_comp = len(self._components) > 1
         if multi_comp:
             header = f"{'k':<4} {'comp':<8} {'N_k':<6} "
@@ -932,7 +1007,7 @@ class EnsembleSpectraAnalysis:
             lines.append(f"{'':4} {'':6} " + '  '.join(
                 f'{"(mean +/- std)":<16}' for _ in display_obs
             ))
-        lines.append('-' * 60)
+        lines.append('-' * 80)
 
         for k in self._degrees:
             N_k = self._dimensions.get(k, 0)
@@ -967,7 +1042,7 @@ class EnsembleSpectraAnalysis:
                         + '  '.join(f'{p:<16}' for p in parts)
                     )
 
-        lines.append('-' * 60)
+        lines.append('-' * 80)
         lines.append('')
 
         return '\n'.join(indent + line for line in lines)
@@ -1010,38 +1085,44 @@ class EnsembleSpectraAnalysis:
         Returns
         -------
         dict
-            {name: array of shape (num_members,)}.
+            {name: array of shape (num_members,)} for each name in
+            STANDARD_OBSERVABLES.
         """
         spectra_list = self._member_spectra[(k, component)]
         n = self._num_members
 
-        results: dict[str, np.ndarray] = {}
-
         dim_ker = np.empty(n, dtype=np.float64)
-        spectral_gap = np.empty(n, dtype=np.float64)
-        lambda_max = np.empty(n, dtype=np.float64)
+        eigval_min_nz = np.empty(n, dtype=np.float64)
+        eigval_max = np.empty(n, dtype=np.float64)
+        eigval_mean = np.empty(n, dtype=np.float64)
+        eigval_mean_nz = np.empty(n, dtype=np.float64)
+        eigval_var = np.empty(n, dtype=np.float64)
+        eigval_var_nz = np.empty(n, dtype=np.float64)
+        eigval_sum = np.empty(n, dtype=np.float64)
         num_nonzero = np.empty(n, dtype=np.float64)
-        mean_eigenvalue = np.empty(n, dtype=np.float64)
-        trace = np.empty(n, dtype=np.float64)
 
         for i, spc in enumerate(spectra_list):
-            dim_ker[i] = spc.dim_ker()
-
-            nz = spc.nonzero_eigenvalues()
-            spectral_gap[i] = nz[0] if len(nz) > 0 else np.nan
-
             evals = spc.eigenvalues
-            lambda_max[i] = evals[-1] if len(evals) > 0 else np.nan
+            nz = spc.nonzero_eigenvalues()
 
+            dim_ker[i] = spc.dim_ker()
+            eigval_min_nz[i] = nz[0] if len(nz) > 0 else np.nan
+            eigval_max[i] = evals[-1] if len(evals) > 0 else np.nan
+            eigval_mean[i] = spc.moment(1, normalized=True, nonzero=False) if len(evals) > 0 else np.nan
+            eigval_mean_nz[i] = spc.moment(1, normalized=True, nonzero=True) if len(nz) > 0 else np.nan
+            eigval_var[i] = float(np.var(evals)) if len(evals) > 0 else np.nan
+            eigval_var_nz[i] = float(np.var(nz)) if len(nz) > 0 else np.nan
+            eigval_sum[i] = spc.moment(1, normalized=False, nonzero=False)
             num_nonzero[i] = len(nz)
-            mean_eigenvalue[i] = spc.moment(1, normalized=True, nonzero=False)
-            trace[i] = spc.moment(1, normalized=False, nonzero=False)
 
-        results['dim_ker'] = dim_ker
-        results['spectral_gap'] = spectral_gap
-        results['lambda_max'] = lambda_max
-        results['num_nonzero'] = num_nonzero
-        results['mean_eigenvalue'] = mean_eigenvalue
-        results['trace'] = trace
-
-        return results
+        return {
+            'dim_ker': dim_ker,
+            'eigval_min_nz': eigval_min_nz,
+            'eigval_max': eigval_max,
+            'eigval_mean': eigval_mean,
+            'eigval_mean_nz': eigval_mean_nz,
+            'eigval_var': eigval_var,
+            'eigval_var_nz': eigval_var_nz,
+            'eigval_sum': eigval_sum,
+            'num_nonzero': num_nonzero,
+        }
