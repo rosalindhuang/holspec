@@ -1003,6 +1003,7 @@ def run_spectra(
 
     compute_spectra = config['configs'].get('compute_spectra', True)
     solver = config['configs']['solver']
+    solver_params = config['configs'].get('solver_params', None)
     compute_eigenvectors = config['configs']['compute_eigenvectors']
     error_handling = config['runtime'].get('error_handling', 'skip')
     output_retention = config['runtime'].get('output_retention', 'partial')
@@ -1046,6 +1047,7 @@ def run_spectra(
                 project_root, stage_name,
                 {'compute_spectra': compute_spectra,
                  'solver': solver,
+                 'solver_params': solver_params,
                  'compute_eigenvectors': compute_eigenvectors},
             )
 
@@ -1071,6 +1073,7 @@ def run_spectra(
                     hlsp = HodgeLaplacianSpectra(
                         hl,
                         solver=solver,
+                        solver_params=solver_params,
                         compute_eigenvectors=compute_eigenvectors,
                     )
 
@@ -1125,6 +1128,8 @@ def run_spectra(
                 print(f"  {hlsp}")
                 print(f"  compute_spectra: {compute_spectra}")
                 print(f"  solver: {solver}")
+                if solver_params:
+                    print(f"  solver_params: {solver_params}")
                 print(f"  compute_eigenvectors: {compute_eigenvectors}")
                 print(f"  hodge laplacian spectra:")
                 for k in hlsp.degrees:
@@ -1786,6 +1791,7 @@ def load_spectra(
     # Read group-level attributes for constructor params
     _, group_attributes = read_h5(filepath, group=group, dataset_names=[])
     solver = str(group_attributes.get('solver', 'dense'))
+    solver_params = group_attributes.get('solver_params', None)
     raw_eigvec = group_attributes.get('compute_eigenvectors', False)
     if isinstance(raw_eigvec, (bool, np.bool_)):
         compute_eigenvectors = bool(raw_eigvec)
@@ -1799,6 +1805,7 @@ def load_spectra(
     hlsp = HodgeLaplacianSpectra(
         hl,
         solver=solver,
+        solver_params=solver_params,
         compute_eigenvectors=compute_eigenvectors,
         metadata=metadata,
     )

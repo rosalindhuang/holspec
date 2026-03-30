@@ -9,6 +9,7 @@ redundant computation.
 from __future__ import annotations
 
 import hashlib
+import json
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -19,7 +20,7 @@ from holspec.utilities import save_h5, read_h5, join_h5_group
 from holspec.hodge_laplacian.base import LAPLACIAN_COMPONENT_NAMES
 
 from .spectrum import Spectrum
-from .eigensolvers import compute_eigendecomposition, VALID_SOLVER_NAMES
+from .eigensolvers import compute_eigendecomposition, VALID_SOLVER_NAMES, validate_solver_params
 from .validation import ZERO_EIGENVALUE_TOL
 
 if TYPE_CHECKING:
@@ -49,8 +50,14 @@ class HodgeLaplacianSpectra:
     hl : HodgeLaplacian
         Source Hodge Laplacian defining the operators to decompose.
     solver : {'dense', 'sparse'}, default='dense'
-        Eigensolver backend. 'sparse' is accepted at construction but
-        raises NotImplementedError when computation is attempted.
+        Eigensolver backend. 'dense' computes the full spectrum via
+        numpy.linalg.eigh. 'sparse' computes a subset of eigenvalues
+        via scipy.sparse.linalg.eigsh, controlled by solver_params.
+    solver_params : dict, optional
+        Parameters for the sparse eigensolver. Required when
+        solver='sparse', ignored (normalized to None) when
+        solver='dense'. See ``validate_solver_params`` for supported
+        keys: 'num_eigenvalues' (required), 'which', 'sigma'.
     compute_eigenvectors : bool or list of (int, str) tuples, default=False
         Controls which eigenvectors are computed. True computes eigenvectors
         for all (k, component) pairs. False computes none. A list of
@@ -61,15 +68,15 @@ class HodgeLaplacianSpectra:
 
     Notes
     -----
-    - Validates the solver string at construction. No spectra are
-      computed until requested.
+    - Validates the solver string and solver_params at construction.
+      No spectra are computed until requested.
     - Lazy computation piggybacks on upstream caching: hl.to_matrix(k)
       and hl.cm[k] are themselves lazy and cached.
-    - Content hash is derived from hl.content_hash alone, not from
-      solver or compute_eigenvectors. These affect computation strategy
-      and data storage, not the mathematical content. When sparse solver
-      support is added, solver parameters affecting which eigenvalues
-      are computed will need to be incorporated.
+    - Content hash is derived from hl.content_hash and solver_params
+      (when non-empty). solver and compute_eigenvectors do not affect
+      the hash because they control computation strategy, not
+      mathematical content. solver_params affects the hash because it
+      determines which eigenvalues are computed (partial spectra).
     - Persistence follows the derived-quantity pattern: save() writes
       the cache; load_cache() populates the cache of an existing
       instance. No standalone load() classmethod exists. Chain-loading is
@@ -84,6 +91,7 @@ class HodgeLaplacianSpectra:
         self,
         hl: HodgeLaplacian,
         solver: str = 'dense',
+        solver_params: dict | None = None,
         compute_eigenvectors: bool | list = False,
         metadata: dict | None = None,
     ):
@@ -93,6 +101,12 @@ class HodgeLaplacianSpectra:
                 f"Unknown solver '{solver}'. "
                 f"Valid solvers: {VALID_SOLVER_NAMES}."
             )
+
+        # Normalize and validate solver_params
+        if solver == 'dense':
+            self._solver_params = None
+        else:
+            self._solver_params = validate_solver_params(solver_params)
 
         self._hl = hl
         self._solver = solver
@@ -172,6 +186,11 @@ class HodgeLaplacianSpectra:
         return self._solver
 
     @property
+    def solver_params(self) -> dict | None:
+        """Sparse solver parameters, or None for dense solver."""
+        return self._solver_params
+
+    @property
     def compute_eigenvectors(self) -> bool | list:
         """
         Controls which eigenvectors are computed.
@@ -184,10 +203,13 @@ class HodgeLaplacianSpectra:
     @property
     def content_hash(self) -> str:
         """
-        SHA-256 hash derived from the HodgeLaplacian content hash.
+        SHA-256 hash derived from the HodgeLaplacian content hash and
+        solver parameters.
 
-        Computed lazily and cached. Uniquely identifies the spectra since
-        they are a deterministic function of the Hodge Laplacian inputs.
+        Computed lazily and cached. For the dense solver (solver_params
+        is None), the hash depends only on the HodgeLaplacian, preserving
+        backward compatibility. For the sparse solver, solver_params is
+        incorporated because it determines which eigenvalues are computed.
         """
         if self._hash_cache is None:
             self._hash_cache = self._compute_content_hash()
@@ -239,8 +261,9 @@ class HodgeLaplacianSpectra:
 
         Returns
         -------
-        ndarray, shape (N_k,)
-            Eigenvalues sorted ascending, non-negative.
+        ndarray, shape (num_eigenvalues,)
+            Eigenvalues sorted ascending, non-negative. num_eigenvalues
+            equals N_k when the spectrum is complete.
         """
         return self.spectrum(k, component).eigenvalues
 
@@ -260,8 +283,9 @@ class HodgeLaplacianSpectra:
         Returns
         -------
         ndarray or None
-            Eigenvector matrix of shape (N_k, N_k), or None if
-            compute_eigenvectors is False.
+            Eigenvector matrix of shape (N_k, num_eigenvalues), or None
+            if compute_eigenvectors is False. num_eigenvalues equals N_k
+            when the spectrum is complete.
         """
         return self.spectrum(k, component).eigenvectors
 
@@ -331,6 +355,8 @@ class HodgeLaplacianSpectra:
             'cached_keys': cached_keys,
             'metadata': self.metadata,
         }
+        if self._solver_params is not None:
+            root_attributes['solver_params'] = self._solver_params
         save_h5(
             filepath,
             datasets=None,
@@ -467,10 +493,11 @@ class HodgeLaplacianSpectra:
     def __repr__(self) -> str:
         n_cached = len(self._spectrum_cache)
         sizes = list(self.dimensions.values())
+        params_str = f", solver_params={self._solver_params}" if self._solver_params else ""
         return (
             f"HodgeLaplacianSpectra(max_dim={self.max_dim}, "
             f"dimensions={sizes}, "
-            f"solver='{self._solver}', "
+            f"solver='{self._solver}'{params_str}, "
             f"cached={n_cached}, "
             f"hash={self.content_hash[:8]})"
         )
@@ -522,10 +549,11 @@ class HodgeLaplacianSpectra:
             )
 
         lines.append('-' * 60)
-        lines.append(
-            f"solver: {self._solver}, "
-            f"eigenvectors: {self._compute_eigenvectors}"
-        )
+        parts = [f"solver: {self._solver}"]
+        if self._solver_params:
+            parts.append(f"solver_params: {self._solver_params}")
+        parts.append(f"eigenvectors: {self._compute_eigenvectors}")
+        lines.append(', '.join(parts))
         lines.append(f"content_hash: {self.content_hash[:16]}")
         lines.append('')
 
@@ -560,6 +588,7 @@ class HodgeLaplacianSpectra:
         eigenvalues, eigenvectors = compute_eigendecomposition(
             L, G_k,
             solver=self._solver,
+            solver_params=self._solver_params,
             compute_eigenvectors=((k, component) in self._eigenvector_keys),
         )
 
@@ -569,7 +598,9 @@ class HodgeLaplacianSpectra:
         )
 
     def _compute_content_hash(self) -> str:
-        """Compute SHA-256 hash from the HodgeLaplacian content hash."""
+        """Compute SHA-256 hash from the HodgeLaplacian content hash and solver params."""
         hasher = hashlib.sha256()
         hasher.update(self._hl.content_hash.encode('utf-8'))
+        if self._solver_params:
+            hasher.update(json.dumps(self._solver_params, sort_keys=True).encode('utf-8'))
         return hasher.hexdigest()

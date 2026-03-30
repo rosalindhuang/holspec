@@ -8,5 +8,5 @@ utilities.
 
 from .base import HodgeLaplacianSpectra
 from .spectrum import Spectrum
-from .eigensolvers import compute_eigendecomposition, VALID_SOLVER_NAMES
+from .eigensolvers import compute_eigendecomposition, validate_solver_params, VALID_SOLVER_NAMES
 from .validation import validate_spectrum, ZERO_EIGENVALUE_TOL
