@@ -14,6 +14,7 @@ from .base import PointData
 from .ensemble import PointDataEnsemble
 from .point_generators import *
 from .data_loaders import *
+from .data_generation import make_ensemble_config, create_ensemble_label, run_data_generation
 from .validation import validate_positions, validate_distances
 
 
@@ -40,7 +41,12 @@ __all__ = [
 
     'POINT_GENERATOR_REGISTRY',
     'generate_points_from_config',
-    'create_point_generator_label'
+    'create_point_generator_label',
+
+    # data_generation.py
+    'make_ensemble_config',
+    'create_ensemble_label',
+    'run_data_generation',
 
     # loaders.py
     # TODO: Add loader functions to __all__ when implemented
