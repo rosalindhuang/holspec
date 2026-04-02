@@ -38,3 +38,6 @@ docs/**/*.pdf
 *copilot*
 *chatgpt*
 *obsidian*
+
+# Temp scripts
+.tmp/

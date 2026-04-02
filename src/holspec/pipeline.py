@@ -92,6 +92,10 @@ def trace_provenance(
     filepath = Path(filepath)
     project_root = Path(project_root)
 
+    # Resolve relative paths against project_root, not cwd
+    if not filepath.is_absolute():
+        filepath = project_root / filepath
+
     provenance_chain: dict[str, Path] = {}
     current_filepath = filepath
 
@@ -1924,14 +1928,15 @@ def select_stage_outputs(
     output_data_dir = project_root / 'data' / 'interim' / stage_name
     raw_data_dir = project_root / 'data' / 'raw'
 
-    # Build category mapping: point_data_label -> category
-    ptd_categories: dict[str, str] = {}
+    # Build category mapping: point_data_label -> set of categories
+    # (a label can appear in multiple raw categories)
+    ptd_categories: dict[str, set[str]] = {}
     if select_categories:
         for category_dir in sorted(raw_data_dir.iterdir()):
             if not category_dir.is_dir():
                 continue
             for raw_file in category_dir.glob('*.h5'):
-                ptd_categories[raw_file.stem] = category_dir.name
+                ptd_categories.setdefault(raw_file.stem, set()).add(category_dir.name)
 
     # Whether filenames have the {sc}__{cm} format (stage 2+)
     has_metric_suffix = stage_num >= 2
@@ -1945,7 +1950,7 @@ def select_stage_outputs(
 
         # Filter by category
         if select_categories:
-            if ptd_categories.get(ptd_label) not in select_categories:
+            if not ptd_categories.get(ptd_label, set()) & set(select_categories):
                 continue
 
         # Filter by point data label
