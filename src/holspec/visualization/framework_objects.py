@@ -264,15 +264,15 @@ def plot_simplicial_complex_2d(
     # Plot simplices (triangles -> edges -> vertices for proper layering)
     if 2 in simplices and simplices[2]:
         kw = {**kwargs, **dim_kwargs.get(2, {})}
-        fig, ax = plot_triangles_2d(simplices[2], positions, color=color_map[2], ax=ax, zorder=1, **kw)
+        fig, ax = plot_triangles_2d(simplices[2], positions, color=color_map[2], ax=ax, zorder=10, **kw)
     
     if 1 in simplices and simplices[1]:
         kw = {**kwargs, **dim_kwargs.get(1, {})}
-        fig, ax = plot_edges_2d(simplices[1], positions, color=color_map[1], ax=ax, zorder=2, **kw)
+        fig, ax = plot_edges_2d(simplices[1], positions, color=color_map[1], ax=ax, zorder=20, **kw)
     
     if 0 in simplices and simplices[0]:
         kw = {**kwargs, **dim_kwargs.get(0, {})}
-        fig, ax = plot_vertices_2d(simplices[0], positions, color=color_map[0], ax=ax, zorder=3, **kw)
+        fig, ax = plot_vertices_2d(simplices[0], positions, color=color_map[0], ax=ax, zorder=30, **kw)
     
     # Add labels if requested
     if show_labels:
