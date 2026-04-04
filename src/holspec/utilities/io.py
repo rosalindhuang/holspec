@@ -369,41 +369,61 @@ def repack_h5(
         raise
 
 
+def _is_h5py_native_list(lst):
+    """Check if a converted list can be stored as a native h5py array attribute.
+
+    Returns True for flat lists where all elements share a single primitive
+    type (int, float, str, or bool).  Empty lists are considered native.
+    """
+    if not lst:
+        return True
+    types = {type(x) for x in lst}
+    return len(types) == 1 and types.issubset({int, float, str, bool})
+
+
 def to_h5_attribute(obj):
     """
     Convert object to HDF5-compatible attribute type.
-    
+
     HDF5 attributes have limitations compared to datasets. This function handles
     conversion of Python/numpy types to HDF5-storable attributes.
-    
+
     Parameters
     ----------
     obj : any
         Object to convert.
-    
+
     Returns
     -------
     serializable
-        HDF5-compatible representation. Dicts become JSON strings, numpy types
-        become native Python types.
-    
+        HDF5-compatible representation. Dicts, None, and mixed-type or nested
+        lists become JSON strings. Numpy types become native Python types.
+        Homogeneous numeric or string lists are kept as native lists.
+
     Raises
     ------
     TypeError
         If object type is not supported.
-    
+
     Notes
     -----
+    - None is serialized to the JSON string ``'null'``
     - Dicts are serialized to JSON strings (can be parsed back with json.loads)
+    - Lists/tuples of a single primitive type (int, float, str, bool) are stored
+      natively as h5py array attributes
+    - Lists/tuples with mixed types, nested structures, or None elements are
+      serialized to JSON strings
     - Numpy types are converted to native Python types
-    - Lists/tuples are recursively processed
-    - On read, json.loads() is automatically applied to string attributes in read_h5()
-    
+    - On read, json.loads() is automatically applied to string attributes in
+      read_h5(), so all JSON-serialized values round-trip transparently
+
     See Also
     --------
     convert_numpy_to_python : Recursively converts numpy types without JSON serialization
     """
-    if isinstance(obj, dict): # Dicts must be serialized as JSON strings for HDF5
+    if obj is None:
+        return json.dumps(None)
+    if isinstance(obj, dict):
         return json.dumps(convert_numpy_to_python(obj))
     elif isinstance(obj, np.ndarray):
         return obj.tolist()
@@ -411,14 +431,17 @@ def to_h5_attribute(obj):
         return obj.item()
     elif isinstance(obj, np.bool_):
         return bool(obj)
-    elif isinstance(obj, (str, int, float, bool, type(None))):
+    elif isinstance(obj, (str, int, float, bool)):
         return obj
     elif isinstance(obj, (list, tuple)):
-        return [to_h5_attribute(item) for item in obj]
+        converted = convert_numpy_to_python(list(obj))
+        if _is_h5py_native_list(converted):
+            return converted
+        return json.dumps(converted)
     else:
         raise TypeError(
             f"{type(obj).__name__} not supported for HDF5 attributes. "
-            f"Supported types: str, int, float, bool, list, dict (as JSON), numpy types."
+            f"Supported types: str, int, float, bool, None, list, dict (as JSON), numpy types."
         )
 
 
