@@ -921,6 +921,11 @@ class EnsembleSpectraAnalysis:
                 f"live {list(self._components)}."
             )
 
+        # Restore metadata
+        stored_metadata = root_attrs.get('metadata')
+        if isinstance(stored_metadata, dict):
+            self.metadata.update(stored_metadata)
+
         # Load observables
         for k in self._degrees:
             for comp in self._components:
