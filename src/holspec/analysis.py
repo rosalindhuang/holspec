@@ -283,10 +283,9 @@ class EnsembleSpectraAnalysis:
         self._compute_all_observables()
 
         # Distribution cache stores one active result per
-        # (k, component, nonzero). method and method_params are recorded
-        # in the cached payload but are not part of the cache key, so
-        # later calls with different settings replace the previous entry
-        # for that key.
+        # (k, component, nonzero). Returns cached on hit when
+        # method_params is None; recomputes when explicit params
+        # are provided.
         self._distribution_cache: dict[tuple[int, str, bool], dict] = {}
 
     # =========================================================================
@@ -692,20 +691,22 @@ class EnsembleSpectraAnalysis:
 
         Notes
         -----
-        - Distribution cache semantics: cached distributions are keyed
-          only by (k, component, nonzero), not by method or
-          method_params.
-        - Accordingly, the cache stores at most one "active"
-          distribution for a given spectrum selection. A later call with
-          different distribution settings for the same
-          (k, component, nonzero) recomputes the result and replaces the
-          cached entry.
-        - This is intentional for the current workflow, where
-          zero-inclusive versus nonzero-only distributions may need to
-          coexist, but multiple histogram/KDE parameter variants for the
-          same selection are not yet cached simultaneously.
+        - Cache semantics: cached distributions are keyed by
+          (k, component, nonzero). When ``method_params`` is None,
+          a cached result is returned if one exists and its method
+          matches. When ``method_params`` is explicitly provided,
+          the distribution is recomputed and the cache entry replaced.
+        - This means the cache stores at most one "active"
+          distribution per (k, component, nonzero) selection.
         """
         self._validate_key(k, component)
+
+        # Return cached result if available and no specific params requested
+        cache_key = (k, component, nonzero)
+        if method_params is None and cache_key in self._distribution_cache:
+            cached = self._distribution_cache[cache_key]
+            if cached['method'] == method:
+                return cached
 
         # Extract eigenvalue arrays
         spectra_list = self._member_spectra[(k, component)]
