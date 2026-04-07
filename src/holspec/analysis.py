@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from holspec.utilities import save_h5, read_h5, get_keys_h5, join_h5_group
+from holspec.pipeline import trace_provenance
 from holspec.spectra import Spectrum
 from holspec.hodge_laplacian import LAPLACIAN_COMPONENT_NAMES
 
@@ -723,9 +724,9 @@ class EnsembleSpectraAnalysis:
             pooled = np.concatenate(eig_arrays) if eig_arrays else np.array([])
             if pooled.size > 0:
                 n_bins = params['bins']
-                # When bins is an int, clamp to available unique values
-                # to avoid "too many bins for data range" errors
-                if isinstance(n_bins, (int, np.integer)):
+                # When bins is an int and no explicit range is set,
+                # clamp to available unique values to avoid errors
+                if isinstance(n_bins, (int, np.integer)) and params.get('range') is None:
                     n_bins = min(int(n_bins), max(len(np.unique(pooled)), 1))
                 shared_edges = np.histogram_bin_edges(
                     pooled, bins=n_bins, range=params['range'],
@@ -1132,3 +1133,155 @@ class EnsembleSpectraAnalysis:
             'eigval_sum': eigval_sum,
             'num_nonzero': num_nonzero,
         }
+
+
+# =============================================================================
+# Helpers
+# =============================================================================
+
+def extract_exp_params(provenance: dict, exp_params: list[str]) -> dict:
+    """
+    Extract experimental parameters from a provenance chain.
+
+    Reads upstream file attributes to recover parameter values.
+    Returns a dict with keys for all requested parameters; missing
+    parameters are stored as None.
+
+    Parameters
+    ----------
+    provenance : dict
+        Provenance dict mapping stage names to file paths.
+    exp_params : list of str
+        Names of experimental parameters to extract (e.g. ['noise', 'alpha']).
+
+    Returns
+    -------
+    dict
+        {param_name: value or None}.
+    """
+    result = {name: None for name in exp_params}
+
+    for name in exp_params:
+        if name == 'noise':
+            ptd_filepath = provenance.get('point_data')
+            if ptd_filepath is None:
+                continue
+            _, ptd_attrs = read_h5(ptd_filepath, dataset_names=[])
+            noise_config = ptd_attrs.get('noise_config')
+            if noise_config is not None:
+                result['noise'] = noise_config.get('scale')
+
+        elif name == 'alpha':
+            sc_filepath = provenance.get('topology_simplicial')
+            if sc_filepath is None:
+                continue
+            _, sc_attrs = read_h5(sc_filepath, dataset_names=[])
+            stage_config = sc_attrs.get('stage_config', {})
+            result['alpha'] = stage_config.get('params', {}).get('alpha')
+
+    return result
+
+
+def build_spectra_file_records(
+    spectra_filepaths_nested: dict,
+    project_root: str | Path,
+) -> dict[Path, dict]:
+    """
+    Convert nested selection output into a flat provenance-based file index.
+
+    Parameters
+    ----------
+    spectra_filepaths_nested : dict[str, dict[str, Path]]
+        Output of select_stage_outputs: {ptd_label: {output_label: filepath}}.
+    project_root : str or Path
+        Project root for resolving provenance paths.
+
+    Returns
+    -------
+    dict[Path, dict]
+        Flat mapping {filepath: file_record}.
+    """
+    records = {}
+
+    for ptd_dir_label, output_dict in spectra_filepaths_nested.items():
+        for output_label, filepath in output_dict.items():
+            filepath = Path(filepath).resolve()
+
+            provenance = trace_provenance(filepath, project_root)
+            provenance = {k: Path(v).resolve() for k, v in provenance.items()}
+
+            ptd_label = provenance['point_data'].stem if 'point_data' in provenance else None
+            sc_label = provenance['topology_simplicial'].stem if 'topology_simplicial' in provenance else None
+            cm_stem = provenance['geometry_metric'].stem if 'geometry_metric' in provenance else None
+            if cm_stem is not None and sc_label is not None and cm_stem.startswith(sc_label + '__'):
+                cm_label = cm_stem[len(sc_label) + 2:]
+            else:
+                cm_label = cm_stem
+
+            records[filepath] = {
+                'filepath': filepath,
+                'ptd_label': ptd_label,
+                'sc_label': sc_label,
+                'cm_label': cm_label,
+                'output_label': output_label,
+                'provenance': provenance,
+            }
+
+    return records
+
+
+def save_exp_series(
+    filepath: str | Path,
+    dataset_name: str,
+    group_key: tuple[str, ...],
+    series: dict,
+    analysis_config: dict,
+) -> None:
+    """
+    Save an experiment series to an HDF5 file.
+
+    Parameters
+    ----------
+    filepath : str or Path
+        Output file path.
+    dataset_name : str
+        Name of the dataset (e.g. 'trilatt_noise').
+    group_key : tuple of str
+        Fields identifying this series (e.g. ('delaunay', 'combinatorial')).
+    series : dict
+        Series data with keys: 'exp_param', 'exp_values',
+        'observable_series', 'distribution_series', 'distance_series'.
+    analysis_config : dict
+        Analysis configuration (native Python types; HDF5 conversion
+        is handled by save_h5 / to_h5_attribute).
+    """
+    filepath = Path(filepath)
+    if filepath.exists():
+        filepath.unlink()
+
+    ac = analysis_config
+    root_attributes = {
+        'dataset_name': dataset_name,
+        'exp_param': series['exp_param'],
+        'group_key': group_key,
+        **ac,
+    }
+    save_h5(filepath, datasets={'exp_values': series['exp_values']}, attributes=root_attributes, mode='create')
+
+    analysis_keys = ac['analysis_keys']
+    observable_names = ac['observable_names']
+
+    for k, comp in analysis_keys:
+        obs = series['observable_series'][(k, comp)]
+        obs_datasets = {}
+        for obs_name in observable_names:
+            obs_datasets[f'{obs_name}_mean'] = obs[obs_name]['mean']
+            obs_datasets[f'{obs_name}_std'] = obs[obs_name]['std']
+        save_h5(filepath, datasets=obs_datasets, group=f'observables/degree_{k}_{comp}', mode='create')
+
+    for k, comp in analysis_keys:
+        dist = series['distribution_series'][(k, comp)]
+        save_h5(filepath, datasets={'x': dist['x'], 'density_stack': dist['density_stack']}, group=f'distributions/degree_{k}_{comp}', mode='create')
+
+    for k, comp in analysis_keys:
+        save_h5(filepath, datasets={f'degree_{k}_{comp}': series['distance_series'][(k, comp)]}, group='distances', mode='update')
