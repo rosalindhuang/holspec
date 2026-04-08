@@ -36,6 +36,7 @@ __all__ = [
     'values_to_colors',
 
     # From framework_objects.py
+    'make_Lk_label',
     'plot_point_data',
     'plot_simplicial_complex_2d',
     'plot_simplicial_complex_3d',

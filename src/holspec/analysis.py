@@ -42,6 +42,19 @@ STANDARD_OBSERVABLES = (
     'num_nonzero',
 )
 
+# LaTeX labels for observables (keyed by observable name)
+OBSERVABLE_LABELS = {
+    'dim_ker': r'$\dim\ker$',
+    'eigval_min_nz': r'$\lambda_{\min,\,\mathrm{nonzero}}$',
+    'eigval_max': r'$\lambda_{\max}$',
+    'eigval_mean': r'$\langle\lambda\rangle$',
+    'eigval_mean_nz': r'$\langle\lambda\rangle_\mathrm{nonzero}$',
+    'eigval_var': r'$\mathrm{Var}(\lambda)$',
+    'eigval_var_nz': r'$\mathrm{Var}(\lambda)_\mathrm{nonzero}$',
+    'eigval_sum': r'$\sum\lambda$',
+    'num_nonzero': r'$N_\mathrm{nonzero}$',
+}
+
 _HISTOGRAM_DEFAULTS = {
     'bins': 50,
     'range': None,
@@ -1260,17 +1273,19 @@ def save_exp_series(
         filepath.unlink()
 
     ac = analysis_config
+    analysis_keys = ac.get('analysis_keys',
+        [(k, comp) for k in ac['degrees'] for comp in ac['components']])
+    observable_names = ac['observable_names']
+
     root_attributes = {
         'dataset_name': dataset_name,
         'exp_param': series['exp_param'],
         'group_key': group_key,
         'group_label': '__'.join(group_key),
-        **ac,
+        'analysis_keys': analysis_keys,
+        **{k: v for k, v in ac.items() if k != 'analysis_keys'},
     }
     save_h5(filepath, datasets={'exp_values': series['exp_values']}, attributes=root_attributes, mode='create')
-
-    analysis_keys = ac['analysis_keys']
-    observable_names = ac['observable_names']
 
     for k, comp in analysis_keys:
         obs = series['observable_series'][(k, comp)]
