@@ -10,10 +10,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.axes import Axes
+from matplotlib.colors import LogNorm, Normalize
 from typing import Optional, Tuple, Union, List, Dict
 
+from holspec.analysis import OBSERVABLE_LABELS
 from holspec.visualization import (
-    plot_circles, 
+    format_axis,
+    format_cbar,
+    plot_bars,
+    plot_lines,
+    plot_circles,
     plot_spheres,
     plot_vertices_2d,
     plot_edges_2d,
@@ -432,3 +438,431 @@ def plot_simplicial_complex_3d(
             add_simplex_orientation_3d(simplices, positions, dims_to_orient, color_map, ax=ax)
     
     return fig, ax
+
+
+# =============================================================================
+# Spectra visualization
+# =============================================================================
+
+def plot_eigval_distribution(
+    esa,
+    analysis_config: dict,
+    *,
+    axis_config: Optional[Dict] = None,
+    bar_config: Optional[Dict] = None,
+    ylim_ranges: Optional[Dict[Tuple, Tuple[float, float]]] = None,
+    title: Optional[str] = None,
+    figsize: Tuple[float, float] = (14, 4),
+    float_fmt: str = '.4g',
+) -> Figure:
+    """
+    Plot eigenvalue distribution bar charts for one spectra analysis,
+    with one subplot per degree.
+
+    Parameters
+    ----------
+    esa : EnsembleSpectraAnalysis
+        The spectra analysis object (with cached distributions).
+    analysis_config : dict
+        Per-dataset analysis config with keys 'degrees', 'components',
+        'nonzero', and optionally 'distribution_params'.
+    axis_config : dict, optional
+        Keyword arguments passed to format_axis for each subplot.
+    bar_config : dict, optional
+        Keyword arguments passed to plot_bars for each subplot.
+    ylim_ranges : dict, optional
+        Shared y-ranges as {(k, comp): (ylo, yhi)} for matching ylims
+        across experiment series. If None, ylims are auto-scaled.
+    title : str, optional
+        Figure suptitle.
+    figsize : tuple of float, default (14, 4)
+        Figure size.
+    float_fmt : str, default '.4g'
+        Format string for annotation numbers.
+
+    Returns
+    -------
+    Figure
+        The matplotlib figure.
+    """
+    if axis_config is None:
+        axis_config = {}
+    if bar_config is None:
+        bar_config = {}
+
+    degrees = analysis_config['degrees']
+    components = analysis_config['components']
+    analysis_keys = [(k, comp) for k in degrees for comp in components]
+    nonzero = analysis_config.get('nonzero', False)
+    dstrb_params = analysis_config.get('distribution_params', {})
+    dims = esa.dimensions
+
+    margins = axis_config.get('margins', (0.05, 0.05))
+    x_margin = margins[0] if isinstance(margins, (tuple, list)) else margins
+    y_margin = margins[1] if isinstance(margins, (tuple, list)) else margins
+
+    fig, axes = plt.subplots(1, len(degrees), figsize=figsize)
+    if len(degrees) == 1:
+        axes = [axes]
+
+    for col, (k, comp) in enumerate(analysis_keys):
+        ax = axes[col]
+        dist = esa.eigenvalue_distribution(k, comp, nonzero=nonzero)
+        x = dist['x']
+        density = dist['density_mean']
+        bar_width = (x[1] - x[0]) if len(x) > 1 else 0.5
+
+        plot_bars(xy_list=[(x, density)], ax=ax,
+                  color=f'C{k}', width=bar_width, **bar_config)
+        format_axis(ax, title=f"${make_Lk_label(k, comp)}$", **axis_config)
+
+        # Set x-limits from distribution range config
+        xrange = dstrb_params.get(k, {}).get('range')
+        if xrange is not None:
+            xspan = xrange[1] - xrange[0]
+            xpad = xspan * x_margin
+            ax.set_xlim(xrange[0] - xpad, xrange[1] + xpad)
+
+        # Apply shared y-limits
+        if ylim_ranges is not None:
+            yrange = ylim_ranges.get((k, comp))
+            if yrange is not None:
+                ax.set_ylim(0, yrange[1] * (1 + y_margin))
+
+        # Annotate with dimension, nullity, and eigenvalue range
+        summary = esa.observables_summary(k, comp)
+        N_k = dims.get(k, 0)
+        null_mean = summary['dim_ker']['mean']
+        lam_min = summary['eigval_min_nz']['mean']
+        lam_max = summary['eigval_max']['mean']
+        Lk = make_Lk_label(k, comp)
+        ann = (
+            f'$\\operatorname{{dim}} C_{{{k}}} = {N_k}$\n'
+            f'$\\operatorname{{null}} {Lk} = {null_mean:{float_fmt}}$\n'
+            f'$\\lambda_{{\\min}} = {lam_min:{float_fmt}}$\n'
+            f'$\\lambda_{{\\max}} = {lam_max:{float_fmt}}$'
+        )
+        ax.text(0.025, 0.95, ann, transform=ax.transAxes,
+                fontsize=9, color=f'C{k}', va='top', ha='left')
+
+    if title is not None:
+        fig.suptitle(title, fontsize=11)
+    fig.tight_layout()
+    return fig
+
+
+def plot_observable_vs_parameter(
+    series: dict,
+    obs_name: str,
+    *,
+    axis_config: Optional[Dict] = None,
+    line_config: Optional[Dict] = None,
+    fill_alpha: float = 0.2,
+    title: Optional[str] = None,
+    figsize: Tuple[float, float] = (14, 4),
+) -> Figure:
+    """
+    Plot an observable vs experiment parameter, one subplot per degree.
+
+    Parameters
+    ----------
+    series : dict
+        Experiment series dict with keys 'exp_param', 'exp_values',
+        'analysis_keys', 'observable_series'.
+    obs_name : str
+        Observable name to plot (e.g. 'dim_ker', 'eigval_mean_nz').
+    axis_config : dict, optional
+        Keyword arguments passed to format_axis.
+    line_config : dict, optional
+        Keyword arguments passed to plot_lines (marker, linewidth, etc.).
+    fill_alpha : float, default 0.2
+        Alpha for the mean +/- std shading.
+    title : str, optional
+        Figure suptitle.
+    figsize : tuple of float, default (14, 4)
+        Figure size.
+
+    Returns
+    -------
+    Figure
+        The matplotlib figure.
+    """
+    if axis_config is None:
+        axis_config = {}
+    if line_config is None:
+        line_config = {}
+
+    exp_param = series['exp_param']
+    exp_values = series['exp_values']
+    analysis_keys = series['analysis_keys']
+    obs_label = OBSERVABLE_LABELS.get(obs_name, obs_name)
+    n_deg = len(analysis_keys)
+
+    fig, axes = plt.subplots(1, n_deg, figsize=figsize)
+    if n_deg == 1:
+        axes = [axes]
+
+    for col, (k, comp) in enumerate(analysis_keys):
+        ax = axes[col]
+        obs = series['observable_series'][(k, comp)][obs_name]
+        mean = obs['mean']
+        std = obs['std']
+
+        plot_lines([(exp_values, mean)], ax=ax, color=f'C{k}', **line_config)
+        ax.fill_between(exp_values, mean - std, mean + std,
+                        alpha=fill_alpha, color=f'C{k}')
+
+        format_axis(ax, title=f"${make_Lk_label(k, comp)}$",
+                    ylabel=obs_label, xlabel=exp_param, **axis_config)
+
+        # Legend on first subplot only
+        if col == 0:
+            ax.plot([], [], color=f'C{k}', label='mean', **line_config)
+            ax.fill_between([], [], [], alpha=fill_alpha,
+                            color=f'C{k}', label=r'mean $\pm$ std')
+            ax.legend(fontsize=8, loc='best')
+
+    if title is not None:
+        fig.suptitle(title, fontsize=11)
+    fig.tight_layout()
+    return fig
+
+
+def plot_distribution_heatmap(
+    series: dict,
+    *,
+    cmap: str = 'magma',
+    log: bool = False,
+    axis_config: Optional[Dict] = None,
+    cbar_config: Optional[Dict] = None,
+    title: Optional[str] = None,
+    figsize: Tuple[float, float] = (16, 4),
+) -> Figure:
+    """
+    Plot eigenvalue distribution heatmaps, one subplot per degree.
+
+    Parameters
+    ----------
+    series : dict
+        Experiment series dict with keys 'exp_param', 'exp_values',
+        'analysis_keys', 'distribution_series'.
+    cmap : str, default 'magma'
+        Colormap name.
+    log : bool, default False
+        If True, apply LogNorm to the density values.
+    axis_config : dict, optional
+        Keyword arguments passed to format_axis.
+    cbar_config : dict, optional
+        Keyword arguments passed to format_cbar.
+    title : str, optional
+        Figure suptitle.
+    figsize : tuple of float, default (16, 4)
+        Figure size.
+
+    Returns
+    -------
+    Figure
+        The matplotlib figure.
+    """
+    if axis_config is None:
+        axis_config = {}
+    if cbar_config is None:
+        cbar_config = {}
+
+    exp_param = series['exp_param']
+    exp_values = series['exp_values']
+    analysis_keys = series['analysis_keys']
+    n_deg = len(analysis_keys)
+
+    fig, axes = plt.subplots(1, n_deg, figsize=figsize)
+    if n_deg == 1:
+        axes = [axes]
+
+    for col, (k, comp) in enumerate(analysis_keys):
+        ax = axes[col]
+        ds = series['distribution_series'][(k, comp)]
+        x = ds['x']
+        density_stack = ds['density_stack']
+
+        # Reconstruct bin edges from centers for pcolormesh
+        bin_width = x[1] - x[0] if len(x) > 1 else 1.0
+        x_edges = np.concatenate([[x[0] - bin_width / 2], x + bin_width / 2])
+
+        # Parameter edges from midpoints
+        if len(exp_values) > 1:
+            param_mids = 0.5 * (exp_values[:-1] + exp_values[1:])
+            param_step = exp_values[1] - exp_values[0]
+        else:
+            param_mids = np.array([])
+            param_step = 1.0
+        param_edges = np.concatenate([
+            [exp_values[0] - param_step / 2],
+            param_mids,
+            [exp_values[-1] + param_step / 2],
+        ])
+
+        # Optional log normalization
+        norm = None
+        if log:
+            z_max = np.nanmax(density_stack)
+            if z_max > 0:
+                z_floor = z_max * 0.01
+                density_plot = np.where(density_stack > z_floor, density_stack, z_floor)
+                norm = LogNorm(vmin=z_floor, vmax=z_max)
+            else:
+                density_plot = density_stack
+        else:
+            density_plot = density_stack
+
+        im = ax.pcolormesh(x_edges, param_edges, density_plot,
+                           shading='flat', cmap=cmap, norm=norm)
+        cbar = fig.colorbar(im, ax=ax)
+        format_cbar(cbar, **cbar_config)
+        format_axis(ax, title=f"${make_Lk_label(k, comp)}$",
+                    ylabel=exp_param, **axis_config)
+
+    if title is not None:
+        fig.suptitle(title, fontsize=11)
+    fig.tight_layout()
+    return fig
+
+
+def plot_distribution_lines(
+    series: dict,
+    *,
+    cmap: str = 'viridis',
+    linewidth: float = 1.5,
+    axis_config: Optional[Dict] = None,
+    title: Optional[str] = None,
+    figsize: Tuple[float, float] = (16, 4),
+) -> Figure:
+    """
+    Overlay eigenvalue distributions as colored lines, one subplot per degree.
+
+    Parameters
+    ----------
+    series : dict
+        Experiment series dict with keys 'exp_param', 'exp_values',
+        'analysis_keys', 'distribution_series'.
+    cmap : str, default 'viridis'
+        Colormap name for line colors.
+    linewidth : float, default 1.5
+        Line width.
+    axis_config : dict, optional
+        Keyword arguments passed to format_axis.
+    title : str, optional
+        Figure suptitle.
+    figsize : tuple of float, default (16, 4)
+        Figure size.
+
+    Returns
+    -------
+    Figure
+        The matplotlib figure.
+    """
+    if axis_config is None:
+        axis_config = {}
+
+    exp_param = series['exp_param']
+    exp_values = series['exp_values']
+    analysis_keys = series['analysis_keys']
+    n_deg = len(analysis_keys)
+    n_levels = len(exp_values)
+    colormap = plt.get_cmap(cmap)
+
+    fig, axes = plt.subplots(1, n_deg, figsize=figsize)
+    if n_deg == 1:
+        axes = [axes]
+
+    for col, (k, comp) in enumerate(analysis_keys):
+        ax = axes[col]
+        ds = series['distribution_series'][(k, comp)]
+        x = ds['x']
+        density_stack = ds['density_stack']
+
+        for i in range(n_levels):
+            c = (i + 1) / (n_levels + 1)
+            ax.plot(x, density_stack[i], color=colormap(c),
+                    linewidth=linewidth, zorder=i)
+
+        # Colorbar showing parameter values
+        sm = plt.cm.ScalarMappable(
+            cmap=colormap,
+            norm=Normalize(vmin=exp_values[0], vmax=exp_values[-1]),
+        )
+        sm.set_array([])
+        cbar = fig.colorbar(sm, ax=ax, pad=0.02)
+        format_cbar(cbar, label=exp_param)
+
+        format_axis(ax, title=f"${make_Lk_label(k, comp)}$", **axis_config)
+
+    if title is not None:
+        fig.suptitle(title, fontsize=11)
+    fig.tight_layout()
+    return fig
+
+
+def plot_distribution_distance(
+    series: dict,
+    *,
+    distance_metric: str = 'distance',
+    axis_config: Optional[Dict] = None,
+    line_config: Optional[Dict] = None,
+    title: Optional[str] = None,
+    figsize: Tuple[float, float] = (14, 4),
+) -> Figure:
+    """
+    Plot successive distribution distance vs experiment parameter,
+    one subplot per degree.
+
+    Parameters
+    ----------
+    series : dict
+        Experiment series dict with keys 'exp_param', 'exp_values',
+        'analysis_keys', 'distance_series'.
+    distance_metric : str, default 'distance'
+        Name of the distance metric (used for y-axis label).
+    axis_config : dict, optional
+        Keyword arguments passed to format_axis.
+    line_config : dict, optional
+        Keyword arguments passed to plot_lines.
+    title : str, optional
+        Figure suptitle.
+    figsize : tuple of float, default (14, 4)
+        Figure size.
+
+    Returns
+    -------
+    Figure
+        The matplotlib figure.
+    """
+    if axis_config is None:
+        axis_config = {}
+    if line_config is None:
+        line_config = {}
+
+    exp_param = series['exp_param']
+    exp_values = series['exp_values']
+    analysis_keys = series['analysis_keys']
+    n_deg = len(analysis_keys)
+    midpoints = 0.5 * (exp_values[:-1] + exp_values[1:])
+
+    fig, axes = plt.subplots(1, n_deg, figsize=figsize)
+    if n_deg == 1:
+        axes = [axes]
+
+    for col, (k, comp) in enumerate(analysis_keys):
+        ax = axes[col]
+        dists = series['distance_series'][(k, comp)]
+
+        plot_lines([(midpoints, dists)], ax=ax, color=f'C{k}', **line_config)
+
+        format_axis(ax, title=f"${make_Lk_label(k, comp)}$",
+                    xlabel=exp_param, ylabel=f'{distance_metric} distance',
+                    **axis_config)
+
+    if title is not None:
+        fig.suptitle(title, fontsize=11)
+    fig.tight_layout()
+    return fig
+

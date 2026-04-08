@@ -37,6 +37,11 @@ __all__ = [
 
     # From framework_objects.py
     'make_Lk_label',
+    'plot_eigval_distribution',
+    'plot_observable_vs_parameter',
+    'plot_distribution_heatmap',
+    'plot_distribution_lines',
+    'plot_distribution_distance',
     'plot_point_data',
     'plot_simplicial_complex_2d',
     'plot_simplicial_complex_3d',
