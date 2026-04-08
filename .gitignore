@@ -30,7 +30,7 @@ outputs/*
 *.code-workspace
 .tmp/
 
-# Date/time-stamped backups (YY-MM-DD or YYYY-MM-DD suffixes)
+# Date/time-stamped backups
 *_[0-9][0-9]-[0-9][0-9]-[0-9][0-9]*
 *_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]*
 

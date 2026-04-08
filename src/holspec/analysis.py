@@ -1264,6 +1264,7 @@ def save_exp_series(
         'dataset_name': dataset_name,
         'exp_param': series['exp_param'],
         'group_key': group_key,
+        'group_label': '__'.join(group_key),
         **ac,
     }
     save_h5(filepath, datasets={'exp_values': series['exp_values']}, attributes=root_attributes, mode='create')
