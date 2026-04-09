@@ -1451,6 +1451,9 @@ def run_pipeline(
             results.setdefault(stage_name, {}).update(stage_output)
             prev_output = stage_output
 
+        if not stage_config['runtime'].get('verbose', False):
+            print()
+
     # --- Save assembled per-stage configs ---
 
     if save_stage_configs:
