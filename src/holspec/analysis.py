@@ -1258,7 +1258,7 @@ def save_exp_series(
     filepath : str or Path
         Output file path.
     dataset_name : str
-        Name of the dataset (e.g. 'trilatt_noise').
+        Name of the dataset (e.g. 'exp_noise_trilatt').
     group_key : tuple of str
         Fields identifying this series (e.g. ('delaunay', 'combinatorial')).
     series : dict
