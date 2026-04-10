@@ -1456,7 +1456,7 @@ def run_pipeline(
 
     # --- Save assembled per-stage configs ---
 
-    if save_stage_configs:
+    if save_stage_configs and results:
         _save_stage_configs(config, results, project_root)
 
     # --- Completion ---
@@ -1882,6 +1882,7 @@ def select_pipeline_inputs(
 def select_stage_outputs(
     stage_num: int,
     project_root: str | Path,
+    base_dir: str | Path | None = None,
     select_categories: list[str] | None = None,
     select_point_data: list[str] | None = None,
     select_simplicial_complex: list[str] | None = None,
@@ -1899,10 +1900,17 @@ def select_stage_outputs(
         Pipeline stage number (1--4).
     project_root : str or Path
         Project root directory.
+    base_dir : str or Path, optional
+        Base directory for stage outputs, relative to ``project_root``.
+        When provided, scans ``project_root / base_dir / stage_name``
+        instead of the default ``data/interim/stage_name``. Use this to
+        select outputs from a specific per-dataset pipeline run (e.g.
+        ``'data/interim/exp_noise_trilatt'``).
     select_categories : list of str, optional
-        Raw data category names to include (e.g. ``['lattice_2d', 'random']``).
+        Raw data category names to include (e.g. ``['test_examples']``).
         Categories are derived from subdirectory names under ``data/raw/``.
-        If None or empty, all categories are included.
+        If None or empty, all categories are included. Not needed when
+        ``base_dir`` already isolates outputs by dataset.
     select_point_data : list of str, optional
         Glob patterns for point data labels (e.g. ``['trilatthex*', 'randunif*']``).
         If None or empty, all point data labels are included.
@@ -1928,8 +1936,14 @@ def select_stage_outputs(
 
     project_root = Path(project_root)
     stage_name = PIPELINE_STAGE_NAMES[stage_num]
-    output_data_dir = project_root / 'data' / 'interim' / stage_name
+    if base_dir is not None:
+        output_data_dir = project_root / base_dir / stage_name
+    else:
+        output_data_dir = project_root / 'data' / 'interim' / stage_name
     raw_data_dir = project_root / 'data' / 'raw'
+
+    if not output_data_dir.is_dir():
+        return {}
 
     # Build category mapping: point_data_label -> set of categories
     # (a label can appear in multiple raw categories)

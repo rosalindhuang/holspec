@@ -46,23 +46,6 @@ OUTPUTS_DIR = PROJECT_ROOT / "outputs"
 
 SRC_DIR = PROJECT_ROOT / "src"
 
-# --- Pipeline directories ---
-
-from holspec.pipeline import PIPELINE_STAGE_NAMES
-
-PIPELINE_INPUT_DIRS: dict[int, Path] = {
-    1: DATA_RAW_DIR,
-    **{
-        n: DATA_INTERIM_DIR / PIPELINE_STAGE_NAMES[n - 1]
-        for n in (2, 3, 4)
-    },
-}
-
-PIPELINE_OUTPUT_DIRS: dict[int, Path] = {
-    n: DATA_INTERIM_DIR / name
-    for n, name in PIPELINE_STAGE_NAMES.items()
-}
-
 
 # =============================================================================
 # Utilities for directory management
