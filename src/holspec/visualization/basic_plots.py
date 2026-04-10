@@ -688,6 +688,7 @@ def plot_vertices_2d(
     positions: np.ndarray,
     color: Union[str, Sequence] = 'C0',
     radius: Optional[float] = None,
+    radius_scale: float = 1.0,
     ax: Optional[Axes] = None,
     **kwargs
 ) -> Tuple[Figure, Axes]:
@@ -706,6 +707,9 @@ def plot_vertices_2d(
         coloring.
     radius : float, optional
         Radius of circles. If None, auto-computed from data range.
+    radius_scale : float, default=1.0
+        Multiplier applied to the auto-computed radius. Only used when
+        ``radius`` is None.
     ax : Axes, optional
         Axes to plot on. If None, creates new figure.
     **kwargs
@@ -740,7 +744,7 @@ def plot_vertices_2d(
     # Auto-compute radius if not provided
     if radius is None:
         data_range = np.ptp(positions, axis=0).max()
-        radius = 0.02 * data_range if data_range > 0 else 0.05
+        radius = 0.02 * data_range * radius_scale if data_range > 0 else 0.05
 
     # Resolve per-vertex colors
     colors = _resolve_colors(color, len(vertices))
@@ -938,6 +942,7 @@ def plot_vertices_3d(
     positions: np.ndarray,
     color: Union[str, Sequence] = 'C0',
     radius: Optional[float] = None,
+    radius_scale: float = 1.0,
     ax: Optional[Axes] = None,
     **kwargs
 ) -> Tuple[Figure, Axes]:
@@ -956,6 +961,9 @@ def plot_vertices_3d(
         coloring.
     radius : float, optional
         Radius of spheres. If None, auto-computed from data range.
+    radius_scale : float, default=1.0
+        Multiplier applied to the auto-computed radius. Only used when
+        ``radius`` is None.
     ax : Axes, optional
         3D axes to plot on. If None, creates new figure.
     **kwargs
@@ -979,7 +987,7 @@ def plot_vertices_3d(
     # Auto-compute radius if not provided
     if radius is None:
         data_range = np.ptp(positions, axis=0).max()
-        radius = 0.06 * data_range if data_range > 0 else 0.05
+        radius = 0.06 * data_range * radius_scale if data_range > 0 else 0.05
 
     # Resolve per-vertex colors
     colors = _resolve_colors(color, len(vertices))

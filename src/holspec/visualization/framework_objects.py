@@ -10,8 +10,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.axes import Axes
+from matplotlib.colorbar import Colorbar
 from matplotlib.colors import LogNorm, Normalize
-from typing import Optional, Tuple, Union, List, Dict
+from typing import Optional, Sequence, Tuple, Union, List, Dict
 
 from holspec.analysis import OBSERVABLE_LABELS
 from holspec.visualization import (
@@ -31,7 +32,8 @@ from holspec.visualization import (
     plot_triangles_3d,
     plot_tetrahedra_3d,
     add_simplex_orientation_3d,
-    add_simplex_labels_3d
+    add_simplex_labels_3d,
+    values_to_colors,
 )
 
 # =============================================================================
@@ -438,6 +440,165 @@ def plot_simplicial_complex_3d(
             add_simplex_orientation_3d(simplices, positions, dims_to_orient, color_map, ax=ax)
     
     return fig, ax
+
+
+# =============================================================================
+# Cochain visualization
+# =============================================================================
+
+# Dispatch dicts: map simplex dimension to primitive plotting function
+_PLOT_SIMPLEX_2D = {0: plot_vertices_2d, 1: plot_edges_2d, 2: plot_triangles_2d}
+_PLOT_SIMPLEX_3D = {
+    0: plot_vertices_3d, 1: plot_edges_3d,
+    2: plot_triangles_3d, 3: plot_tetrahedra_3d,
+}
+
+# Default kwargs for reference geometry (lower-dim simplices drawn in background)
+_DEFAULT_COMPLEX_KWARGS_2D = {
+    0: {'radius_scale': 0.6},
+    1: {'linewidth': 1.0},
+}
+_DEFAULT_COMPLEX_KWARGS_3D = {
+    0: {'radius_scale': 0.6},
+    1: {'linewidth': 1.0},
+    2: {'alpha': 0.3, 'edgecolor': 'none'},
+}
+
+
+def plot_cochain(
+    simplices: Dict[int, List[Tuple]],
+    positions: np.ndarray,
+    k: int,
+    values: np.ndarray,
+    *,
+    cmap: str = 'coolwarm',
+    clim: Optional[Tuple[float, float]] = None,
+    show_complex: bool = True,
+    complex_color: str = 'k',
+    complex_kwargs: Optional[Dict[int, Dict]] = None,
+    simplex_kwargs: Optional[Dict] = None,
+    cbar: bool = True,
+    cbar_kwargs: Optional[Dict] = None,
+    ax: Optional[Axes] = None,
+) -> Tuple[Figure, Axes, Optional[Colorbar]]:
+    """
+    Visualize a scalar-valued cochain on a simplicial complex.
+
+    Colors k-simplices by cochain values using a colormap, with optional
+    lower-dimensional simplices drawn as structural reference. Works for
+    both 2D and 3D ambient spaces, dispatching automatically based on
+    the point positions.
+
+    Parameters
+    ----------
+    simplices : Dict[int, List[Tuple]]
+        Full simplicial complex. Keys are dimensions (0, 1, 2, ...),
+        values are lists of vertex-index tuples.
+    positions : np.ndarray
+        Vertex coordinates, shape (N, 2) or (N, 3).
+    k : int
+        Degree of the cochain (dimension of simplices to color).
+    values : np.ndarray
+        Cochain values, one per k-simplex. Must have length
+        ``len(simplices[k])``.
+    cmap : str, default='coolwarm'
+        Colormap name.
+    clim : tuple of (float, float), optional
+        Color limits (vmin, vmax). If None, uses symmetric limits
+        centered at zero: ``(-max(|values|), +max(|values|))``.
+    show_complex : bool, default=True
+        Whether to draw lower-dimensional simplices (dim < k) as
+        structural reference geometry. For k=0 nothing is drawn
+        regardless of this setting.
+    complex_color : str, default='k'
+        Color for reference geometry.
+    complex_kwargs : Dict[int, Dict], optional
+        Per-dimension kwargs for reference geometry, keyed by simplex
+        dimension. Merged with defaults (user values take precedence).
+    simplex_kwargs : Dict, optional
+        Kwargs for the colored k-simplices (e.g. linewidth, alpha).
+    cbar : bool, default=True
+        Whether to create a colorbar.
+    cbar_kwargs : Dict, optional
+        Kwargs passed to ``fig.colorbar()`` (e.g. shrink, pad).
+    ax : Axes, optional
+        Axes to plot on. If None, creates a new figure.
+
+    Returns
+    -------
+    fig : Figure
+    ax : Axes
+    cbar : Colorbar or None
+        The colorbar object if ``cbar=True``, else None. Use
+        ``format_cbar(cbar, ...)`` to style it.
+    """
+    values = np.asarray(values)
+    ambient_dim = positions.shape[1]
+
+    # Select 2D or 3D dispatch and defaults
+    if ambient_dim == 2:
+        plot_simplex = _PLOT_SIMPLEX_2D
+        default_complex_kw = _DEFAULT_COMPLEX_KWARGS_2D
+    elif ambient_dim == 3:
+        plot_simplex = _PLOT_SIMPLEX_3D
+        default_complex_kw = _DEFAULT_COMPLEX_KWARGS_3D
+    else:
+        raise ValueError(
+            f"positions must be 2D or 3D, got shape {positions.shape}"
+        )
+
+    # Create figure/axes if needed
+    if ax is None:
+        if ambient_dim == 2:
+            fig, ax = plt.subplots()
+        else:
+            fig = plt.figure()
+            ax = fig.add_subplot(111, projection='3d')
+    else:
+        fig = ax.figure
+
+    # Color normalization
+    if clim is not None:
+        vmin, vmax = clim
+    else:
+        absmax = np.max(np.abs(values)) if values.size > 0 else 1.0
+        vmin, vmax = -absmax, absmax
+
+    colors, sm = values_to_colors(values, cmap=cmap, vmin=vmin, vmax=vmax)
+
+    # Draw reference geometry (lower-dim simplices)
+    if show_complex:
+        merged_complex_kw = {
+            d: {**default_complex_kw.get(d, {}), **(complex_kwargs or {}).get(d, {})}
+            for d in range(k)
+        }
+        # zorder: higher-dim reference behind colored simplices,
+        # vertices (d=0) always on top for visibility
+        for d in sorted(merged_complex_kw):
+            if d not in simplices or not simplices[d]:
+                continue
+            if d not in plot_simplex:
+                continue
+            ref_zorder = 50 if d == 0 else 10 + d * 10
+            kw = merged_complex_kw[d]
+            plot_simplex[d](
+                simplices[d], positions,
+                color=complex_color, ax=ax, zorder=ref_zorder, **kw,
+            )
+
+    # Draw colored k-simplices
+    kw = dict(simplex_kwargs or {})
+    plot_simplex[k](
+        simplices[k], positions,
+        color=colors, ax=ax, zorder=40, **kw,
+    )
+
+    # Colorbar
+    cbar_obj = None
+    if cbar:
+        cbar_obj = fig.colorbar(sm, ax=ax, **(cbar_kwargs or {}))
+
+    return fig, ax, cbar_obj
 
 
 # =============================================================================

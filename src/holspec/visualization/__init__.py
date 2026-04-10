@@ -45,4 +45,5 @@ __all__ = [
     'plot_point_data',
     'plot_simplicial_complex_2d',
     'plot_simplicial_complex_3d',
+    'plot_cochain',
 ]
