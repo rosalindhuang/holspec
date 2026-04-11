@@ -217,6 +217,12 @@ class EnsembleSpectraAnalysis:
     dimension, etc.), and provides lazy-cached eigenvalue distribution
     estimation. Custom observables can be added via compute_member_observable.
 
+    Optionally stores eigenvector spectra — partial spectra from a sparse
+    solver with eigenvectors attached, stored separately from the dense
+    member spectra used for distribution analysis. Use
+    ``set_eigenvector_spectra()`` to attach after construction, or pass
+    ``eigenvector_spectra`` to the constructor.
+
     Parameters
     ----------
     member_spectra : dict[tuple[int, str], list[Spectrum]]
@@ -224,6 +230,10 @@ class EnsembleSpectraAnalysis:
         Spectrum per ensemble member; all lists must have the same length.
     metadata : dict, optional
         Provenance metadata. 'creation_time' is auto-populated if absent.
+    eigenvector_spectra : dict[tuple[int, str], list[Spectrum]], optional
+        Partial spectra with eigenvectors from a sparse solver, keyed by
+        (degree, component). Each list must have the same length as the
+        member_spectra lists.
 
     Notes
     -----
@@ -243,6 +253,7 @@ class EnsembleSpectraAnalysis:
         self,
         member_spectra: dict[tuple[int, str], list[Spectrum]],
         metadata: dict | None = None,
+        eigenvector_spectra: dict[tuple[int, str], list[Spectrum]] | None = None,
     ):
         # Validate member_spectra
         if not member_spectra:
@@ -301,6 +312,11 @@ class EnsembleSpectraAnalysis:
         # method_params is None; recomputes when explicit params
         # are provided.
         self._distribution_cache: dict[tuple[int, str, bool], dict] = {}
+
+        # Eigenvector spectra (sparse solver results with eigenvectors)
+        self._eigenvector_spectra: dict[tuple[int, str], list[Spectrum]] | None = None
+        if eigenvector_spectra is not None:
+            self._validate_and_set_eigenvector_spectra(eigenvector_spectra)
 
     # =========================================================================
     # Factory Methods
@@ -405,7 +421,13 @@ class EnsembleSpectraAnalysis:
             if project_root is not None:
                 metadata['project_root'] = str(project_root)
 
-        return cls(member_spectra, metadata=metadata)
+        esa = cls(member_spectra, metadata=metadata)
+
+        # Load eigenvector spectra if present and requested
+        if load_eigenvectors:
+            esa._load_eigenvector_spectra_from_file(filepath)
+
+        return esa
 
     @classmethod
     def from_hlsp_list(
@@ -493,6 +515,18 @@ class EnsembleSpectraAnalysis:
         """Sorted (k, component) pairs present in the analysis."""
         return sorted(self._member_spectra.keys())
 
+    @property
+    def has_eigenvectors(self) -> bool:
+        """Whether eigenvector spectra are stored."""
+        return self._eigenvector_spectra is not None
+
+    @property
+    def eigenvector_keys(self) -> list[tuple[int, str]]:
+        """Sorted (k, component) pairs with eigenvectors, or empty list."""
+        if self._eigenvector_spectra is None:
+            return []
+        return sorted(self._eigenvector_spectra.keys())
+
     # =========================================================================
     # Spectrum Access
     # =========================================================================
@@ -550,6 +584,69 @@ class EnsembleSpectraAnalysis:
         list of ndarray or None
         """
         return [spc.eigenvectors for spc in self.member_spectra(k, component)]
+
+    def eigenvector_spectra(
+        self, k: int, component: str = 'full',
+    ) -> list[Spectrum] | None:
+        """
+        Per-member eigenvector Spectrum objects at (k, component).
+
+        These contain partial spectra from a sparse solver, with
+        eigenvectors attached. Returns None if eigenvectors were not
+        computed for this (k, component) pair.
+
+        Parameters
+        ----------
+        k : int
+            Degree.
+        component : str, default='full'
+            Laplacian component.
+
+        Returns
+        -------
+        list of Spectrum, or None
+        """
+        if self._eigenvector_spectra is None:
+            return None
+        return self._eigenvector_spectra.get((k, component))
+
+    def set_eigenvector_spectra(
+        self,
+        eigenvector_spectra: dict[tuple[int, str], list[Spectrum]],
+    ) -> None:
+        """
+        Attach eigenvector spectra after construction.
+
+        Parameters
+        ----------
+        eigenvector_spectra : dict[tuple[int, str], list[Spectrum]]
+            Mapping from (degree, component) to list of Spectrum objects
+            containing eigenvectors. Each list must have length
+            ``num_members``.
+        """
+        self._validate_and_set_eigenvector_spectra(eigenvector_spectra)
+
+    def _validate_and_set_eigenvector_spectra(
+        self,
+        eigenvector_spectra: dict[tuple[int, str], list[Spectrum]],
+    ) -> None:
+        """Validate and store eigenvector spectra."""
+        for (k, component), spc_list in eigenvector_spectra.items():
+            if not isinstance(k, int) or k < 0:
+                raise ValueError(
+                    f"Degree must be a non-negative integer, got k={k!r}."
+                )
+            if component not in LAPLACIAN_COMPONENT_NAMES:
+                raise ValueError(
+                    f"Unknown component '{component}'. "
+                    f"Valid components: {LAPLACIAN_COMPONENT_NAMES}."
+                )
+            if len(spc_list) != self._num_members:
+                raise ValueError(
+                    f"Eigenvector spectrum list for ({k}, '{component}') has "
+                    f"length {len(spc_list)}, expected {self._num_members}."
+                )
+        self._eigenvector_spectra = eigenvector_spectra
 
     # =========================================================================
     # Observable Access
@@ -897,6 +994,46 @@ class EnsembleSpectraAnalysis:
                 hdf5_options=hdf5_options,
             )
 
+        # Save eigenvector spectra
+        if self._eigenvector_spectra is not None:
+            eigvec_root = join_h5_group(group, 'eigenvectors')
+            eigvec_keys_list = [
+                f'{k}_{comp}'
+                for k, comp in sorted(self._eigenvector_spectra.keys())
+            ]
+            save_h5(
+                filepath,
+                datasets=None,
+                attributes={
+                    'num_members': self._num_members,
+                    'eigenvector_keys': eigvec_keys_list,
+                },
+                mode='update',
+                group=eigvec_root,
+                hdf5_options=hdf5_options,
+            )
+            for (k, comp), spc_list in self._eigenvector_spectra.items():
+                for i, spc in enumerate(spc_list):
+                    member_group = join_h5_group(
+                        eigvec_root,
+                        f'member_{i:04d}/degree_{k}/component_{comp}',
+                    )
+                    spc_datasets = {'eigenvalues': spc.eigenvalues}
+                    spc_attributes = {
+                        'dimension': spc.dimension,
+                        'num_eigenvalues': spc.num_eigenvalues,
+                    }
+                    if spc.eigenvectors is not None:
+                        spc_datasets['eigenvectors'] = spc.eigenvectors
+                    save_h5(
+                        filepath,
+                        datasets=spc_datasets,
+                        attributes=spc_attributes,
+                        mode='update',
+                        group=member_group,
+                        hdf5_options=hdf5_options,
+                    )
+
     def load_cache(
         self,
         filepath: str | Path,
@@ -982,6 +1119,64 @@ class EnsembleSpectraAnalysis:
                         }
                     except KeyError:
                         pass
+
+        # Load eigenvector spectra
+        self._load_eigenvector_spectra_from_file(filepath, group)
+
+    def _load_eigenvector_spectra_from_file(
+        self,
+        filepath: str | Path,
+        group: str | None = None,
+    ) -> None:
+        """Load eigenvector spectra from the eigenvectors/ group if present."""
+        eigvec_root = join_h5_group(group, 'eigenvectors')
+        try:
+            _, eigvec_attrs = read_h5(
+                filepath, group=eigvec_root, dataset_names=[],
+            )
+        except KeyError:
+            return
+
+        eigvec_keys_raw = eigvec_attrs.get('eigenvector_keys', [])
+        if len(eigvec_keys_raw) == 0:
+            return
+
+        # Parse available keys
+        available_keys = []
+        for key_str in eigvec_keys_raw:
+            k_str, comp = key_str.split('_', 1)
+            available_keys.append((int(k_str), comp))
+
+        # Discover member groups
+        member_keys = sorted(
+            k for k in get_keys_h5(filepath, group=eigvec_root)
+            if k.startswith('member_')
+        )
+        if not member_keys:
+            return
+
+        eigvec_spectra: dict[tuple[int, str], list[Spectrum]] = {
+            key: [] for key in available_keys
+        }
+        for member_key in member_keys:
+            for k, comp in available_keys:
+                subgroup = join_h5_group(
+                    eigvec_root,
+                    f'{member_key}/degree_{k}/component_{comp}',
+                )
+                try:
+                    spc_datasets, spc_attrs = read_h5(filepath, group=subgroup)
+                    eigvec_spectra[(k, comp)].append(Spectrum(
+                        spc_datasets['eigenvalues'],
+                        int(spc_attrs['dimension']),
+                        eigenvectors=spc_datasets.get('eigenvectors'),
+                    ))
+                except KeyError:
+                    pass
+
+        # Only set if we actually loaded data
+        if any(spc_list for spc_list in eigvec_spectra.values()):
+            self._eigenvector_spectra = eigvec_spectra
 
     # =========================================================================
     # Utilities
