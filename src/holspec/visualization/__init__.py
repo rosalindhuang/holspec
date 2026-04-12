@@ -14,6 +14,7 @@ __all__ = [
     'format_cbar',
     'animate_3d_turn',
     'make_movie',
+    'make_fig_path',
 
     # From basic_plots.py
     'plot_lines',

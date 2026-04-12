@@ -960,10 +960,12 @@ def plot_vertices_3d(
         vertices, or a sequence of colors (one per vertex) for individual
         coloring.
     radius : float, optional
-        Radius of spheres. If None, auto-computed from data range.
+        Sphere size parameter. Since 3D "spheres" are rendered as scatter
+        markers with screen-space size ``(radius * 100)**2`` in points
+        squared, this is effectively a screen-space size, independent of
+        data coordinates. Defaults to 0.05 if None.
     radius_scale : float, default=1.0
-        Multiplier applied to the auto-computed radius. Only used when
-        ``radius`` is None.
+        Multiplier applied to ``radius``.
     ax : Axes, optional
         3D axes to plot on. If None, creates new figure.
     **kwargs
@@ -984,10 +986,10 @@ def plot_vertices_3d(
     vertex_indices = [v[0] for v in vertices]
     vertex_positions = positions[vertex_indices]
 
-    # Auto-compute radius if not provided
+    # Default radius (screen-space size via plot_spheres)
     if radius is None:
-        data_range = np.ptp(positions, axis=0).max()
-        radius = 0.06 * data_range * radius_scale if data_range > 0 else 0.05
+        radius = 0.05
+    radius = radius * radius_scale
 
     # Resolve per-vertex colors
     colors = _resolve_colors(color, len(vertices))

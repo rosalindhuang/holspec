@@ -428,3 +428,49 @@ def make_movie(
         # Always clean up
         if os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
+
+
+# =============================================================================
+# Figure path utilities
+# =============================================================================
+
+def make_fig_path(
+    fig_dir: Path,
+    dataset_name: str,
+    subdir: str,
+    figname: str,
+    flat: bool = True,
+    group_by: Optional[str] = None,
+) -> Path:
+    """Build figure output path, optionally grouping by a top-level subdirectory.
+
+    When *group_by* is set, files are placed under
+    ``fig_dir / dataset_name / group_by /`` with *subdir* flattened into
+    the filename.  Used for non-experiment datasets to group outputs by
+    point data label.
+
+    Parameters
+    ----------
+    fig_dir : Path
+        Root figure output directory.
+    dataset_name : str
+        Dataset name subdirectory.
+    subdir : str
+        Pipeline output label (used as subdirectory or filename prefix).
+    figname : str
+        Base filename for the figure.
+    flat : bool, default True
+        If True, flatten *subdir* into the filename rather than using a
+        subdirectory.
+    group_by : str or None, default None
+        Optional grouping subdirectory name.  When set, overrides *flat*.
+
+    Returns
+    -------
+    Path
+    """
+    if group_by is not None:
+        return fig_dir / dataset_name / group_by / f"{subdir}__{figname}"
+    if flat:
+        return fig_dir / dataset_name / f"{subdir}__{figname}"
+    return fig_dir / dataset_name / subdir / figname

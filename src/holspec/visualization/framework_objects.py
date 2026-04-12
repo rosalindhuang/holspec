@@ -613,7 +613,7 @@ def plot_eigval_distribution(
     bar_config: Optional[Dict] = None,
     ylim_ranges: Optional[Dict[Tuple, Tuple[float, float]]] = None,
     title: Optional[str] = None,
-    figsize: Tuple[float, float] = (14, 4),
+    subplot_size: Tuple[float, float] = (4.5, 4),
     float_fmt: str = '.4g',
 ) -> Figure:
     """
@@ -636,8 +636,9 @@ def plot_eigval_distribution(
         across experiment series. If None, ylims are auto-scaled.
     title : str, optional
         Figure suptitle.
-    figsize : tuple of float, default (14, 4)
-        Figure size.
+    subplot_size : tuple of float, default (4.5, 4)
+        Size per subplot (width, height). Total figure width scales with
+        the number of degrees.
     float_fmt : str, default '.4g'
         Format string for annotation numbers.
 
@@ -662,6 +663,7 @@ def plot_eigval_distribution(
     x_margin = margins[0] if isinstance(margins, (tuple, list)) else margins
     y_margin = margins[1] if isinstance(margins, (tuple, list)) else margins
 
+    figsize = (subplot_size[0] * len(degrees), subplot_size[1])
     fig, axes = plt.subplots(1, len(degrees), figsize=figsize)
     if len(degrees) == 1:
         axes = [axes]
@@ -720,7 +722,7 @@ def plot_observable_vs_parameter(
     line_config: Optional[Dict] = None,
     fill_alpha: float = 0.2,
     title: Optional[str] = None,
-    figsize: Tuple[float, float] = (14, 4),
+    subplot_size: Tuple[float, float] = (4.5, 4),
 ) -> Figure:
     """
     Plot an observable vs experiment parameter, one subplot per degree.
@@ -740,8 +742,9 @@ def plot_observable_vs_parameter(
         Alpha for the mean +/- std shading.
     title : str, optional
         Figure suptitle.
-    figsize : tuple of float, default (14, 4)
-        Figure size.
+    subplot_size : tuple of float, default (4.5, 4)
+        Size per subplot (width, height). Total figure width scales with
+        the number of degrees.
 
     Returns
     -------
@@ -759,6 +762,7 @@ def plot_observable_vs_parameter(
     obs_label = OBSERVABLE_LABELS.get(obs_name, obs_name)
     n_deg = len(analysis_keys)
 
+    figsize = (subplot_size[0] * n_deg, subplot_size[1])
     fig, axes = plt.subplots(1, n_deg, figsize=figsize)
     if n_deg == 1:
         axes = [axes]
@@ -797,7 +801,7 @@ def plot_distribution_heatmap(
     axis_config: Optional[Dict] = None,
     cbar_config: Optional[Dict] = None,
     title: Optional[str] = None,
-    figsize: Tuple[float, float] = (16, 4),
+    subplot_size: Tuple[float, float] = (5, 4),
 ) -> Figure:
     """
     Plot eigenvalue distribution heatmaps, one subplot per degree.
@@ -817,8 +821,9 @@ def plot_distribution_heatmap(
         Keyword arguments passed to format_cbar.
     title : str, optional
         Figure suptitle.
-    figsize : tuple of float, default (16, 4)
-        Figure size.
+    subplot_size : tuple of float, default (5, 4)
+        Size per subplot (width, height). Total figure width scales with
+        the number of degrees.
 
     Returns
     -------
@@ -835,6 +840,7 @@ def plot_distribution_heatmap(
     analysis_keys = series['analysis_keys']
     n_deg = len(analysis_keys)
 
+    figsize = (subplot_size[0] * n_deg, subplot_size[1])
     fig, axes = plt.subplots(1, n_deg, figsize=figsize)
     if n_deg == 1:
         axes = [axes]
@@ -895,7 +901,7 @@ def plot_distribution_lines(
     linewidth: float = 1.5,
     axis_config: Optional[Dict] = None,
     title: Optional[str] = None,
-    figsize: Tuple[float, float] = (16, 4),
+    subplot_size: Tuple[float, float] = (5, 4),
 ) -> Figure:
     """
     Overlay eigenvalue distributions as colored lines, one subplot per degree.
@@ -913,8 +919,9 @@ def plot_distribution_lines(
         Keyword arguments passed to format_axis.
     title : str, optional
         Figure suptitle.
-    figsize : tuple of float, default (16, 4)
-        Figure size.
+    subplot_size : tuple of float, default (5, 4)
+        Size per subplot (width, height). Total figure width scales with
+        the number of degrees.
 
     Returns
     -------
@@ -931,6 +938,7 @@ def plot_distribution_lines(
     n_levels = len(exp_values)
     colormap = plt.get_cmap(cmap)
 
+    figsize = (subplot_size[0] * n_deg, subplot_size[1])
     fig, axes = plt.subplots(1, n_deg, figsize=figsize)
     if n_deg == 1:
         axes = [axes]
@@ -970,7 +978,7 @@ def plot_distribution_distance(
     axis_config: Optional[Dict] = None,
     line_config: Optional[Dict] = None,
     title: Optional[str] = None,
-    figsize: Tuple[float, float] = (14, 4),
+    subplot_size: Tuple[float, float] = (4.5, 4),
 ) -> Figure:
     """
     Plot successive distribution distance vs experiment parameter,
@@ -989,8 +997,9 @@ def plot_distribution_distance(
         Keyword arguments passed to plot_lines.
     title : str, optional
         Figure suptitle.
-    figsize : tuple of float, default (14, 4)
-        Figure size.
+    subplot_size : tuple of float, default (4.5, 4)
+        Size per subplot (width, height). Total figure width scales with
+        the number of degrees.
 
     Returns
     -------
@@ -1008,6 +1017,7 @@ def plot_distribution_distance(
     n_deg = len(analysis_keys)
     midpoints = 0.5 * (exp_values[:-1] + exp_values[1:])
 
+    figsize = (subplot_size[0] * n_deg, subplot_size[1])
     fig, axes = plt.subplots(1, n_deg, figsize=figsize)
     if n_deg == 1:
         axes = [axes]
