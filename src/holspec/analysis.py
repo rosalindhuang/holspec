@@ -1381,6 +1381,63 @@ def entry_group_key(
     return tuple(field_map[f] for f in group_by)
 
 
+def entry_fixed_varying(
+    entry: dict,
+    group_by: list[str],
+) -> tuple[list[str], str]:
+    """Split an entry's label fields into fixed and varying values.
+
+    Partitions the three label fields ``ptd_label``, ``sc_label``,
+    ``cm_label`` into those listed in *group_by* (fixed across an
+    experiment series) and the single remaining field (the varying one,
+    i.e. the experiment parameter).  ``sc_label`` and ``cm_label`` are
+    parsed from the entry's ``output_label`` the same way as
+    :func:`entry_group_key`.
+
+    Parameters
+    ----------
+    entry : dict
+        An entry dict as produced by :func:`load_spectra_analyses`, with
+        at least keys ``'ptd_label'`` and ``'output_label'``.
+    group_by : list of str
+        Field names that are fixed across the series.  Must be a subset
+        of ``{'ptd_label', 'sc_label', 'cm_label'}`` that leaves exactly
+        one varying field.
+
+    Returns
+    -------
+    fixed_values : list of str
+        Values of the fixed fields, in *group_by* order.
+    varying_value : str
+        Value of the field not in *group_by*.
+
+    Raises
+    ------
+    ValueError
+        If *group_by* does not leave exactly one varying field.
+    """
+    parts = entry['output_label'].split('__', 1)
+    sc_label = parts[0]
+    cm_label = parts[1] if len(parts) == 2 else ''
+    field_map = {
+        'ptd_label': entry['ptd_label'],
+        'sc_label': sc_label,
+        'cm_label': cm_label,
+    }
+
+    all_fields = ['ptd_label', 'sc_label', 'cm_label']
+    varying = [f for f in all_fields if f not in group_by]
+    if len(varying) != 1:
+        raise ValueError(
+            f"group_by must leave exactly one varying field; "
+            f"got group_by={group_by}, varying={varying}"
+        )
+
+    fixed_values = [field_map[f] for f in group_by]
+    varying_value = field_map[varying[0]]
+    return fixed_values, varying_value
+
+
 def extract_exp_params(provenance: dict, exp_params: list[str]) -> dict:
     """
     Extract experimental parameters from a provenance chain.
