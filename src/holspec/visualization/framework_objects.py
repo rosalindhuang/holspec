@@ -601,6 +601,325 @@ def plot_cochain(
     return fig, ax, cbar_obj
 
 
+def plot_cochain_grid(
+    simplices: Dict[int, List[Tuple]],
+    positions: np.ndarray,
+    values_grid: List[List[Optional[np.ndarray]]],
+    degrees: Sequence[int],
+    *,
+    cmap: str = 'coolwarm',
+    clims: Optional[List[List[Optional[Tuple[float, float]]]]] = None,
+    cbar_share: str = 'row',
+    show_complex: bool = True,
+    complex_kwargs: Optional[Dict[int, Dict]] = None,
+    simplex_kwargs_per_k: Optional[Dict[int, Dict]] = None,
+    axis_config: Optional[Dict] = None,
+    cbar_kwargs: Optional[Dict] = None,
+    cbar_config: Optional[Dict] = None,
+    cell_titles: Optional[List[List[Optional[str]]]] = None,
+    row_labels: Optional[Sequence[str]] = None,
+    col_labels: Optional[Sequence[str]] = None,
+    title: Optional[str] = None,
+    subplot_size: Tuple[float, float] = (3.0, 2.6),
+) -> Tuple[Figure, np.ndarray]:
+    """
+    Plot a grid of cochains on a shared simplicial complex.
+
+    Each row of the grid paints simplices of a given degree, and each
+    column holds one cochain (or ``None`` for an empty cell). Supports
+    per-cell, per-row, or figure-wide shared colorbars, optional row
+    and column labels, and per-cell titles.
+
+    Parameters
+    ----------
+    simplices : Dict[int, List[Tuple]]
+        Simplicial complex. Shared by every cell in the grid.
+    positions : np.ndarray
+        Vertex coordinates, shape (N, 2) or (N, 3). The ambient
+        dimension sets the 2D/3D projection for every axis in the grid.
+    values_grid : list of list of (ndarray or None)
+        Rectangular grid of cochain values, shape ``[n_rows][n_cols]``.
+        Each non-None entry must have length equal to the number of
+        simplices at the row's degree. ``None`` entries become hidden
+        (empty) cells.
+    degrees : sequence of int
+        Length ``n_rows``. ``degrees[r]`` is the cochain degree painted
+        by all cells in row ``r``. Rows may use different degrees.
+    cmap : str, default 'coolwarm'
+        Colormap name.
+    clims : list of list of (tuple or None), optional
+        Per-cell color limit overrides, same shape as ``values_grid``.
+        ``None`` entries fall back to symmetric auto-clim from each
+        cell's own values.
+    cbar_share : {'none', 'row', 'figure'}, default 'row'
+        Colorbar sharing scope:
+
+        - ``'none'``: one colorbar per cell.
+        - ``'row'``: one colorbar per row, using the widest symmetric
+          clim across that row's resolved cell clims.
+        - ``'figure'``: one colorbar for the whole grid.
+    show_complex : bool, default True
+        Passed through to ``plot_cochain`` for each cell.
+    complex_kwargs : Dict[int, Dict], optional
+        Per-dimension reference-geometry kwargs, passed through to
+        ``plot_cochain``.
+    simplex_kwargs_per_k : Dict[int, Dict], optional
+        Per-degree simplex kwargs. ``simplex_kwargs_per_k[k]`` is
+        passed as ``simplex_kwargs`` to ``plot_cochain`` for rows with
+        degree ``k``.
+    axis_config : Dict, optional
+        Keyword arguments passed to ``format_axis`` for each cell.
+    cbar_kwargs : Dict, optional
+        Colorbar-creation kwargs passed to ``fig.colorbar`` (e.g.
+        ``shrink``, ``aspect``, ``pad``, ``fraction``). Merged over
+        the default ``{'shrink': 0.85}``. ``location='right'`` is
+        set by the function and cannot be overridden here.
+    cbar_config : Dict, optional
+        Colorbar-styling kwargs passed to ``format_cbar`` after
+        creation (e.g. ``label``, ``label_fontsize``). Applied to
+        every colorbar the function creates, regardless of
+        ``cbar_share``.
+    cell_titles : list of list of (str or None), optional
+        Per-cell titles, same shape as ``values_grid``. Rendered via
+        ``ax.set_title``.
+    row_labels : sequence of str, optional
+        Length ``n_rows``. Row labels placed on the leftmost cell of
+        each row (as ``ylabel`` in 2D or ``text2D`` in 3D).
+    col_labels : sequence of str, optional
+        Length ``n_cols``. Column headers placed on the top cell of
+        each column (as ``set_title``). If ``cell_titles[0][c]`` is
+        already set, ``col_labels[c]`` is silently dropped for that
+        column — per-cell titles take precedence.
+    title : str, optional
+        Figure suptitle.
+    subplot_size : tuple of float, default (3.0, 2.6)
+        Size per subplot (width, height). Total figure size scales
+        with the grid dimensions.
+
+    Returns
+    -------
+    fig : Figure
+        The matplotlib figure.
+    axes : np.ndarray
+        2D array of Axes, shape ``(n_rows, n_cols)``. Cells that were
+        passed as ``None`` in ``values_grid`` have been hidden with
+        ``axis('off')`` but are still present in the array.
+    """
+    from matplotlib.colors import Normalize
+    import matplotlib.cm as cm
+
+    if cbar_share not in ('none', 'row', 'figure'):
+        raise ValueError(
+            f"cbar_share must be one of 'none', 'row', 'figure'; "
+            f"got {cbar_share!r}"
+        )
+
+    merged_cbar_kwargs = {'shrink': 1, **(cbar_kwargs or {})}
+    shared_cbar_kwargs = {**merged_cbar_kwargs, 'location': 'right'}
+
+    n_rows = len(values_grid)
+    if n_rows == 0:
+        raise ValueError("values_grid is empty")
+    n_cols = len(values_grid[0])
+    for r, row in enumerate(values_grid):
+        if len(row) != n_cols:
+            raise ValueError(
+                f"values_grid must be rectangular: row 0 has {n_cols} "
+                f"cells but row {r} has {len(row)}"
+            )
+    if len(degrees) != n_rows:
+        raise ValueError(
+            f"degrees has length {len(degrees)} but values_grid has "
+            f"{n_rows} rows"
+        )
+    if clims is not None and (
+        len(clims) != n_rows
+        or any(len(row) != n_cols for row in clims)
+    ):
+        raise ValueError("clims must have the same shape as values_grid")
+    if cell_titles is not None and (
+        len(cell_titles) != n_rows
+        or any(len(row) != n_cols for row in cell_titles)
+    ):
+        raise ValueError("cell_titles must have the same shape as values_grid")
+
+    ambient_dim = positions.shape[1]
+    if ambient_dim not in (2, 3):
+        raise ValueError(
+            f"positions must be 2D or 3D, got shape {positions.shape}"
+        )
+
+    # First pass: resolve per-cell clims (override or symmetric auto).
+    cell_clims: List[List[Optional[Tuple[float, float]]]] = [
+        [None] * n_cols for _ in range(n_rows)
+    ]
+    for r in range(n_rows):
+        for c in range(n_cols):
+            vals = values_grid[r][c]
+            if vals is None:
+                continue
+            override = clims[r][c] if clims is not None else None
+            if override is not None:
+                cell_clims[r][c] = override
+            else:
+                absmax = float(np.max(np.abs(vals))) if vals.size else 1.0
+                cell_clims[r][c] = (-absmax, absmax)
+
+    # Aggregate clims by share scope (symmetric widening).
+    def _widen_symmetric(clim_list):
+        absmax = 0.0
+        for cl in clim_list:
+            if cl is None:
+                continue
+            absmax = max(absmax, abs(cl[0]), abs(cl[1]))
+        return (-absmax, absmax) if absmax > 0 else None
+
+    final_clims: List[List[Optional[Tuple[float, float]]]] = [
+        [cell_clims[r][c] for c in range(n_cols)] for r in range(n_rows)
+    ]
+    if cbar_share == 'row':
+        for r in range(n_rows):
+            row_clim = _widen_symmetric(cell_clims[r])
+            if row_clim is None:
+                continue
+            for c in range(n_cols):
+                if cell_clims[r][c] is not None:
+                    final_clims[r][c] = row_clim
+    elif cbar_share == 'figure':
+        fig_clim = _widen_symmetric(
+            [cell_clims[r][c] for r in range(n_rows) for c in range(n_cols)]
+        )
+        if fig_clim is not None:
+            for r in range(n_rows):
+                for c in range(n_cols):
+                    if cell_clims[r][c] is not None:
+                        final_clims[r][c] = fig_clim
+
+    # Create figure and axes.
+    subplot_kw = {'projection': '3d'} if ambient_dim == 3 else {}
+    figsize = (subplot_size[0] * n_cols, subplot_size[1] * n_rows)
+    fig, axes = plt.subplots(
+        n_rows, n_cols,
+        figsize=figsize,
+        subplot_kw=subplot_kw,
+        squeeze=False,
+        layout='constrained',
+    )
+
+    # Plot cells.
+    for r in range(n_rows):
+        for c in range(n_cols):
+            ax = axes[r, c]
+            vals = values_grid[r][c]
+            if vals is None:
+                ax.axis('off')
+                continue
+            k = degrees[r]
+            _, _, cell_cbar = plot_cochain(
+                simplices, positions, k, vals,
+                cmap=cmap,
+                clim=final_clims[r][c],
+                show_complex=show_complex,
+                complex_kwargs=complex_kwargs,
+                simplex_kwargs=(simplex_kwargs_per_k or {}).get(k),
+                cbar=(cbar_share == 'none'),
+                cbar_kwargs=merged_cbar_kwargs if cbar_share == 'none' else None,
+                ax=ax,
+            )
+            if cell_cbar is not None and cbar_config:
+                format_cbar(cell_cbar, **cbar_config)
+            if axis_config:
+                format_axis(ax, **axis_config)
+            if cell_titles is not None and cell_titles[r][c] is not None:
+                ax.set_title(cell_titles[r][c])
+            if ambient_dim == 3:
+                ax.set_box_aspect([1, 1, 1])
+
+    # Column labels (top row). Skip columns where cell_titles[0][c] is set.
+    if col_labels is not None:
+        for c in range(n_cols):
+            if col_labels[c] is None:
+                continue
+            if (
+                cell_titles is not None
+                and cell_titles[0][c] is not None
+            ):
+                continue
+            if values_grid[0][c] is None:
+                continue
+            axes[0, c].set_title(col_labels[c])
+
+    # Row labels (leftmost column).
+    if row_labels is not None:
+        for r in range(n_rows):
+            if row_labels[r] is None:
+                continue
+            left_ax = axes[r, 0]
+            if values_grid[r][0] is None:
+                # Leftmost cell is blank — use fig.text placed at the row center.
+                bbox = left_ax.get_position()
+                fig.text(
+                    bbox.x0 - 0.01, bbox.y0 + bbox.height / 2,
+                    row_labels[r],
+                    rotation=90, ha='right', va='center', fontsize=11,
+                )
+                continue
+            if ambient_dim == 2:
+                left_ax.set_ylabel(row_labels[r], fontsize=11, labelpad=10)
+            else:
+                left_ax.text2D(
+                    -0.15, 0.5, row_labels[r],
+                    transform=left_ax.transAxes,
+                    rotation=90, ha='right', va='center', fontsize=11,
+                )
+
+    # Shared colorbars. Pass location='right' to ensure placement at the
+    # right edge of the row/figure, even with axis-off cells in the span.
+    if cbar_share == 'row':
+        for r in range(n_rows):
+            row_cells = [
+                final_clims[r][c] for c in range(n_cols)
+                if final_clims[r][c] is not None
+            ]
+            if not row_cells:
+                continue
+            vmin, vmax = row_cells[0]
+            sm = cm.ScalarMappable(
+                norm=Normalize(vmin=vmin, vmax=vmax), cmap=cmap,
+            )
+            sm.set_array([])
+            cbar_obj = fig.colorbar(
+                sm, ax=list(axes[r, :]),
+                **shared_cbar_kwargs,
+            )
+            if cbar_config:
+                format_cbar(cbar_obj, **cbar_config)
+    elif cbar_share == 'figure':
+        all_cells = [
+            final_clims[r][c]
+            for r in range(n_rows)
+            for c in range(n_cols)
+            if final_clims[r][c] is not None
+        ]
+        if all_cells:
+            vmin, vmax = all_cells[0]
+            sm = cm.ScalarMappable(
+                norm=Normalize(vmin=vmin, vmax=vmax), cmap=cmap,
+            )
+            sm.set_array([])
+            cbar_obj = fig.colorbar(
+                sm, ax=list(axes.ravel()),
+                **shared_cbar_kwargs,
+            )
+            if cbar_config:
+                format_cbar(cbar_obj, **cbar_config)
+
+    if title is not None:
+        fig.suptitle(title, fontsize=12)
+
+    return fig, axes
+
+
 # =============================================================================
 # Spectra visualization
 # =============================================================================
@@ -615,7 +934,7 @@ def plot_eigval_distribution(
     title: Optional[str] = None,
     subplot_size: Tuple[float, float] = (4.5, 4),
     float_fmt: str = '.4g',
-) -> Figure:
+) -> Tuple[Figure, List[Axes]]:
     """
     Plot eigenvalue distribution bar charts for one spectra analysis,
     with one subplot per degree.
@@ -644,8 +963,11 @@ def plot_eigval_distribution(
 
     Returns
     -------
-    Figure
+    fig : Figure
         The matplotlib figure.
+    axes : list of Axes
+        One Axes per degree, in the order given by
+        ``analysis_config['degrees']``.
     """
     if axis_config is None:
         axis_config = {}
@@ -711,7 +1033,7 @@ def plot_eigval_distribution(
     if title is not None:
         fig.suptitle(title, fontsize=11)
     fig.tight_layout()
-    return fig
+    return fig, axes
 
 
 def plot_observable_vs_parameter(
@@ -723,7 +1045,7 @@ def plot_observable_vs_parameter(
     fill_alpha: float = 0.2,
     title: Optional[str] = None,
     subplot_size: Tuple[float, float] = (4.5, 4),
-) -> Figure:
+) -> Tuple[Figure, List[Axes]]:
     """
     Plot an observable vs experiment parameter, one subplot per degree.
 
@@ -748,8 +1070,11 @@ def plot_observable_vs_parameter(
 
     Returns
     -------
-    Figure
+    fig : Figure
         The matplotlib figure.
+    axes : list of Axes
+        One Axes per degree, in the order given by
+        ``series['analysis_keys']``.
     """
     if axis_config is None:
         axis_config = {}
@@ -790,7 +1115,7 @@ def plot_observable_vs_parameter(
     if title is not None:
         fig.suptitle(title, fontsize=11)
     fig.tight_layout()
-    return fig
+    return fig, axes
 
 
 def plot_distribution_heatmap(
@@ -802,7 +1127,7 @@ def plot_distribution_heatmap(
     cbar_config: Optional[Dict] = None,
     title: Optional[str] = None,
     subplot_size: Tuple[float, float] = (5, 4),
-) -> Figure:
+) -> Tuple[Figure, List[Axes]]:
     """
     Plot eigenvalue distribution heatmaps, one subplot per degree.
 
@@ -827,8 +1152,11 @@ def plot_distribution_heatmap(
 
     Returns
     -------
-    Figure
+    fig : Figure
         The matplotlib figure.
+    axes : list of Axes
+        One Axes per degree, in the order given by
+        ``series['analysis_keys']``.
     """
     if axis_config is None:
         axis_config = {}
@@ -891,7 +1219,7 @@ def plot_distribution_heatmap(
     if title is not None:
         fig.suptitle(title, fontsize=11)
     fig.tight_layout()
-    return fig
+    return fig, axes
 
 
 def plot_distribution_lines(
@@ -902,7 +1230,7 @@ def plot_distribution_lines(
     axis_config: Optional[Dict] = None,
     title: Optional[str] = None,
     subplot_size: Tuple[float, float] = (5, 4),
-) -> Figure:
+) -> Tuple[Figure, List[Axes]]:
     """
     Overlay eigenvalue distributions as colored lines, one subplot per degree.
 
@@ -925,8 +1253,11 @@ def plot_distribution_lines(
 
     Returns
     -------
-    Figure
+    fig : Figure
         The matplotlib figure.
+    axes : list of Axes
+        One Axes per degree, in the order given by
+        ``series['analysis_keys']``.
     """
     if axis_config is None:
         axis_config = {}
@@ -968,7 +1299,7 @@ def plot_distribution_lines(
     if title is not None:
         fig.suptitle(title, fontsize=11)
     fig.tight_layout()
-    return fig
+    return fig, axes
 
 
 def plot_distribution_distance(
@@ -979,7 +1310,7 @@ def plot_distribution_distance(
     line_config: Optional[Dict] = None,
     title: Optional[str] = None,
     subplot_size: Tuple[float, float] = (4.5, 4),
-) -> Figure:
+) -> Tuple[Figure, List[Axes]]:
     """
     Plot successive distribution distance vs experiment parameter,
     one subplot per degree.
@@ -1003,8 +1334,11 @@ def plot_distribution_distance(
 
     Returns
     -------
-    Figure
+    fig : Figure
         The matplotlib figure.
+    axes : list of Axes
+        One Axes per degree, in the order given by
+        ``series['analysis_keys']``.
     """
     if axis_config is None:
         axis_config = {}
@@ -1035,5 +1369,5 @@ def plot_distribution_distance(
     if title is not None:
         fig.suptitle(title, fontsize=11)
     fig.tight_layout()
-    return fig
+    return fig, axes
 

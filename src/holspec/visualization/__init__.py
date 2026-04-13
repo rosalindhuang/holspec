@@ -47,4 +47,5 @@ __all__ = [
     'plot_simplicial_complex_2d',
     'plot_simplicial_complex_3d',
     'plot_cochain',
+    'plot_cochain_grid',
 ]
