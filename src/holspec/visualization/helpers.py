@@ -8,9 +8,11 @@ from matplotlib.animation import FuncAnimation
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.colorbar import Colorbar
+from PIL import Image
 import os
 import shutil
 import subprocess
+import warnings
 from typing import Optional, Tuple, Dict, Any, List, Union
 from pathlib import Path
 
@@ -474,3 +476,128 @@ def make_fig_path(
     if flat:
         return fig_dir / dataset_name / f"{subdir}__{figname}"
     return fig_dir / dataset_name / subdir / figname
+
+
+# =============================================================================
+# Image composition
+# =============================================================================
+
+def combine_images(
+    image_paths: List[Union[str, Path]],
+    output_path: Union[str, Path],
+    *,
+    direction: str = "horizontal",
+    background: Optional[Union[str, Tuple[int, int, int, int]]] = None,
+    align: str = "start",
+    on_missing: str = "warn",
+    dpi: Optional[Tuple[float, float]] = None,
+) -> Optional[Path]:
+    """
+    Combine images horizontally or vertically into a single image file.
+
+    Each input is opened as RGBA and pasted onto a new canvas sized to fit
+    all images. Useful for composing heterogeneous figures that matplotlib
+    subplots cannot produce, e.g. independently saved per-degree Laplacian
+    plots with different internal layouts.
+
+    Parameters
+    ----------
+    image_paths : list of str or Path
+        Paths to the images to combine, in the order they should appear.
+    output_path : str or Path
+        Path for the combined output image. Parent directories are created
+        if they do not exist.
+    direction : {'horizontal', 'vertical'}, default 'horizontal'
+        Layout direction. 'horizontal' places images side-by-side;
+        'vertical' stacks them top-to-bottom.
+    background : str, tuple, or None, default None
+        Canvas background color. ``None`` gives a transparent canvas.
+        Otherwise any color string or RGBA tuple accepted by PIL.
+    align : {'start', 'center', 'end'}, default 'start'
+        Alignment of each image along the axis perpendicular to *direction*.
+        For 'horizontal': 'start' = top, 'end' = bottom. For 'vertical':
+        'start' = left, 'end' = right. 'center' centers each image.
+    on_missing : {'warn', 'error', 'skip'}, default 'warn'
+        Behavior when an input path does not exist. 'warn' emits a warning
+        and skips the missing file; 'error' raises ``FileNotFoundError``;
+        'skip' silently ignores the missing file.
+    dpi : tuple of float, optional
+        DPI metadata ``(xdpi, ydpi)`` written into the output PNG's pHYs
+        chunk. If ``None`` (default), the DPI is inherited from the first
+        input image; if that image has none either, no DPI metadata is
+        written. This is a physical-size hint for viewers only — it does
+        not change the output pixel resolution. Without it, combining
+        high-DPI source images tends to look blurry in viewers that
+        respect DPI metadata, because they fall back to ~72–96 DPI.
+
+    Returns
+    -------
+    Path or None
+        The output path if the file was written, or ``None`` if no input
+        images existed to combine.
+    """
+    if direction not in {"horizontal", "vertical"}:
+        raise ValueError(
+            f"direction must be 'horizontal' or 'vertical', got {direction!r}"
+        )
+    if align not in {"start", "center", "end"}:
+        raise ValueError(
+            f"align must be 'start', 'center', or 'end', got {align!r}"
+        )
+    if on_missing not in {"warn", "error", "skip"}:
+        raise ValueError(
+            f"on_missing must be 'warn', 'error', or 'skip', got {on_missing!r}"
+        )
+
+    images: List[Image.Image] = []
+    for path in image_paths:
+        path = Path(path)
+        if not path.exists():
+            if on_missing == "error":
+                raise FileNotFoundError(f"Image not found: {path}")
+            if on_missing == "warn":
+                warnings.warn(f"combine_images: skipping missing file {path}")
+            continue
+        images.append(Image.open(path).convert("RGBA"))
+
+    if not images:
+        return None
+
+    bg = background if background is not None else (0, 0, 0, 0)
+
+    if direction == "horizontal":
+        total_width = sum(img.width for img in images)
+        max_height = max(img.height for img in images)
+        canvas = Image.new("RGBA", (total_width, max_height), bg)
+        x_offset = 0
+        for img in images:
+            if align == "start":
+                y = 0
+            elif align == "center":
+                y = (max_height - img.height) // 2
+            else:  # end
+                y = max_height - img.height
+            canvas.paste(img, (x_offset, y))
+            x_offset += img.width
+    else:  # vertical
+        max_width = max(img.width for img in images)
+        total_height = sum(img.height for img in images)
+        canvas = Image.new("RGBA", (max_width, total_height), bg)
+        y_offset = 0
+        for img in images:
+            if align == "start":
+                x = 0
+            elif align == "center":
+                x = (max_width - img.width) // 2
+            else:  # end
+                x = max_width - img.width
+            canvas.paste(img, (x, y_offset))
+            y_offset += img.height
+
+    effective_dpi = dpi if dpi is not None else images[0].info.get('dpi')
+
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    save_kwargs = {'dpi': effective_dpi} if effective_dpi is not None else {}
+    canvas.save(output_path, **save_kwargs)
+    return output_path

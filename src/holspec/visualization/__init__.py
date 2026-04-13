@@ -15,6 +15,7 @@ __all__ = [
     'animate_3d_turn',
     'make_movie',
     'make_fig_path',
+    'combine_images',
 
     # From basic_plots.py
     'plot_lines',
