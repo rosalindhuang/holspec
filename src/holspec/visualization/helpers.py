@@ -439,17 +439,25 @@ def make_movie(
 def make_fig_path(
     fig_dir: Path,
     dataset_name: str,
-    subdir: str,
+    group: Union[str, List[str]],
     figname: str,
+    *,
+    leaf: Optional[str] = None,
     flat: bool = True,
-    group_by: Optional[str] = None,
 ) -> Path:
-    """Build figure output path, optionally grouping by a top-level subdirectory.
+    """Build a figure output path from a group label and optional leaf.
 
-    When *group_by* is set, files are placed under
-    ``fig_dir / dataset_name / group_by /`` with *subdir* flattened into
-    the filename.  Used for non-experiment datasets to group outputs by
-    point data label.
+    The output path has two conceptual slots:
+    - ``group``: identifying parts that are fixed across a set of related
+      figures (e.g., the ``group_by`` fields of an experiment series).
+    - ``leaf`` (optional): a per-file label, e.g. the varying experiment
+      parameter value for an individual figure; omitted for aggregate
+      outputs like movies and stacks that span the whole group.
+
+    The *flat* flag controls whether *group* becomes a filename prefix
+    (all four values joined into a flat filename under
+    ``fig_dir/dataset_name``) or a real subdirectory wrapping the leaf
+    filename.
 
     Parameters
     ----------
@@ -457,25 +465,46 @@ def make_fig_path(
         Root figure output directory.
     dataset_name : str
         Dataset name subdirectory.
-    subdir : str
-        Pipeline output label (used as subdirectory or filename prefix).
+    group : str or list of str
+        Fixed label parts.  A list is joined internally with ``'__'``.  A
+        bare string is treated as a single-element group.
     figname : str
-        Base filename for the figure.
+        Figure-type base filename with extension, e.g. ``'eigval_dstrb.png'``.
+    leaf : str, optional
+        Per-file label (e.g. the varying experiment parameter value).
+        Omit for aggregate figures that span a whole group.
     flat : bool, default True
-        If True, flatten *subdir* into the filename rather than using a
-        subdirectory.
-    group_by : str or None, default None
-        Optional grouping subdirectory name.  When set, overrides *flat*.
+        If True, everything lives directly under
+        ``fig_dir/dataset_name`` with parts joined by ``'__'``.  If False,
+        *group* becomes a subdirectory and the leaf filename sits inside.
 
     Returns
     -------
     Path
+
+    Notes
+    -----
+    Output shapes::
+
+        flat=True,  leaf given: fig_dir/dataset_name/{group}__{leaf}__{figname}
+        flat=True,  no leaf:    fig_dir/dataset_name/{group}__{figname}
+        flat=False, leaf given: fig_dir/dataset_name/{group}/{leaf}__{figname}
+        flat=False, no leaf:    fig_dir/dataset_name/{group}/{figname}
+
+    where ``{group}`` is the ``'__'``-joined form of *group* (or the bare
+    string when *group* is already a string).
     """
-    if group_by is not None:
-        return fig_dir / dataset_name / group_by / f"{subdir}__{figname}"
+    group_str = '__'.join(group) if not isinstance(group, str) else group
+
     if flat:
-        return fig_dir / dataset_name / f"{subdir}__{figname}"
-    return fig_dir / dataset_name / subdir / figname
+        parts = [group_str]
+        if leaf:
+            parts.append(leaf)
+        parts.append(figname)
+        return fig_dir / dataset_name / '__'.join(parts)
+
+    filename = f"{leaf}__{figname}" if leaf else figname
+    return fig_dir / dataset_name / group_str / filename
 
 
 # =============================================================================
