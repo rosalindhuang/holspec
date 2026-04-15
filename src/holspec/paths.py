@@ -3,6 +3,7 @@
 Project paths and directory utilities.
 """
 from pathlib import Path
+from fnmatch import fnmatch
 import shutil
 from functools import lru_cache
 
@@ -52,9 +53,11 @@ SRC_DIR = PROJECT_ROOT / "src"
 # =============================================================================
 
 def prepare_directory(
-    path: Path, 
-    clear_mode: str | bool | None = None, 
-    verbose: bool = True
+    path: Path,
+    clear_mode: str | bool | None = None,
+    include_patterns: list[str] | None = None,
+    exclude_patterns: list[str] | None = None,
+    verbose: bool = True,
 ) -> None:
     """
     Ensure a directory exists, creating it if necessary, and optionally clearing its contents.
@@ -69,6 +72,15 @@ def prepare_directory(
         - True or 'all': Remove all files and subdirectories
         - 'files': Remove only files, keep subdirectories
         - 'dirs': Remove only subdirectories, keep files
+    include_patterns : list of str, optional
+        Glob patterns for item names (e.g. ``['pipeline_*.yml', 'pipeline_*_stages']``).
+        If given, only items whose name matches at least one pattern are
+        considered for clearing. If None or empty, all items are candidates
+        (subject to ``clear_mode``). Exact names are valid patterns.
+    exclude_patterns : list of str, optional
+        Glob patterns for items to preserve. Items whose name matches any
+        pattern are skipped, even if ``clear_mode`` and ``include_patterns``
+        would otherwise remove them. Exact names are valid patterns.
     verbose : bool, default=True
         If True, print status messages.
 
@@ -78,46 +90,58 @@ def prepare_directory(
     """
     if path is None:
         return
-    
+
     # Normalize boolean and string inputs for clear_mode
     if clear_mode is True:
         clear_mode = 'all'
     elif clear_mode is False or clear_mode == 'none':
         clear_mode = None
-    
+
     # Validate clear_mode
     valid_modes = {None, 'all', 'files', 'dirs'}
     if clear_mode not in valid_modes:
         raise ValueError(f"clear_mode must be one of {valid_modes} or a boolean, got '{clear_mode}'")
-    
+
     if path.exists() and path.is_dir():
         if verbose:
             print(f"Directory exists: {path}")
-        
+
         if clear_mode is not None:
             items = list(path.iterdir())
             if not items:
                 return
-            
+
+            # Apply pattern filters
+            def _pattern_match(name):
+                if include_patterns and not any(fnmatch(name, p) for p in include_patterns):
+                    return False
+                if exclude_patterns and any(fnmatch(name, p) for p in exclude_patterns):
+                    return False
+                return True
+
+            items = [item for item in items if _pattern_match(item.name)]
+            if not items:
+                return
+
             if verbose:
                 print(f"Clearing directory ({clear_mode}): {path}")
-            
+
             files = [item for item in items if item.is_file()]
             dirs = [item for item in items if item.is_dir()]
-            
+
             # Clear based on mode
             if clear_mode in ('all', 'files'):
                 for item in files:
                     item.unlink()
                 if verbose and files:
                     print(f"  Removed {len(files)} file(s): {[f.name for f in files]}")
-            
+
             if clear_mode in ('all', 'dirs'):
                 for item in dirs:
                     shutil.rmtree(item, ignore_errors=True)
                 if verbose and dirs:
                     print(f"  Removed {len(dirs)} dir(s): {[d.name for d in dirs]}")
-            
+
             if verbose:
                 print()
     else:
