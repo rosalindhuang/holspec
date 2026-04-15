@@ -8,6 +8,7 @@ point data ensembles from configuration dictionaries.
 
 from pathlib import Path
 from datetime import datetime
+from fnmatch import fnmatch
 
 from holspec.point_data.point_generators import create_point_generator_label
 from holspec.point_data.ensemble import PointDataEnsemble
@@ -126,8 +127,9 @@ def run_data_generation(
     project_root : str or Path
         Project root for resolving relative paths.
     select_categories : list of str or None, optional
-        Categories to generate. If None, generates all categories
-        present in the config.
+        Glob patterns for category names (e.g. ``['test_examples',
+        'exp_noise_trilatt_nr*']``). If None, generates all categories
+        present in the config. Exact names are valid patterns.
 
     Returns
     -------
@@ -144,15 +146,12 @@ def run_data_generation(
     verbose = config['runtime']['verbose']
     dataset_configs = config['configs']
 
-    if select_categories is None:
-        select_categories = list(dataset_configs.keys())
-
     # --- Generate ensembles ---
 
     output_filepaths: dict[str, dict[str, Path]] = {}
 
     for category, configs_dict in dataset_configs.items():
-        if category not in select_categories:
+        if select_categories and not any(fnmatch(category, pat) for pat in select_categories):
             continue
 
         print(f"-" * 60)

@@ -1842,9 +1842,10 @@ def select_pipeline_inputs(
     project_root : str or Path
         Project root directory.
     select_categories : list of str, optional
-        Raw data category names to include (e.g. ``['lattice_2d', 'random']``).
-        Categories correspond to subdirectory names under ``data/raw/``.
-        If None or empty, all categories are included.
+        Glob patterns for raw data category names (e.g. ``['test_examples',
+        'exp_noise_trilatt_nr*']``). Categories correspond to subdirectory
+        names under ``data/raw/``. If None or empty, all categories are
+        included. Exact names are valid patterns.
     select_point_data : list of str, optional
         Glob patterns for point data labels (e.g. ``['trilatthex*', 'randunif*']``).
         If None or empty, all point data labels are included.
@@ -1864,7 +1865,7 @@ def select_pipeline_inputs(
             continue
 
         # Filter by category
-        if select_categories and category_dir.name not in select_categories:
+        if select_categories and not any(fnmatch(category_dir.name, pat) for pat in select_categories):
             continue
 
         for filepath in sorted(category_dir.glob('*.h5')):
@@ -1907,10 +1908,11 @@ def select_stage_outputs(
         select outputs from a specific per-dataset pipeline run (e.g.
         ``'data/interim/exp_noise_trilatt'``).
     select_categories : list of str, optional
-        Raw data category names to include (e.g. ``['test_examples']``).
-        Categories are derived from subdirectory names under ``data/raw/``.
-        If None or empty, all categories are included. Not needed when
-        ``base_dir`` already isolates outputs by dataset.
+        Glob patterns for raw data category names (e.g. ``['test_examples',
+        'exp_noise_trilatt_nr*']``). Categories are derived from subdirectory
+        names under ``data/raw/``. If None or empty, all categories are
+        included. Not needed when ``base_dir`` already isolates outputs by
+        dataset. Exact names are valid patterns.
     select_point_data : list of str, optional
         Glob patterns for point data labels (e.g. ``['trilatthex*', 'randunif*']``).
         If None or empty, all point data labels are included.
@@ -1967,7 +1969,8 @@ def select_stage_outputs(
 
         # Filter by category
         if select_categories:
-            if not ptd_categories.get(ptd_label, set()) & set(select_categories):
+            ptd_cat_set = ptd_categories.get(ptd_label, set())
+            if not any(fnmatch(cat, pat) for cat in ptd_cat_set for pat in select_categories):
                 continue
 
         # Filter by point data label
