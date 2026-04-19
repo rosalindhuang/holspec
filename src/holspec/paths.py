@@ -57,10 +57,11 @@ def prepare_directory(
     clear_mode: str | bool | None = None,
     include_patterns: list[str] | None = None,
     exclude_patterns: list[str] | None = None,
+    create_missing: bool = True,
     verbose: bool = True,
 ) -> None:
     """
-    Ensure a directory exists, creating it if necessary, and optionally clearing its contents.
+    Prepare a directory: optionally create it if missing, and optionally clear its contents.
 
     Parameters
     ----------
@@ -81,6 +82,9 @@ def prepare_directory(
         Glob patterns for items to preserve. Items whose name matches any
         pattern are skipped, even if ``clear_mode`` and ``include_patterns``
         would otherwise remove them. Exact names are valid patterns.
+    create_missing : bool, default=True
+        If True, create the directory when it does not exist. If False,
+        skip creation (clearing still applies if the directory exists).
     verbose : bool, default=True
         If True, print status messages.
 
@@ -144,7 +148,7 @@ def prepare_directory(
 
             if verbose:
                 print()
-    else:
+    elif create_missing:
         if verbose:
             print(f"Creating directory: {path}")
         path.mkdir(parents=True, exist_ok=True)
