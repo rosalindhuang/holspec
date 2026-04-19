@@ -465,6 +465,58 @@ _DEFAULT_COMPLEX_KWARGS_3D = {
 }
 
 
+def make_cochain_kwargs(
+    positions: np.ndarray,
+) -> Tuple[Dict[int, Dict], Dict[int, Dict]]:
+    """Build per-k styling kwargs for ``plot_cochain``, scaled by vertex count.
+
+    Returns styling dicts suitable for passing as ``complex_kwargs`` and
+    ``simplex_kwargs`` to ``plot_cochain``. Radii and linewidths scale
+    with ``1/sqrt(N)`` so plots stay legible across mesh sizes.
+
+    Parameters
+    ----------
+    positions : np.ndarray
+        Vertex coordinates, shape (N, 2) or (N, 3).
+
+    Returns
+    -------
+    complex_kwargs : dict[int, dict]
+        Styling for the reference complex (lower-dim simplices drawn in
+        background), keyed by simplex dimension.
+    simplex_kwargs_per_k : dict[int, dict]
+        Styling for the colored k-simplices, keyed by k. Pass the
+        appropriate entry as ``simplex_kwargs=simplex_kwargs_per_k[k]``.
+    """
+    n_vertices = len(positions)
+    ambient_dim = positions.shape[1]
+
+    lw_ref = 0.6 + 5 / np.sqrt(n_vertices)
+    lw_colored = 1.5 + 15 / np.sqrt(n_vertices)
+
+    if ambient_dim == 2:
+        simplex_r = 0.14 - 0.12 / np.sqrt(n_vertices)
+        complex_r = 0.12 - 0.12 / np.sqrt(n_vertices)
+    elif ambient_dim == 3:
+        simplex_r = 0.10
+        complex_r = 0.10
+    else:
+        raise ValueError(f"positions must be 2D or 3D, got shape {positions.shape}")
+
+    complex_kwargs = {
+        0: {'radius': complex_r},
+        1: {'linewidth': lw_ref},
+        2: {'alpha': 0.15, 'edgecolor': 'k', 'linewidth': lw_ref * 0.5},
+    }
+    simplex_kwargs_per_k = {
+        0: {'radius': simplex_r},
+        1: {'linewidth': lw_colored},
+        2: {'alpha': 0.9, 'edgecolor': 'k', 'linewidth': lw_ref},
+        3: {'alpha': 0.3, 'edgecolor': 'k', 'linewidth': lw_ref * 0.5},
+    }
+    return complex_kwargs, simplex_kwargs_per_k
+
+
 def plot_cochain(
     simplices: Dict[int, List[Tuple]],
     positions: np.ndarray,
