@@ -21,6 +21,7 @@ from .helpers import (
     entry_fixed_varying,
     extract_exp_params,
     build_spectra_file_records,
+    compute_transition_points,
     save_exp_series,
     load_spectra_analyses,
     load_experiment_series,

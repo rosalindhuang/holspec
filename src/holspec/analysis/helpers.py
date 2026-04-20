@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
+
 from holspec.utilities import save_h5, read_h5
 from holspec.pipeline import trace_provenance, select_stage_outputs
 
@@ -201,6 +203,43 @@ def build_spectra_file_records(
     return records
 
 
+def compute_transition_points(
+    series: dict,
+) -> dict[tuple[int, str], float]:
+    """
+    Per-(k, component) phase-transition point for an experiment series.
+
+    For each (k, component) key, returns the midpoint between the two
+    consecutive ``exp_values`` at which ``distance_series[(k, comp)]``
+    peaks.  Returns NaN for keys whose distance series is empty.
+
+    Parameters
+    ----------
+    series : dict
+        Experiment series dict with keys ``'exp_values'``,
+        ``'analysis_keys'``, and ``'distance_series'``.
+
+    Returns
+    -------
+    dict[tuple[int, str], float]
+        Mapping ``{(k, component): transition_point}``.
+    """
+    exp_values = np.asarray(series['exp_values'])
+    analysis_keys = series['analysis_keys']
+    distance_series = series['distance_series']
+
+    midpoints = 0.5 * (exp_values[:-1] + exp_values[1:])
+
+    transition_points = {}
+    for k, comp in analysis_keys:
+        dists = np.asarray(distance_series[(k, comp)])
+        if dists.size == 0:
+            transition_points[(k, comp)] = float('nan')
+        else:
+            transition_points[(k, comp)] = float(midpoints[np.argmax(dists)])
+    return transition_points
+
+
 def save_exp_series(
     filepath: str | Path,
     dataset_name: str,
@@ -221,7 +260,8 @@ def save_exp_series(
         Fields identifying this series (e.g. ('delaunay', 'combinatorial')).
     series : dict
         Series data with keys: 'exp_param', 'exp_values',
-        'observable_series', 'distribution_series', 'distance_series'.
+        'observable_series', 'distribution_series', 'distance_series',
+        'transition_points'.
     analysis_config : dict
         Analysis configuration (native Python types; HDF5 conversion
         is handled by save_h5 / to_h5_attribute).
@@ -259,6 +299,9 @@ def save_exp_series(
 
     for k, comp in analysis_keys:
         save_h5(filepath, datasets={f'degree_{k}_{comp}': series['distance_series'][(k, comp)]}, group='distances', mode='update')
+
+    for k, comp in analysis_keys:
+        save_h5(filepath, datasets={f'degree_{k}_{comp}': series['transition_points'][(k, comp)]}, group='transitions', mode='update')
 
 
 # =============================================================================
@@ -428,7 +471,11 @@ def load_experiment_series(
         *series_dict* contains keys ``'exp_param'``, ``'exp_values'``,
         ``'group_label'``, ``'observable_series'``,
         ``'distribution_series'``, ``'distance_series'``,
-        ``'analysis_keys'``, ``'observable_names'``.
+        ``'transition_points'``, ``'analysis_keys'``,
+        ``'observable_names'``.
+
+        ``'transition_points'`` is ``{}`` for files saved before
+        transition points were persisted.
     """
     exp_series_dir = Path(exp_series_dir)
     result = {}
@@ -472,6 +519,15 @@ def load_experiment_series(
                                  dataset_names=[f'degree_{k}_{comp}'])
             distance_series[(int(k), comp)] = dist_ds[f'degree_{k}_{comp}']
 
+        transition_points = {}
+        try:
+            for k, comp in analysis_keys:
+                trans_ds, _ = read_h5(filepath, group='transitions',
+                                      dataset_names=[f'degree_{k}_{comp}'])
+                transition_points[(int(k), comp)] = float(trans_ds[f'degree_{k}_{comp}'])
+        except KeyError:
+            transition_points = {}
+
         series_key = (dataset_name, group_key)
         result[series_key] = {
             'exp_param': exp_param,
@@ -480,6 +536,7 @@ def load_experiment_series(
             'observable_series': observable_series,
             'distribution_series': distribution_series,
             'distance_series': distance_series,
+            'transition_points': transition_points,
             'analysis_keys': [(int(k), comp) for k, comp in analysis_keys],
             'observable_names': observable_names,
         }
