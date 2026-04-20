@@ -1092,6 +1092,7 @@ def plot_observable_vs_parameter(
     series: dict,
     obs_name: str,
     *,
+    mark_transition: bool = False,
     axis_config: Optional[Dict] = None,
     line_config: Optional[Dict] = None,
     fill_alpha: float = 0.2,
@@ -1105,9 +1106,14 @@ def plot_observable_vs_parameter(
     ----------
     series : dict
         Experiment series dict with keys 'exp_param', 'exp_values',
-        'analysis_keys', 'observable_series'.
+        'analysis_keys', 'observable_series'. If ``mark_transition`` is
+        True, ``'transition_points'`` is also required.
     obs_name : str
         Observable name to plot (e.g. 'dim_ker', 'eigval_mean_nz').
+    mark_transition : bool, default False
+        If True, draw a red-dashed vertical line at the per-(k, comp)
+        transition point from ``series['transition_points']``, with an
+        annotation of the exp_param value.
     axis_config : dict, optional
         Keyword arguments passed to format_axis.
     line_config : dict, optional
@@ -1157,6 +1163,11 @@ def plot_observable_vs_parameter(
         format_axis(ax, title=f"${make_Lk_label(k, comp)}$",
                     ylabel=obs_label, xlabel=exp_param, **axis_config)
 
+        if mark_transition:
+            _draw_transition_marker(
+                ax, series['transition_points'].get((k, comp)),
+            )
+
         # Legend on first subplot only
         if col == 0:
             ax.plot([], [], color=f'C{k}', label='mean', **line_config)
@@ -1175,6 +1186,7 @@ def plot_distribution_heatmap(
     *,
     cmap: str = 'magma',
     log: bool = False,
+    mark_transition: bool = False,
     axis_config: Optional[Dict] = None,
     cbar_config: Optional[Dict] = None,
     title: Optional[str] = None,
@@ -1187,11 +1199,16 @@ def plot_distribution_heatmap(
     ----------
     series : dict
         Experiment series dict with keys 'exp_param', 'exp_values',
-        'analysis_keys', 'distribution_series'.
+        'analysis_keys', 'distribution_series'. If ``mark_transition``
+        is True, ``'transition_points'`` is also required.
     cmap : str, default 'magma'
         Colormap name.
     log : bool, default False
         If True, apply LogNorm to the density values.
+    mark_transition : bool, default False
+        If True, draw a red-dashed horizontal line at the per-(k, comp)
+        transition point from ``series['transition_points']`` (exp_param
+        is on the y-axis of the heatmap).
     axis_config : dict, optional
         Keyword arguments passed to format_axis.
     cbar_config : dict, optional
@@ -1268,6 +1285,12 @@ def plot_distribution_heatmap(
         format_axis(ax, title=f"${make_Lk_label(k, comp)}$",
                     ylabel=exp_param, **axis_config)
 
+        if mark_transition:
+            _draw_transition_marker(
+                ax, series['transition_points'].get((k, comp)),
+                orientation='horizontal',
+            )
+
     if title is not None:
         fig.suptitle(title, fontsize=11)
     fig.tight_layout()
@@ -1279,6 +1302,7 @@ def plot_distribution_lines(
     *,
     cmap: str = 'viridis',
     linewidth: float = 1.5,
+    mark_transition: bool = False,
     axis_config: Optional[Dict] = None,
     title: Optional[str] = None,
     subplot_size: Tuple[float, float] = (5, 4),
@@ -1290,11 +1314,15 @@ def plot_distribution_lines(
     ----------
     series : dict
         Experiment series dict with keys 'exp_param', 'exp_values',
-        'analysis_keys', 'distribution_series'.
+        'analysis_keys', 'distribution_series'. If ``mark_transition``
+        is True, ``'transition_points'`` is also required.
     cmap : str, default 'viridis'
         Colormap name for line colors.
     linewidth : float, default 1.5
         Line width.
+    mark_transition : bool, default False
+        If True, redraw the density curve at the exp_value nearest the
+        per-(k, comp) transition point in red dashed on top.
     axis_config : dict, optional
         Keyword arguments passed to format_axis.
     title : str, optional
@@ -1336,6 +1364,17 @@ def plot_distribution_lines(
             c = (i + 1) / (n_levels + 1)
             ax.plot(x, density_stack[i], color=colormap(c),
                     linewidth=linewidth, zorder=i)
+
+        if mark_transition:
+            transition = series['transition_points'].get((k, comp))
+            if transition is not None and not np.isnan(transition):
+                i_nearest = int(np.argmin(np.abs(exp_values - transition)))
+                nearest_value = float(exp_values[i_nearest])
+                ax.plot(x, density_stack[i_nearest],
+                        color='r', linestyle='--', linewidth=1.5,
+                        zorder=n_levels + 1,
+                        label=f'${nearest_value:.3g}$')
+                ax.legend(fontsize=8, loc='best')
 
         # Colorbar showing parameter values
         sm = plt.cm.ScalarMappable(
