@@ -1070,14 +1070,17 @@ def plot_eigval_distribution(
         summary = esa.observables_summary(k, comp)
         N_k = dims.get(k, 0)
         null_mean = summary['dim_ker']['mean']
-        lam_min = summary['eigval_min_nz']['mean']
-        lam_max = summary['eigval_max']['mean']
+        null_std = summary['dim_ker']['std']
+        lam_min_mean = summary['eigval_min_nz']['mean']
+        lam_min_std = summary['eigval_min_nz']['std']
+        lam_max_mean = summary['eigval_max']['mean']
+        lam_max_std = summary['eigval_max']['std']
         Lk = make_Lk_label(k, comp)
         ann = (
             f'$\\operatorname{{dim}} C_{{{k}}} = {N_k}$\n'
-            f'$\\operatorname{{null}} {Lk} = {null_mean:{float_fmt}}$\n'
-            f'$\\lambda_{{\\min}} = {lam_min:{float_fmt}}$\n'
-            f'$\\lambda_{{\\max}} = {lam_max:{float_fmt}}$'
+            f'$\\operatorname{{null}} {Lk} = {null_mean:{float_fmt}} \\pm {null_std:{float_fmt}}$\n'
+            f'$\\lambda_{{\\min}} = {lam_min_mean:{float_fmt}} \\pm {lam_min_std:{float_fmt}}$\n'
+            f'$\\lambda_{{\\max}} = {lam_max_mean:{float_fmt}} \\pm {lam_max_std:{float_fmt}}$'
         )
         ax.text(0.025, 0.95, ann, transform=ax.transAxes,
                 fontsize=9, color=f'C{k}', va='top', ha='left')
