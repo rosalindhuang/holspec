@@ -1358,6 +1358,7 @@ def plot_distribution_distance(
     series: dict,
     *,
     distance_metric: str = 'distance',
+    mark_transition: bool = False,
     axis_config: Optional[Dict] = None,
     line_config: Optional[Dict] = None,
     title: Optional[str] = None,
@@ -1371,9 +1372,14 @@ def plot_distribution_distance(
     ----------
     series : dict
         Experiment series dict with keys 'exp_param', 'exp_values',
-        'analysis_keys', 'distance_series'.
+        'analysis_keys', 'distance_series'. If ``mark_transition`` is
+        True, ``'transition_points'`` is also required.
     distance_metric : str, default 'distance'
         Name of the distance metric (used for y-axis label).
+    mark_transition : bool, default False
+        If True, draw a red-dashed vertical line at the per-(k, comp)
+        transition point from ``series['transition_points']``, with an
+        annotation of the exp_param value.
     axis_config : dict, optional
         Keyword arguments passed to format_axis.
     line_config : dict, optional
@@ -1418,8 +1424,59 @@ def plot_distribution_distance(
                     xlabel=exp_param, ylabel=f'{distance_metric} distance',
                     **axis_config)
 
+        if mark_transition:
+            _draw_transition_marker(
+                ax, series['transition_points'].get((k, comp)),
+            )
+
     if title is not None:
         fig.suptitle(title, fontsize=11)
     fig.tight_layout()
     return fig, axes
+
+
+def _draw_transition_marker(
+    ax: Axes,
+    transition: Optional[float],
+    orientation: str = 'vertical',
+) -> None:
+    """
+    Draw a red-dashed marker at the phase-transition point, labelled
+    with the numeric transition value.
+
+    No-op if ``transition`` is None or NaN.
+
+    Parameters
+    ----------
+    ax : Axes
+        Target axes.
+    transition : float or None
+        Transition value on the exp_param axis.
+    orientation : {'vertical', 'horizontal'}, default 'vertical'
+        Whether the marker is an axvline (exp_param on x) or axhline
+        (exp_param on y).
+    """
+    if transition is None or np.isnan(transition):
+        return
+    label = f'${transition:.3g}$'
+    if orientation == 'vertical':
+        ax.axvline(x=transition, color='r', linestyle='--',
+                   linewidth=1.2, label=label)
+        ax.annotate(label, xy=(transition, 0.05),
+                    xycoords=ax.get_xaxis_transform(which='grid'),
+                    xytext=(4, 0), textcoords='offset points',
+                    color='red', fontsize=8, ha='left', va='bottom')
+    elif orientation == 'horizontal':
+        ax.axhline(y=transition, color='r', linestyle='--',
+                   linewidth=1.2, label=label)
+        ax.annotate(label, xy=(0.98, transition),
+                    xycoords=ax.get_yaxis_transform(which='grid'),
+                    xytext=(0, 4), textcoords='offset points',
+                    color='red', fontsize=8, ha='right', va='bottom',
+                    bbox=dict(facecolor='white', alpha=0.75, edgecolor='r',
+                              boxstyle='round,pad=0.2'))
+    else:
+        raise ValueError(
+            f"orientation must be 'vertical' or 'horizontal', got {orientation!r}."
+        )
 
