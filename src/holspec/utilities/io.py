@@ -205,8 +205,13 @@ def read_h5(
         attributes = {}
         for key in source.attrs.keys():
             value = source.attrs[key]
-            # Try to parse JSON strings back to dicts/lists
-            if isinstance(value, str):
+            # Only JSON-decode strings that to_h5_attribute would have produced:
+            # dicts ({...}), non-native lists ([...]), or None ('null'). Avoids
+            # silently coercing plain strings that happen to parse as JSON
+            # numbers (e.g. a hex hash like '28e657807056' → inf).
+            if isinstance(value, str) and (
+                value == 'null' or value[:1] in ('{', '[')
+            ):
                 try:
                     attributes[key] = json.loads(value)
                 except json.JSONDecodeError:
