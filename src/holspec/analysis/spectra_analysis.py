@@ -482,9 +482,14 @@ class EnsembleSpectraAnalysis:
 
     def _validate_and_set_eigenvector_spectra(
         self,
-        eigenvector_spectra: dict[tuple[int, str], list[Spectrum]],
+        eigenvector_spectra: dict[tuple[int, str], list[Spectrum | None]],
     ) -> None:
-        """Validate and store eigenvector spectra."""
+        """Validate and store eigenvector spectra.
+
+        Each ``spc_list`` is aligned positionally with ``member_keys``:
+        entry ``i`` corresponds to member position ``i`` and may be ``None``
+        if eigenvectors were not computed for that member.
+        """
         for (k, component), spc_list in eigenvector_spectra.items():
             if not isinstance(k, int) or k < 0:
                 raise ValueError(
@@ -868,6 +873,8 @@ class EnsembleSpectraAnalysis:
             )
             for (k, comp), spc_list in self._eigenvector_spectra.items():
                 for i, spc in enumerate(spc_list):
+                    if spc is None:
+                        continue
                     member_group = join_h5_group(
                         eigvec_root,
                         f'member_{i:04d}/degree_{k}/component_{comp}',
@@ -1001,7 +1008,7 @@ class EnsembleSpectraAnalysis:
             k_str, comp = key_str.split('_', 1)
             available_keys.append((int(k_str), comp))
 
-        # Discover member groups
+        # Discover member groups (may be sparse: not every position present)
         member_keys = sorted(
             k for k in get_keys_h5(filepath, group=eigvec_root)
             if k.startswith('member_')
@@ -1009,10 +1016,12 @@ class EnsembleSpectraAnalysis:
         if not member_keys:
             return
 
-        eigvec_spectra: dict[tuple[int, str], list[Spectrum]] = {
-            key: [] for key in available_keys
+        # Lists are positionally aligned with member_keys; None fills gaps
+        eigvec_spectra: dict[tuple[int, str], list[Spectrum | None]] = {
+            key: [None] * self._num_members for key in available_keys
         }
         for member_key in member_keys:
+            i = int(member_key.split('_')[1])
             for k, comp in available_keys:
                 subgroup = join_h5_group(
                     eigvec_root,
@@ -1020,16 +1029,17 @@ class EnsembleSpectraAnalysis:
                 )
                 try:
                     spc_datasets, spc_attrs = read_h5(filepath, group=subgroup)
-                    eigvec_spectra[(k, comp)].append(Spectrum(
+                    eigvec_spectra[(k, comp)][i] = Spectrum(
                         spc_datasets['eigenvalues'],
                         int(spc_attrs['dimension']),
                         eigenvectors=spc_datasets.get('eigenvectors'),
-                    ))
+                    )
                 except KeyError:
                     pass
 
         # Only set if we actually loaded data
-        if any(spc_list for spc_list in eigvec_spectra.values()):
+        if any(any(s is not None for s in spc_list)
+               for spc_list in eigvec_spectra.values()):
             self._eigenvector_spectra = eigvec_spectra
 
     # =========================================================================
