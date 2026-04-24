@@ -1099,6 +1099,7 @@ def plot_observable_vs_parameter(
     axis_config: Optional[Dict] = None,
     line_config: Optional[Dict] = None,
     fill_alpha: float = 0.2,
+    match_ylim_range: bool = False,
     title: Optional[str] = None,
     subplot_size: Tuple[float, float] = (4.5, 4),
 ) -> Tuple[Figure, List[Axes]]:
@@ -1123,6 +1124,12 @@ def plot_observable_vs_parameter(
         Keyword arguments passed to plot_lines (marker, linewidth, etc.).
     fill_alpha : float, default 0.2
         Alpha for the mean +/- std shading.
+    match_ylim_range : bool, default False
+        If True, after populating all subplots, re-center each subplot's
+        ylim on its own midpoint with a common span equal to the max of
+        the autoscaled spans. Equalizes visual variation across degrees
+        without forcing shared absolute limits. Incompatible with an
+        explicit ``'ylims'`` entry in ``axis_config`` (raises ValueError).
     title : str, optional
         Figure suptitle.
     subplot_size : tuple of float, default (4.5, 4)
@@ -1141,6 +1148,12 @@ def plot_observable_vs_parameter(
         axis_config = {}
     if line_config is None:
         line_config = {}
+
+    if match_ylim_range and 'ylims' in axis_config:
+        raise ValueError(
+            "match_ylim_range=True is incompatible with an explicit "
+            "'ylims' in axis_config; the two contradict."
+        )
 
     exp_param = series['exp_param']
     exp_values = series['exp_values']
@@ -1177,6 +1190,13 @@ def plot_observable_vs_parameter(
             ax.fill_between([], [], [], alpha=fill_alpha,
                             color=f'C{k}', label=r'mean $\pm$ std')
             ax.legend(fontsize=8, loc='best')
+
+    if match_ylim_range:
+        target = max(y1 - y0 for y0, y1 in (ax.get_ylim() for ax in axes))
+        for ax in axes:
+            y0, y1 = ax.get_ylim()
+            mid = 0.5 * (y0 + y1)
+            ax.set_ylim(mid - 0.5 * target, mid + 0.5 * target)
 
     if title is not None:
         fig.suptitle(title, fontsize=11)
@@ -1403,6 +1423,7 @@ def plot_distribution_distance(
     mark_transition: bool = False,
     axis_config: Optional[Dict] = None,
     line_config: Optional[Dict] = None,
+    match_ylims: bool = False,
     title: Optional[str] = None,
     subplot_size: Tuple[float, float] = (4.5, 4),
 ) -> Tuple[Figure, List[Axes]]:
@@ -1426,6 +1447,12 @@ def plot_distribution_distance(
         Keyword arguments passed to format_axis.
     line_config : dict, optional
         Keyword arguments passed to plot_lines.
+    match_ylims : bool, default False
+        If True, after populating all subplots, apply shared absolute
+        y-limits across degrees, floored at 0 (distances are
+        non-negative). Lets the eye directly compare distance magnitudes
+        across degrees. Incompatible with an explicit ``'ylims'`` entry
+        in ``axis_config`` (raises ValueError).
     title : str, optional
         Figure suptitle.
     subplot_size : tuple of float, default (4.5, 4)
@@ -1444,6 +1471,12 @@ def plot_distribution_distance(
         axis_config = {}
     if line_config is None:
         line_config = {}
+
+    if match_ylims and 'ylims' in axis_config:
+        raise ValueError(
+            "match_ylims=True is incompatible with an explicit "
+            "'ylims' in axis_config; the two contradict."
+        )
 
     exp_param = series['exp_param']
     exp_values = series['exp_values']
@@ -1470,6 +1503,11 @@ def plot_distribution_distance(
             _draw_transition_marker(
                 ax, series['transition_points'].get((k, comp)),
             )
+
+    if match_ylims:
+        ymax = max(y1 for _, y1 in (ax.get_ylim() for ax in axes))
+        for ax in axes:
+            ax.set_ylim(0.0, ymax)
 
     if title is not None:
         fig.suptitle(title, fontsize=11)
