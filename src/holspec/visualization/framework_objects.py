@@ -985,6 +985,7 @@ def plot_eigval_distribution(
     ylim_ranges: Optional[Dict[Tuple, Tuple[float, float]]] = None,
     title: Optional[str] = None,
     subplot_size: Tuple[float, float] = (4.5, 4),
+    layout: str = 'horizontal',
     float_fmt: str = '.4g',
 ) -> Tuple[Figure, List[Axes]]:
     """
@@ -1008,8 +1009,12 @@ def plot_eigval_distribution(
     title : str, optional
         Figure suptitle.
     subplot_size : tuple of float, default (4.5, 4)
-        Size per subplot (width, height). Total figure width scales with
-        the number of degrees.
+        Size per subplot (width, height). Total figure size scales with
+        the number of degrees along the layout axis.
+    layout : {'horizontal', 'vertical'}, default 'horizontal'
+        Direction along which the per-degree subplots are arranged.
+        ``'horizontal'`` lays them out left-to-right (one row);
+        ``'vertical'`` lays them out top-to-bottom (one column).
     float_fmt : str, default '.4g'
         Format string for annotation numbers.
 
@@ -1025,9 +1030,18 @@ def plot_eigval_distribution(
         axis_config = {}
     if bar_config is None:
         bar_config = {}
+    if layout not in ('horizontal', 'vertical'):
+        raise ValueError(
+            f"layout must be 'horizontal' or 'vertical', got {layout!r}"
+        )
 
     degrees = analysis_config['degrees']
     components = analysis_config['components']
+    if len(components) != 1:
+        raise ValueError(
+            f"plot_eigval_distribution renders one Laplacian component per figure; "
+            f"got components={components}. Call once per component."
+        )
     analysis_keys = [(k, comp) for k in degrees for comp in components]
     nonzero = analysis_config.get('nonzero', False)
     dstrb_params = analysis_config.get('distribution_params', {})
@@ -1037,9 +1051,15 @@ def plot_eigval_distribution(
     x_margin = margins[0] if isinstance(margins, (tuple, list)) else margins
     y_margin = margins[1] if isinstance(margins, (tuple, list)) else margins
 
-    figsize = (subplot_size[0] * len(degrees), subplot_size[1])
-    fig, axes = plt.subplots(1, len(degrees), figsize=figsize)
-    if len(degrees) == 1:
+    n = len(degrees)
+    if layout == 'horizontal':
+        nrows, ncols = 1, n
+        figsize = (subplot_size[0] * n, subplot_size[1])
+    else:
+        nrows, ncols = n, 1
+        figsize = (subplot_size[0], subplot_size[1] * n)
+    fig, axes = plt.subplots(nrows, ncols, figsize=figsize)
+    if n == 1:
         axes = [axes]
 
     for col, (k, comp) in enumerate(analysis_keys):
