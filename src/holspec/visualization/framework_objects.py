@@ -984,7 +984,7 @@ def plot_eigval_distribution(
     bar_config: Optional[Dict] = None,
     ylim_ranges: Optional[Dict[Tuple, Tuple[float, float]]] = None,
     title: Optional[str] = None,
-    subplot_size: Tuple[float, float] = (4.5, 4),
+    subplot_size: Optional[Tuple[float, float]] = None,
     layout: str = 'horizontal',
     float_fmt: str = '.4g',
 ) -> Tuple[Figure, List[Axes]]:
@@ -1008,9 +1008,10 @@ def plot_eigval_distribution(
         across experiment series. If None, ylims are auto-scaled.
     title : str, optional
         Figure suptitle.
-    subplot_size : tuple of float, default (4.5, 4)
+    subplot_size : tuple of float, optional
         Size per subplot (width, height). Total figure size scales with
-        the number of degrees along the layout axis.
+        the number of degrees along the layout axis. Defaults depend on
+        ``layout``: ``(4.5, 4)`` for horizontal, ``(4.5, 3)`` for vertical.
     layout : {'horizontal', 'vertical'}, default 'horizontal'
         Direction along which the per-degree subplots are arranged.
         ``'horizontal'`` lays them out left-to-right (one row);
@@ -1034,6 +1035,8 @@ def plot_eigval_distribution(
         raise ValueError(
             f"layout must be 'horizontal' or 'vertical', got {layout!r}"
         )
+    if subplot_size is None:
+        subplot_size = (4.5, 4) if layout == 'horizontal' else (4.5, 3)
 
     degrees = analysis_config['degrees']
     components = analysis_config['components']
