@@ -697,9 +697,17 @@ class EnsembleSpectraAnalysis:
                 # clamp to available unique values to avoid errors
                 if isinstance(n_bins, (int, np.integer)) and params.get('range') is None:
                     n_bins = min(int(n_bins), max(len(np.unique(pooled)), 1))
-                shared_edges = np.histogram_bin_edges(
-                    pooled, bins=n_bins, range=params['range'],
-                )
+                try:
+                    shared_edges = np.histogram_bin_edges(
+                        pooled, bins=n_bins, range=params['range'],
+                    )
+                except ValueError:
+                    # Data span too narrow for n_bins finite-sized bins (e.g.
+                    # nonzero spectra on a highly degenerate Laplacian component
+                    # in float64). Fall back to a single bin centered on the data.
+                    pmin, pmax = float(pooled.min()), float(pooled.max())
+                    pad = max(abs(pmin), abs(pmax), 1.0) * 1e-9
+                    shared_edges = np.array([pmin - pad, pmax + pad])
                 params['bins'] = shared_edges
             else:
                 params['bins'] = np.array([0.0, 1.0])
