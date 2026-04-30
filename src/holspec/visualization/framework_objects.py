@@ -1124,7 +1124,8 @@ def plot_observable_vs_parameter(
     fill_alpha: float = 0.2,
     match_ylim_range: bool = False,
     title: Optional[str] = None,
-    subplot_size: Tuple[float, float] = (4.5, 4),
+    subplot_size: Optional[Tuple[float, float]] = None,
+    layout: str = 'horizontal',
 ) -> Tuple[Figure, List[Axes]]:
     """
     Plot an observable vs experiment parameter, one subplot per degree.
@@ -1155,9 +1156,12 @@ def plot_observable_vs_parameter(
         explicit ``'ylims'`` entry in ``axis_config`` (raises ValueError).
     title : str, optional
         Figure suptitle.
-    subplot_size : tuple of float, default (4.5, 4)
-        Size per subplot (width, height). Total figure width scales with
-        the number of degrees.
+    subplot_size : tuple of float, optional
+        Size per subplot (width, height). Total figure size scales with
+        the number of degrees along the layout axis. Defaults depend on
+        ``layout``: ``(4.5, 4)`` for horizontal, ``(4.5, 3)`` for vertical.
+    layout : {'horizontal', 'vertical'}, default 'horizontal'
+        Direction along which the per-degree subplots are arranged.
 
     Returns
     -------
@@ -1177,6 +1181,12 @@ def plot_observable_vs_parameter(
             "match_ylim_range=True is incompatible with an explicit "
             "'ylims' in axis_config; the two contradict."
         )
+    if layout not in ('horizontal', 'vertical'):
+        raise ValueError(
+            f"layout must be 'horizontal' or 'vertical', got {layout!r}"
+        )
+    if subplot_size is None:
+        subplot_size = (4.5, 4) if layout == 'horizontal' else (4.5, 3)
 
     exp_param = series['exp_param']
     exp_values = series['exp_values']
@@ -1184,8 +1194,13 @@ def plot_observable_vs_parameter(
     obs_label = OBSERVABLE_LABELS.get(obs_name, obs_name)
     n_deg = len(analysis_keys)
 
-    figsize = (subplot_size[0] * n_deg, subplot_size[1])
-    fig, axes = plt.subplots(1, n_deg, figsize=figsize)
+    if layout == 'horizontal':
+        nrows, ncols = 1, n_deg
+        figsize = (subplot_size[0] * n_deg, subplot_size[1])
+    else:
+        nrows, ncols = n_deg, 1
+        figsize = (subplot_size[0], subplot_size[1] * n_deg)
+    fig, axes = plt.subplots(nrows, ncols, figsize=figsize)
     if n_deg == 1:
         axes = [axes]
 
@@ -1236,7 +1251,8 @@ def plot_distribution_heatmap(
     axis_config: Optional[Dict] = None,
     cbar_config: Optional[Dict] = None,
     title: Optional[str] = None,
-    subplot_size: Tuple[float, float] = (5, 4),
+    subplot_size: Optional[Tuple[float, float]] = None,
+    layout: str = 'horizontal',
 ) -> Tuple[Figure, List[Axes]]:
     """
     Plot eigenvalue distribution heatmaps, one subplot per degree.
@@ -1261,9 +1277,12 @@ def plot_distribution_heatmap(
         Keyword arguments passed to format_cbar.
     title : str, optional
         Figure suptitle.
-    subplot_size : tuple of float, default (5, 4)
-        Size per subplot (width, height). Total figure width scales with
-        the number of degrees.
+    subplot_size : tuple of float, optional
+        Size per subplot (width, height). Total figure size scales with
+        the number of degrees along the layout axis. Defaults depend on
+        ``layout``: ``(5, 4)`` for horizontal, ``(5, 3)`` for vertical.
+    layout : {'horizontal', 'vertical'}, default 'horizontal'
+        Direction along which the per-degree subplots are arranged.
 
     Returns
     -------
@@ -1277,14 +1296,25 @@ def plot_distribution_heatmap(
         axis_config = {}
     if cbar_config is None:
         cbar_config = {}
+    if layout not in ('horizontal', 'vertical'):
+        raise ValueError(
+            f"layout must be 'horizontal' or 'vertical', got {layout!r}"
+        )
+    if subplot_size is None:
+        subplot_size = (5, 4) if layout == 'horizontal' else (5, 3)
 
     exp_param = series['exp_param']
     exp_values = series['exp_values']
     analysis_keys = series['analysis_keys']
     n_deg = len(analysis_keys)
 
-    figsize = (subplot_size[0] * n_deg, subplot_size[1])
-    fig, axes = plt.subplots(1, n_deg, figsize=figsize)
+    if layout == 'horizontal':
+        nrows, ncols = 1, n_deg
+        figsize = (subplot_size[0] * n_deg, subplot_size[1])
+    else:
+        nrows, ncols = n_deg, 1
+        figsize = (subplot_size[0], subplot_size[1] * n_deg)
+    fig, axes = plt.subplots(nrows, ncols, figsize=figsize)
     if n_deg == 1:
         axes = [axes]
 
@@ -1351,7 +1381,8 @@ def plot_distribution_lines(
     mark_transition: bool = False,
     axis_config: Optional[Dict] = None,
     title: Optional[str] = None,
-    subplot_size: Tuple[float, float] = (5, 4),
+    subplot_size: Optional[Tuple[float, float]] = None,
+    layout: str = 'horizontal',
 ) -> Tuple[Figure, List[Axes]]:
     """
     Overlay eigenvalue distributions as colored lines, one subplot per degree.
@@ -1373,9 +1404,12 @@ def plot_distribution_lines(
         Keyword arguments passed to format_axis.
     title : str, optional
         Figure suptitle.
-    subplot_size : tuple of float, default (5, 4)
-        Size per subplot (width, height). Total figure width scales with
-        the number of degrees.
+    subplot_size : tuple of float, optional
+        Size per subplot (width, height). Total figure size scales with
+        the number of degrees along the layout axis. Defaults depend on
+        ``layout``: ``(5, 4)`` for horizontal, ``(5, 3)`` for vertical.
+    layout : {'horizontal', 'vertical'}, default 'horizontal'
+        Direction along which the per-degree subplots are arranged.
 
     Returns
     -------
@@ -1387,6 +1421,12 @@ def plot_distribution_lines(
     """
     if axis_config is None:
         axis_config = {}
+    if layout not in ('horizontal', 'vertical'):
+        raise ValueError(
+            f"layout must be 'horizontal' or 'vertical', got {layout!r}"
+        )
+    if subplot_size is None:
+        subplot_size = (5, 4) if layout == 'horizontal' else (5, 3)
 
     exp_param = series['exp_param']
     exp_values = series['exp_values']
@@ -1395,8 +1435,13 @@ def plot_distribution_lines(
     n_levels = len(exp_values)
     colormap = plt.get_cmap(cmap)
 
-    figsize = (subplot_size[0] * n_deg, subplot_size[1])
-    fig, axes = plt.subplots(1, n_deg, figsize=figsize)
+    if layout == 'horizontal':
+        nrows, ncols = 1, n_deg
+        figsize = (subplot_size[0] * n_deg, subplot_size[1])
+    else:
+        nrows, ncols = n_deg, 1
+        figsize = (subplot_size[0], subplot_size[1] * n_deg)
+    fig, axes = plt.subplots(nrows, ncols, figsize=figsize)
     if n_deg == 1:
         axes = [axes]
 
@@ -1448,7 +1493,8 @@ def plot_distribution_distance(
     line_config: Optional[Dict] = None,
     match_ylims: bool = False,
     title: Optional[str] = None,
-    subplot_size: Tuple[float, float] = (4.5, 4),
+    subplot_size: Optional[Tuple[float, float]] = None,
+    layout: str = 'horizontal',
 ) -> Tuple[Figure, List[Axes]]:
     """
     Plot successive distribution distance vs experiment parameter,
@@ -1478,9 +1524,12 @@ def plot_distribution_distance(
         in ``axis_config`` (raises ValueError).
     title : str, optional
         Figure suptitle.
-    subplot_size : tuple of float, default (4.5, 4)
-        Size per subplot (width, height). Total figure width scales with
-        the number of degrees.
+    subplot_size : tuple of float, optional
+        Size per subplot (width, height). Total figure size scales with
+        the number of degrees along the layout axis. Defaults depend on
+        ``layout``: ``(4.5, 4)`` for horizontal, ``(4.5, 3)`` for vertical.
+    layout : {'horizontal', 'vertical'}, default 'horizontal'
+        Direction along which the per-degree subplots are arranged.
 
     Returns
     -------
@@ -1500,6 +1549,12 @@ def plot_distribution_distance(
             "match_ylims=True is incompatible with an explicit "
             "'ylims' in axis_config; the two contradict."
         )
+    if layout not in ('horizontal', 'vertical'):
+        raise ValueError(
+            f"layout must be 'horizontal' or 'vertical', got {layout!r}"
+        )
+    if subplot_size is None:
+        subplot_size = (4.5, 4) if layout == 'horizontal' else (4.5, 3)
 
     exp_param = series['exp_param']
     exp_values = series['exp_values']
@@ -1507,8 +1562,13 @@ def plot_distribution_distance(
     n_deg = len(analysis_keys)
     midpoints = 0.5 * (exp_values[:-1] + exp_values[1:])
 
-    figsize = (subplot_size[0] * n_deg, subplot_size[1])
-    fig, axes = plt.subplots(1, n_deg, figsize=figsize)
+    if layout == 'horizontal':
+        nrows, ncols = 1, n_deg
+        figsize = (subplot_size[0] * n_deg, subplot_size[1])
+    else:
+        nrows, ncols = n_deg, 1
+        figsize = (subplot_size[0], subplot_size[1] * n_deg)
+    fig, axes = plt.subplots(nrows, ncols, figsize=figsize)
     if n_deg == 1:
         axes = [axes]
 
