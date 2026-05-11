@@ -5,15 +5,53 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "holspec"
 version = "0.1.0"
-description = ""
+description = "A scientific Python framework for Hodge Laplacian spectral analysis of point-cloud data."
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+authors = [
+  { name = "Rosalind Huang" },
+]
+keywords = [
+  "point-clouds",
+  "simplicial-complexes",
+  "hodge-laplacian",
+  "spectral-analysis",
+  "data-analysis",
+  "scientific-computing",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering",
+]
+dependencies = [
+  "gudhi",
+  "h5py",
+  "natsort",
+  "nbformat",
+  "numpy",
+  "pandas",
+  "PyYAML",
+  "scipy",
+]
 
 [project.optional-dependencies]
 dev = [
+  "pre-commit",
   "pytest>=7",
   "ruff>=0.5",
+]
+notebook = [
+  "ipykernel",
+  "ipympl",
+  "ipywidgets",
+  "jupyterlab",
+]
+viz = [
+  "matplotlib",
+  "pillow",
 ]
 
 [tool.setuptools]

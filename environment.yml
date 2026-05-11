@@ -5,37 +5,20 @@ dependencies:
   - python=3.12.*
   - pip
 
-  # Scientific Computing
+  # Core package dependencies
   - numpy
   - scipy
   - pandas
-  - xarray
-  - sympy
   - gudhi
-
-  # Visualization
-  - matplotlib
-  - seaborn
-
-  # Data I/O
   - h5py
-  - pyarrow
-  - openpyxl
-  - requests
+  - natsort
+  - nbformat
   - pyyaml
 
-  # Machine Learning
-  - scikit-learn
-  - statsmodels
-  - scikit-image
-
-  # Utilities
-  - natsort
-  - tqdm
-  - rich
-  - pytables
-  - typer
-  - loguru
+  # Visualization and demos
+  - matplotlib
+  - pillow
+  - seaborn
 
   # Jupyter
   - jupyterlab
@@ -43,10 +26,21 @@ dependencies:
   - ipywidgets
   - ipympl
 
-  # Development Tools
+  # Data ingestion and downstream analysis
+  - pyarrow
+  - openpyxl
+  - pytables
+  - scikit-learn
+
+  # CLI and workflow utilities
+  - rich
+  - tqdm
+  - typer
+
+  # Development tools
   - pytest
   - ruff
   - pre-commit
-  
-  # Pip packages
+
+  # Pip packages, if needed
   - pip: []
