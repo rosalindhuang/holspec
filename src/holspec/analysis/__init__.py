@@ -1,10 +1,9 @@
 """
-Spectral analysis utilities for holspec.
+Analysis of Hodge Laplacian spectra across ensembles and experiments.
 
-Provides standalone distribution estimation and comparison functions,
-the EnsembleSpectraAnalysis class for per-dataset spectral analysis,
-and helpers for indexing, persisting, and loading analyses and
-experiment series across datasets.
+This subpackage summarizes computed spectra into observables, distributions,
+experiment-series comparisons, transition estimates, and persisted analysis
+results.
 """
 
 from .distributions import (
@@ -26,3 +25,19 @@ from .helpers import (
     load_spectra_analyses,
     load_experiment_series,
 )
+
+__all__ = [
+    "empirical_distribution",
+    "distribution_distance",
+    "EnsembleSpectraAnalysis",
+    "STANDARD_OBSERVABLES",
+    "OBSERVABLE_LABELS",
+    "entry_group_key",
+    "entry_fixed_varying",
+    "extract_exp_params",
+    "build_spectra_file_records",
+    "compute_transition_points",
+    "save_exp_series",
+    "load_spectra_analyses",
+    "load_experiment_series",
+]

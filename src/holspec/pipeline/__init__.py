@@ -1,11 +1,9 @@
 """
-Pipeline orchestration for holspec.
+Config-driven pipeline orchestration and persisted-result loading.
 
-Provides stage metadata, provenance tracing, loading functions for
-objects that require live references to upstream objects.
-
-Provides pipeline stage functions ``run_{stage}`` that formalize the
-pipeline computations into callable functions.
+This subpackage runs the staged holspec pipeline, manages provenance across
+saved artifacts, selects pipeline inputs and outputs, and reconstructs derived
+objects from HDF5 results.
 """
 
 from .stages import (
@@ -29,3 +27,19 @@ from .helpers import (
     select_stage_outputs,
     split_pipeline_config,
 )
+
+__all__ = [
+    "PIPELINE_STAGE_NAMES",
+    "run_topology_simplicial",
+    "run_geometry_metric",
+    "run_hodge_laplacian",
+    "run_spectra",
+    "trace_provenance",
+    "load_hodge_laplacian",
+    "load_spectra",
+    "run_pipeline",
+    "run_pipeline_stages",
+    "select_pipeline_inputs",
+    "select_stage_outputs",
+    "split_pipeline_config",
+]

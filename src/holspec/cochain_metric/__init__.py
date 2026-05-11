@@ -1,6 +1,10 @@
 # holspec/cochain_metric/__init__.py
 """
-Cochain metric construction and representation.
+Cochain metrics for geometry on simplicial complexes.
+
+This subpackage defines the geometric layer of the holspec pipeline: metric
+tensors on cochain spaces and metric models that assign inner products to
+simplicial complexes.
 """
 
 from .base import CochainMetric
