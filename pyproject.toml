@@ -35,7 +35,11 @@ dependencies = [
   "pandas",
   "PyYAML",
   "scipy",
+  "typer",
 ]
+
+[project.scripts]
+holspec = "holspec.cli:main"
 
 [project.optional-dependencies]
 dev = [
