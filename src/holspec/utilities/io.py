@@ -291,7 +291,8 @@ def inspect_h5(
     filepath: str | Path, 
     relative_to: Optional[str | Path] = None,
     prefix: str = '',
-    indent: str = '  '
+    indent: str = '  ',
+    max_depth: int | None = None,
 ) -> None:
     """
     Print the structure and attributes of an HDF5 file.
@@ -309,6 +310,9 @@ def inspect_h5(
         String prepended to every printed line (e.g., '    ' to indent the whole block).
     indent : str, default '  '
         String used for each level of indentation (e.g., '  ' for two spaces).
+    max_depth : int or None, optional
+        Maximum depth below the file root to print. If None, prints the full
+        tree. A value of 0 prints only root-level attributes.
     """
     filepath = Path(filepath)
     display_path = filepath.relative_to(relative_to) if relative_to is not None else filepath
@@ -330,12 +334,14 @@ def inspect_h5(
             summary = summarize_value(val)
             print(f"{prefix}{_indent}@{key} {summary}")
 
-    def print_h5_structure(name, obj, _indent=""):
+    def print_h5_structure(name, obj, _indent="", _depth=1):
         if isinstance(obj, h5py.Group):
             print(f"{prefix}{_indent}{name}/")
             print_attrs(obj, _indent + indent)
+            if max_depth is not None and _depth >= max_depth:
+                return
             for key in obj:
-                print_h5_structure(key, obj[key], _indent + indent)
+                print_h5_structure(key, obj[key], _indent + indent, _depth + 1)
         elif isinstance(obj, h5py.Dataset):
             print(f"{prefix}{_indent}{name} (type=Dataset, shape={obj.shape}, dtype={obj.dtype})")
             print_attrs(obj, _indent + indent)
@@ -343,6 +349,8 @@ def inspect_h5(
     with h5py.File(filepath, 'r') as f:
         print(f"{prefix}{display_path}/")
         print_attrs(f, _indent=indent)
+        if max_depth is not None and max_depth <= 0:
+            return
         for key in f:
             print_h5_structure(key, f[key], _indent=indent)
 
@@ -368,7 +376,7 @@ def repack_h5(
         shutil.copystat(path, tmp)
         os.replace(tmp, output_path)
         return output_path
-    except Exception as e:
+    except Exception:
         if tmp.exists():
             tmp.unlink()
         raise
@@ -539,7 +547,7 @@ if __name__ == "__main__":
         
         def compare_values(orig, loaded, path=""):
             """Recursively compare values."""
-            if type(orig) != type(loaded):
+            if type(orig) is not type(loaded):
                 # Allow numpy types to match Python types
                 if isinstance(orig, (np.integer, np.int64, np.int32)) and isinstance(loaded, int):
                     if int(orig) != loaded:
@@ -578,8 +586,8 @@ if __name__ == "__main__":
                 if len(orig) != len(loaded):
                     print(f"  ❌ {path}: length differs")
                 else:
-                    for i, (o, l) in enumerate(zip(orig, loaded)):
-                        compare_values(o, l, f"{path}[{i}]")
+                    for i, (original_item, loaded_item) in enumerate(zip(orig, loaded)):
+                        compare_values(original_item, loaded_item, f"{path}[{i}]")
             elif isinstance(orig, np.ndarray):
                 if not np.array_equal(orig, loaded):
                     print(f"  ❌ {path}: arrays differ")

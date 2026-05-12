@@ -1,9 +1,9 @@
 # holspec/point_data/__init__.py
 """
-Point-cloud data containers and synthetic data generation.
+Point cloud data containers and synthetic data generation.
 
 This subpackage defines the input layer of the holspec pipeline: point data,
-point-data ensembles, configurable generators, and orchestration helpers for
+point data ensembles, configurable generators, and orchestration helpers for
 reproducible synthetic datasets.
 """
 
