@@ -7,6 +7,7 @@ boundary-degree behavior, and the boundary-of-boundary property.
 """
 
 import numpy as np
+import pytest
 
 from holspec.simplicial import (
     SimplicialComplex,
@@ -146,6 +147,46 @@ def test_filled_triangle_boundary_of_boundary_is_zero(
 
     assert product.shape == (3, 1)
     assert product.nnz == 0
+
+
+# Simplicial complex contracts
+
+@pytest.mark.parametrize(
+    ("simplices", "match"),
+    [
+        ({}, "cannot be empty"),
+        ({1: [(0, 1)]}, "start at 0"),
+        ({0: [(0,)], 2: [(0, 1, 2)]}, "consecutive"),
+        ({0: [(0,)], 1: [(0, 1, 2)]}, "k-simplex"),
+        ({0: [(0,), (1,)], 1: [(1, 0)]}, "canonical"),
+        ({0: [(-1,)]}, "Invalid vertex index"),
+        ({0: [[0]]}, "Simplex must be tuple"),
+        ({0: [(0,), (0,)]}, "Duplicate"),
+        (
+            {
+                0: [(0,), (1,), (2,)],
+                1: [(0, 1), (1, 2)],
+                2: [(0, 1, 2)],
+            },
+            "not found",
+        ),
+    ],
+)
+def test_simplicial_complex_rejects_invalid_structures(
+    simplices: dict[int, list[tuple[int, ...]]],
+    match: str,
+):
+    with pytest.raises(ValueError, match=match):
+        SimplicialComplex(simplices)
+
+
+@pytest.mark.parametrize("degree", [-1, 4])
+def test_simplicial_complex_rejects_invalid_incidence_degrees(
+    filled_triangle_complex: SimplicialComplex,
+    degree: int,
+):
+    with pytest.raises(ValueError, match="out of range"):
+        filled_triangle_complex.incidence_matrix(degree)
 
 
 # Simplex utility conventions
