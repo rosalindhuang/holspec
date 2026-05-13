@@ -8,7 +8,9 @@ validation checks.
 """
 
 import numpy as np
+import pytest
 
+from holspec.cochain_metric import CochainMetric, construct_diagonal_metric
 from holspec.hodge_laplacian import HodgeLaplacian
 from holspec.simplicial import SimplicialComplex
 
@@ -89,3 +91,44 @@ def test_laplacian_validation_passes_for_tiny_examples(
     edge_hodge_laplacian.validate_laplacians()
     triangle_boundary_hodge_laplacian.validate_laplacians()
     filled_triangle_hodge_laplacian.validate_laplacians()
+
+
+# Hodge Laplacian contracts
+
+def test_hodge_laplacian_rejects_max_dim_mismatch(
+    edge_complex: SimplicialComplex,
+):
+    metric = CochainMetric({0: construct_diagonal_metric(np.ones(2))})
+
+    with pytest.raises(ValueError, match="max_dim mismatch"):
+        HodgeLaplacian(edge_complex, metric)
+
+
+def test_hodge_laplacian_rejects_dimension_mismatch(
+    edge_complex: SimplicialComplex,
+):
+    metric = CochainMetric(
+        {
+            0: construct_diagonal_metric(np.ones(2)),
+            1: construct_diagonal_metric(np.ones(2)),
+        },
+    )
+
+    with pytest.raises(ValueError, match="Cochain dimension mismatch"):
+        HodgeLaplacian(edge_complex, metric)
+
+
+@pytest.mark.parametrize("degree", [-1, 3])
+def test_hodge_laplacian_rejects_invalid_degree_access(
+    filled_triangle_hodge_laplacian: HodgeLaplacian,
+    degree: int,
+):
+    with pytest.raises(ValueError, match="out of range"):
+        filled_triangle_hodge_laplacian.to_matrix(degree)
+
+
+def test_hodge_laplacian_rejects_unknown_component(
+    filled_triangle_hodge_laplacian: HodgeLaplacian,
+):
+    with pytest.raises(ValueError, match="Unknown component"):
+        filled_triangle_hodge_laplacian.to_matrix(0, "diagonal")

@@ -7,6 +7,7 @@ observable methods on a hand-written spectrum.
 """
 
 import numpy as np
+import pytest
 
 from holspec.spectra import HodgeLaplacianSpectra, Spectrum
 
@@ -113,3 +114,111 @@ def test_spectrum_observables_on_known_values():
         spectrum.heat_trace(np.array([0.0, 1.0])),
         [3.0, 1.0 + np.exp(-2.0) + np.exp(-4.0)],
     )
+
+
+# Spectrum contracts
+
+@pytest.mark.parametrize(
+    ("eigenvalues", "dimension", "eigenvectors", "exception", "match"),
+    [
+        (np.array([[0.0, 1.0]]), 2, None, ValueError, "1D"),
+        (np.array([0.0]), 1.5, None, TypeError, "integer"),
+        (np.array([]), -1, None, ValueError, "non-negative"),
+        (np.array([0.0, 1.0]), 1, None, ValueError, "More eigenvalues"),
+        (np.array([1.0, 0.0]), 2, None, ValueError, "sorted"),
+        (np.array([-1.0]), 1, None, ValueError, "below -tol"),
+        (np.array([0.0, 1.0]), 2, np.eye(3), ValueError, "eigenvectors shape"),
+    ],
+)
+def test_spectrum_rejects_invalid_constructor_inputs(
+    eigenvalues: np.ndarray,
+    dimension: int,
+    eigenvectors: np.ndarray | None,
+    exception: type[Exception],
+    match: str,
+):
+    with pytest.raises(exception, match=match):
+        Spectrum(eigenvalues, dimension=dimension, eigenvectors=eigenvectors)
+
+
+def test_spectrum_clamps_near_zero_eigenvalues():
+    spectrum = Spectrum(np.array([-1e-12, 1e-12, 1.0]), dimension=3)
+
+    assert_eigenvalues_allclose(spectrum.eigenvalues, [0.0, 0.0, 1.0])
+
+
+def test_spectrum_rejects_nonzero_eigenvectors_when_missing():
+    spectrum = Spectrum(np.array([0.0, 1.0]), dimension=2)
+
+    with pytest.raises(ValueError, match="Eigenvectors were not provided"):
+        spectrum.nonzero_eigenvectors()
+
+
+# Hodge Laplacian spectra contracts
+
+def test_hodge_laplacian_spectra_rejects_unknown_solver(
+    filled_triangle_hodge_laplacian,
+):
+    with pytest.raises(ValueError, match="Unknown solver"):
+        HodgeLaplacianSpectra(filled_triangle_hodge_laplacian, solver="other")
+
+
+@pytest.mark.parametrize(
+    ("solver_params", "match"),
+    [
+        (None, "solver_params is required"),
+        ({}, "solver_params is required"),
+        ({"unknown": 1}, "Unknown solver_params"),
+        ({"which": "SM"}, "num_eigenvalues"),
+        ({"num_eigenvalues": 0}, "positive integer"),
+        ({"num_eigenvalues": 1, "which": "bad"}, "Invalid which"),
+        ({"num_eigenvalues": 1, "sigma": "zero"}, "sigma must be"),
+    ],
+)
+def test_hodge_laplacian_spectra_rejects_invalid_sparse_solver_params(
+    filled_triangle_hodge_laplacian,
+    solver_params: dict | None,
+    match: str,
+):
+    with pytest.raises(ValueError, match=match):
+        HodgeLaplacianSpectra(
+            filled_triangle_hodge_laplacian,
+            solver="sparse",
+            solver_params=solver_params,
+        )
+
+
+def test_hodge_laplacian_spectra_rejects_invalid_eigenvector_degree(
+    filled_triangle_hodge_laplacian,
+):
+    with pytest.raises(ValueError, match="Invalid degree"):
+        HodgeLaplacianSpectra(
+            filled_triangle_hodge_laplacian,
+            compute_eigenvectors=[(3, "full")],
+        )
+
+
+def test_hodge_laplacian_spectra_rejects_invalid_eigenvector_component(
+    filled_triangle_hodge_laplacian,
+):
+    with pytest.raises(ValueError, match="Unknown component"):
+        HodgeLaplacianSpectra(
+            filled_triangle_hodge_laplacian,
+            compute_eigenvectors=[(0, "diagonal")],
+        )
+
+
+@pytest.mark.parametrize("degree", [-1, 3])
+def test_hodge_laplacian_spectra_rejects_invalid_spectrum_degree(
+    filled_triangle_spectra: HodgeLaplacianSpectra,
+    degree: int,
+):
+    with pytest.raises(ValueError, match="out of range"):
+        filled_triangle_spectra.spectrum(degree)
+
+
+def test_hodge_laplacian_spectra_rejects_invalid_spectrum_component(
+    filled_triangle_spectra: HodgeLaplacianSpectra,
+):
+    with pytest.raises(ValueError, match="Unknown component"):
+        filled_triangle_spectra.spectrum(0, "diagonal")
