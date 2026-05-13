@@ -1,9 +1,10 @@
 """
-Core tests for combinatorial cochain metrics.
+Core and contract tests for cochain metric objects.
 
 These tests verify that the topology-only metric model assigns identity
-metrics of the correct size to each cochain degree, including the
-zero-dimensional boundary metrics used by Hodge-operator edge cases.
+metrics of the correct size to each cochain degree, including boundary-degree
+edge cases, and that MetricTensor/CochainMetric enforce their public runtime
+contracts.
 """
 
 import numpy as np

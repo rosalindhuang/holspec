@@ -10,7 +10,12 @@ from pathlib import Path
 
 import numpy as np
 
-from holspec.pipeline import load_spectra, run_pipeline, trace_provenance
+from holspec.pipeline import (
+    load_spectra,
+    run_pipeline,
+    run_pipeline_stages,
+    trace_provenance,
+)
 from holspec.point_data import PointData, PointDataEnsemble
 from holspec.utilities import save_h5
 
@@ -80,6 +85,43 @@ def test_run_pipeline_tiny_vietoris_rips_workflow(tmp_path: Path):
     assert full_spectrum.eigenvectors is None
     assert np.all(np.diff(full_spectrum.eigenvalues) >= 0)
     assert np.all(full_spectrum.eigenvalues >= 0)
+
+
+def test_run_pipeline_stages_tiny_vietoris_rips_workflow(tmp_path: Path):
+    project_root = tmp_path
+    input_path = project_root / "data" / "raw" / "pipeline" / "triangle.h5"
+
+    _save_triangle_point_data_input(input_path)
+    config = _tiny_pipeline_config()
+
+    results_12 = run_pipeline_stages(
+        config=config,
+        project_root=project_root,
+        stage_nums=(1, 2),
+    )
+    results_34 = run_pipeline_stages(
+        config=config,
+        project_root=project_root,
+        stage_nums=(3, 4),
+        input_filepaths=results_12["geometry_metric"],
+    )
+
+    assert list(results_12) == ["topology_simplicial", "geometry_metric"]
+    assert list(results_34) == ["hodge_laplacian", "spectra"]
+
+    for stage_results in (*results_12.values(), *results_34.values()):
+        assert list(stage_results) == ["triangle"]
+        assert len(stage_results["triangle"]) == 1
+        for output_path in stage_results["triangle"].values():
+            assert output_path.exists()
+            assert output_path.is_relative_to(project_root)
+
+    final_spectra_path = next(iter(results_34["spectra"]["triangle"].values()))
+    spectra = load_spectra(final_spectra_path, project_root, group="member_0000")
+
+    assert spectra.dimensions == {0: 3, 1: 3, 2: 1}
+    assert spectra.spectrum(0, "full").is_complete
+    assert spectra.spectrum(0, "full").eigenvectors is None
 
 
 def _save_triangle_point_data_input(input_path: Path) -> None:

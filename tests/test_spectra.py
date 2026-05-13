@@ -31,6 +31,31 @@ def test_dense_full_spectra_have_expected_contract(
         assert np.all(eigenvalues >= 0)
 
 
+def test_sparse_spectrum_computes_partial_eigenvalues(
+    filled_triangle_hodge_laplacian,
+):
+    spectra = HodgeLaplacianSpectra(
+        filled_triangle_hodge_laplacian,
+        solver="sparse",
+        solver_params={"num_eigenvalues": 1, "which": "SM"},
+    )
+
+    spectrum = spectra.spectrum(0, "full")
+
+    assert spectra.solver_params == {
+        "num_eigenvalues": 1,
+        "which": "SM",
+        "sigma": None,
+    }
+    assert spectrum.dimension == 3
+    assert spectrum.num_eigenvalues == 1
+    assert not spectrum.is_complete
+    assert spectrum.eigenvectors is None
+    assert np.all(np.diff(spectrum.eigenvalues) >= 0)
+    assert np.all(spectrum.eigenvalues >= 0)
+    assert spectrum.eigenvalues[0] < 1e-8
+
+
 # Known tiny-example spectra
 
 def test_edge_full_spectrum_eigenvalues(edge_spectra: HodgeLaplacianSpectra):
