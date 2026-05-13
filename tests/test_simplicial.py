@@ -1,3 +1,11 @@
+"""
+Core tests for simplicial-complex structure and incidence conventions.
+
+These tests use hand-built edge, triangle-boundary, and filled-triangle
+examples to verify simplex counts, orientation-dependent incidence matrices,
+boundary-degree behavior, and the boundary-of-boundary property.
+"""
+
 import numpy as np
 
 from holspec.simplicial import (
@@ -8,9 +16,14 @@ from holspec.simplicial import (
 )
 
 
+# Local helpers
+
 def assert_sparse_array_equal(matrix, expected: np.ndarray) -> None:
+    """Compare a sparse matrix to expected dense values exactly."""
     np.testing.assert_array_equal(matrix.toarray(), expected)
 
+
+# Basic complex invariants
 
 def test_edge_complex_basic_invariants(edge_complex: SimplicialComplex):
     assert edge_complex.max_dim == 1
@@ -40,6 +53,8 @@ def test_filled_triangle_complex_basic_invariants(
     assert filled_triangle_complex.euler_characteristic == 1
 
 
+# Incidence and boundary conventions
+
 def test_boundary_degree_incidence_shapes(
     edge_complex: SimplicialComplex,
     triangle_boundary_complex: SimplicialComplex,
@@ -65,6 +80,8 @@ def test_boundary_degree_incidence_shapes(
 def test_triangle_boundary_incidence_orientation(
     triangle_boundary_complex: SimplicialComplex,
 ):
+    # Columns are oriented edges [(0, 1), (0, 2), (1, 2)];
+    # rows are vertices [(0,), (1,), (2,)].
     expected_D1 = np.array(
         [
             [-1, -1, 0],
@@ -83,6 +100,8 @@ def test_triangle_boundary_incidence_orientation(
 def test_filled_triangle_top_incidence_orientation(
     filled_triangle_complex: SimplicialComplex,
 ):
+    # Boundary of oriented face (0, 1, 2):
+    # +(1, 2) - (0, 2) + (0, 1), ordered as stored edges.
     expected_D2 = np.array(
         [
             [1],
@@ -104,6 +123,8 @@ def test_boundary_matrix_alias_matches_incidence_matrix(
             filled_triangle_complex.incidence_matrix(k).toarray(),
         )
 
+
+# Chain-complex identities
 
 def test_boundary_property_passes_for_tiny_complexes(
     edge_complex: SimplicialComplex,
@@ -127,6 +148,8 @@ def test_filled_triangle_boundary_of_boundary_is_zero(
     assert product.nnz == 0
 
 
+# Simplex utility conventions
+
 def test_simplicial_closure_of_triangle(
     filled_triangle_simplices: dict[int, list[tuple[int, ...]]],
 ):
@@ -135,6 +158,7 @@ def test_simplicial_closure_of_triangle(
 
 def test_triangle_faces_and_boundary_conventions():
     assert get_faces((0, 1, 2), 1) == [(0, 1), (0, 2), (1, 2)]
+    # Boundary signs follow the alternating omitted-vertex convention.
     assert get_boundary((0, 1, 2)) == [
         ((1, 2), 1),
         ((0, 2), -1),

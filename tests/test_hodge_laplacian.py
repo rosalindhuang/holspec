@@ -1,3 +1,12 @@
+"""
+Core tests for Hodge Laplacian operators.
+
+These tests verify that Hodge Laplacians built from tiny combinatorial examples
+respect the expected operator shapes, coboundary/incidence relationship,
+lower-plus-upper decomposition, symmetrization behavior, and Laplacian
+validation checks.
+"""
+
 import numpy as np
 
 from holspec.hodge_laplacian import HodgeLaplacian
@@ -5,6 +14,8 @@ from holspec.simplicial import SimplicialComplex
 
 from tests.helpers import assert_sparse_allclose
 
+
+# Operator dimensions
 
 def test_hodge_laplacian_dimensions_match_metric(
     edge_hodge_laplacian: HodgeLaplacian,
@@ -26,11 +37,14 @@ def test_hodge_laplacian_dimensions_match_metric(
                 assert hl.to_matrix(k, component).shape == (n_k, n_k)
 
 
+# Differential-operator identities
+
 def test_coboundary_is_transposed_incidence(
     filled_triangle_complex: SimplicialComplex,
     filled_triangle_hodge_laplacian: HodgeLaplacian,
 ):
     for k in filled_triangle_hodge_laplacian.degrees:
+        # Cochains use the dual convention d^k = D_{k+1}.T.
         expected = filled_triangle_complex.incidence_matrix(k + 1).T.toarray()
         assert_sparse_allclose(filled_triangle_hodge_laplacian.coboundary(k), expected)
 
@@ -48,12 +62,15 @@ def test_full_laplacian_decomposes_into_lower_plus_upper(
     filled_triangle_hodge_laplacian: HodgeLaplacian,
 ):
     for k in filled_triangle_hodge_laplacian.degrees:
+        # The full Laplacian is defined as the sum of lower and upper components.
         lower = filled_triangle_hodge_laplacian.to_matrix(k, "lower")
         upper = filled_triangle_hodge_laplacian.to_matrix(k, "upper")
         full = filled_triangle_hodge_laplacian.to_matrix(k, "full")
 
         assert_sparse_allclose(full, (lower + upper).toarray())
 
+
+# Symmetrization and validation
 
 def test_symmetrized_full_laplacians_are_symmetric(
     filled_triangle_hodge_laplacian: HodgeLaplacian,

@@ -1,3 +1,11 @@
+"""
+Core tests for combinatorial cochain metrics.
+
+These tests verify that the topology-only metric model assigns identity
+metrics of the correct size to each cochain degree, including the
+zero-dimensional boundary metrics used by Hodge-operator edge cases.
+"""
+
 import numpy as np
 
 from holspec.cochain_metric import CochainMetric
@@ -5,6 +13,8 @@ from holspec.simplicial import SimplicialComplex
 
 from tests.helpers import assert_sparse_allclose
 
+
+# Metric structure
 
 def test_combinatorial_metric_dimensions_match_simplices(
     edge_complex: SimplicialComplex,
@@ -41,9 +51,12 @@ def test_combinatorial_metric_tensors_are_identity(
         assert_sparse_allclose(G_k.to_matrix_inverse(), np.eye(n_k))
 
 
+# Boundary-degree behavior
+
 def test_cochain_metric_boundary_degree_metrics_are_zero_dimensional(
     filled_triangle_metric: CochainMetric,
 ):
+    # Boundary-degree lookups provide zero-dimensional metrics for operator formulas.
     lower_boundary_metric = filled_triangle_metric[-1]
     upper_boundary_metric = filled_triangle_metric[filled_triangle_metric.max_dim + 1]
 
@@ -53,6 +66,8 @@ def test_cochain_metric_boundary_degree_metrics_are_zero_dimensional(
         assert G_boundary.to_matrix().shape == (0, 0)
         assert G_boundary.to_matrix().nnz == 0
 
+
+# Validation
 
 def test_combinatorial_metrics_validate_against_simplex_counts(
     edge_complex: SimplicialComplex,

@@ -1,3 +1,11 @@
+"""
+CLI smoke tests for the public holspec command-line interface.
+
+These tests exercise help output, option handling, tiny data generation,
+pipeline execution, and HDF5 inspection through Typer. They verify the public
+CLI path, not deep mathematical correctness.
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -11,8 +19,11 @@ from holspec.point_data import PointData, PointDataEnsemble
 from holspec.utilities import save_h5
 
 
+# Test client
 runner = CliRunner()
 
+
+# Help and option handling
 
 def test_cli_help():
     result = runner.invoke(app, ["--help"])
@@ -139,6 +150,8 @@ def test_cli_run_rejects_conflicting_output_options(tmp_path: Path):
     assert "Use either --verbose or --quiet" in result.output
 
 
+# Tiny workflow smoke tests
+
 def test_cli_generate_data_with_category_filter(tmp_path: Path):
     project_root = tmp_path
     config_path = project_root / "configs" / "data_generation.yml"
@@ -230,6 +243,8 @@ def test_cli_inspect_max_depth(tmp_path: Path):
     assert "member_0000/" in result.output
     assert "positions (type=Dataset" not in result.output
 
+
+# Local fixtures and config writers
 
 def _save_triangle_input(input_path: Path) -> None:
     positions = np.array(

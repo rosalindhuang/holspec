@@ -1,3 +1,10 @@
+"""
+Tests for the supported public import surface.
+
+These tests keep the top-level holspec API and core subpackage exports aligned
+with the intended public interface used by examples, documentation, and users.
+"""
+
 import holspec
 from holspec import (
     analysis,

@@ -1,9 +1,19 @@
+"""
+Core tests for dense Hodge Laplacian spectra.
+
+These tests verify dense full-spectrum computation on tiny combinatorial
+examples with known eigenvalues and kernel dimensions, plus basic Spectrum
+observable methods on a hand-written spectrum.
+"""
+
 import numpy as np
 
 from holspec.spectra import HodgeLaplacianSpectra, Spectrum
 
 from tests.helpers import assert_eigenvalues_allclose
 
+
+# Dense spectra contract
 
 def test_dense_full_spectra_have_expected_contract(
     filled_triangle_spectra: HodgeLaplacianSpectra,
@@ -20,7 +30,11 @@ def test_dense_full_spectra_have_expected_contract(
         assert np.all(eigenvalues >= 0)
 
 
+# Known tiny-example spectra
+
 def test_edge_full_spectrum_eigenvalues(edge_spectra: HodgeLaplacianSpectra):
+    # Expected spectra are for full combinatorial Hodge Laplacians on the
+    # hand-built examples from conftest.py.
     expected = {
         0: [0.0, 2.0],
         1: [2.0],
@@ -64,11 +78,15 @@ def test_filled_triangle_full_spectrum_eigenvalues(
         )
 
 
+# Kernel dimensions
+
 def test_full_laplacian_kernel_dimensions_match_tiny_topology(
     edge_spectra: HodgeLaplacianSpectra,
     triangle_boundary_spectra: HodgeLaplacianSpectra,
     filled_triangle_spectra: HodgeLaplacianSpectra,
 ):
+    # Kernel dimensions are checked only for full Laplacians, where they match
+    # Betti-style expectations.
     examples = [
         (edge_spectra, {0: 1, 1: 0}),
         (triangle_boundary_spectra, {0: 1, 1: 1}),
@@ -79,6 +97,8 @@ def test_full_laplacian_kernel_dimensions_match_tiny_topology(
         for k, expected_dim_ker in expected_kernel_dimensions.items():
             assert spectra.spectrum(k, "full").dim_ker() == expected_dim_ker
 
+
+# Spectrum observables
 
 def test_spectrum_observables_on_known_values():
     spectrum = Spectrum(np.array([0.0, 2.0, 4.0]), dimension=3)

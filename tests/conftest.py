@@ -1,3 +1,12 @@
+"""
+Shared pytest fixtures for the holspec verification suite.
+
+These fixtures provide tiny hand-checkable simplicial complexes and their
+downstream combinatorial metrics, Hodge Laplacians, and dense spectra. They are
+intended for deterministic mathematical verification rather than generated-data
+or pipeline smoke tests.
+"""
+
 import pytest
 
 from holspec.cochain_metric import (
@@ -8,6 +17,8 @@ from holspec.hodge_laplacian import HodgeLaplacian
 from holspec.simplicial import SimplicialComplex
 from holspec.spectra import HodgeLaplacianSpectra
 
+
+# Tiny simplicial examples
 
 @pytest.fixture
 def edge_simplices() -> dict[int, list[tuple[int, ...]]]:
@@ -53,6 +64,8 @@ def filled_triangle_complex(
     return SimplicialComplex(filled_triangle_simplices)
 
 
+# Combinatorial cochain metrics
+
 def _combinatorial_metric(sc: SimplicialComplex) -> CochainMetric:
     metric_tensors, _ = construct_combinatorial_cochain_metric(sc)
     return CochainMetric(metric_tensors)
@@ -74,6 +87,8 @@ def triangle_boundary_metric(
 def filled_triangle_metric(filled_triangle_complex: SimplicialComplex) -> CochainMetric:
     return _combinatorial_metric(filled_triangle_complex)
 
+
+# Hodge Laplacians
 
 @pytest.fixture
 def edge_hodge_laplacian(
@@ -98,6 +113,8 @@ def filled_triangle_hodge_laplacian(
 ) -> HodgeLaplacian:
     return HodgeLaplacian(filled_triangle_complex, filled_triangle_metric)
 
+
+# Dense spectra
 
 @pytest.fixture
 def edge_spectra(edge_hodge_laplacian: HodgeLaplacian) -> HodgeLaplacianSpectra:
