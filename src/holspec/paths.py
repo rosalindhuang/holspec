@@ -46,6 +46,7 @@ NOTEBOOKS_DIR = PROJECT_ROOT / "notebooks"
 OUTPUTS_DIR = PROJECT_ROOT / "outputs"
 
 SRC_DIR = PROJECT_ROOT / "src"
+TESTS_DIR = PROJECT_ROOT / "tests"
 
 
 # =============================================================================
@@ -280,6 +281,7 @@ if __name__ == "__main__":
     print("  NOTEBOOKS_DIR:".ljust(15), NOTEBOOKS_DIR)
     print("  OUTPUTS_DIR:".ljust(15), OUTPUTS_DIR)
     print("  SRC_DIR:".ljust(15), SRC_DIR)
+    print("  TESTS_DIR:".ljust(15), TESTS_DIR)
     
     print()
     print("Project directory tree:")

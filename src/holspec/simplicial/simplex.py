@@ -89,7 +89,7 @@ def get_boundary(simplex: tuple) -> list[tuple[tuple, int]]:
     Examples
     --------
     >>> get_boundary((0, 1, 2))
-    [((0, 1), 1), ((0, 2), -1), ((1, 2), 1)]
+    [((1, 2), 1), ((0, 2), -1), ((0, 1), 1)]
     
     Notes
     -----
@@ -263,12 +263,12 @@ if __name__ == "__main__":
     print("="*80)
     print(f"Properties and operations for a {k}-simplex")
     print("="*80)
-    print(f"Vertices:")
+    print("Vertices:")
     print(simplex)
     print()
 
     # Faces of the simplex
-    print(f"Faces:")
+    print("Faces:")
     print(f"{'Dim':<5} {'Count':<8} {'Faces'}")
     print("-" * 60)
     for j in range(k+1):
@@ -280,7 +280,7 @@ if __name__ == "__main__":
 
     # Boundary
     boundary = get_boundary(simplex)
-    print(f"Boundary:")
+    print("Boundary:")
     print(f"{'Sign':<6} {'Face'}")
     print("-" * 60)
     for face, sign in boundary:
@@ -289,7 +289,7 @@ if __name__ == "__main__":
     print()
 
     # Orientation sign
-    print(f"Orientations:")
+    print("Orientations:")
     print(f"{'Sign':<6} {'Permutation'}")
     print("-" * 60)
     for i in range(3):
@@ -300,7 +300,7 @@ if __name__ == "__main__":
     print()
 
     # Simplicial closure
-    print(f"Simplicial closure:")
+    print("Simplicial closure:")
     print(f"{'Dim':<5} {'Count':<8} {'Simplices'}")
     print("-" * 60)
     closed_simplices = compute_simplicial_closure([simplex])
