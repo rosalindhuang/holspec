@@ -21,16 +21,16 @@ data/*
 outputs/*
 !outputs/.gitkeep
 
-# Claude Code
-.claude/settings.local.json
-.claude/projects/
+# AI Assistants
+.claude/
+.codex/config.toml
+.codex/rules/
+AGENTS.md
 
 # Miscellaneous
 .attic
 *.code-workspace
-.tmp/
 
 # Date/time-stamped backups
 *_[0-9][0-9]-[0-9][0-9]-[0-9][0-9]*
 *_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]*
-
