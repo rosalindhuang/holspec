@@ -1,0 +1,47 @@
+summary:
+  created_by: examples/quickstart.ipynb
+inputs:
+  data_dir: examples/data/raw
+  filepaths:
+    triangular_lattice_nr5_clean: examples/data/raw/quickstart/triangular_lattice_nr5_clean.h5
+    triangular_lattice_nr5_noise_0p10: examples/data/raw/quickstart/triangular_lattice_nr5_noise_0p10.h5
+    triangular_lattice_nr5_noise_0p25: examples/data/raw/quickstart/triangular_lattice_nr5_noise_0p25.h5
+    triangular_lattice_nr5_noise_0p40: examples/data/raw/quickstart/triangular_lattice_nr5_noise_0p40.h5
+stages:
+  topology_simplicial:
+    configs:
+      simplicial_constructions:
+        delaunay:
+          method: delaunay
+          params: {}
+    runtime:
+      verbose: false
+      cache_incidence: false
+      validate_boundary_property: false
+  geometry_metric:
+    configs:
+      metric_models:
+        combinatorial:
+          model: combinatorial
+          params: {}
+    runtime:
+      verbose: false
+      validate_metric: true
+  hodge_laplacian:
+    configs: {}
+    runtime:
+      verbose: false
+      cache_laplacians: false
+      validate_laplacians: false
+  spectra:
+    configs:
+      compute_spectra: true
+      solver: dense
+      compute_eigenvectors: false
+    runtime:
+      verbose: false
+runtime:
+  verbose: true
+  save_stage_configs: false
+outputs:
+  data_dir: examples/data/interim

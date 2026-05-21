@@ -1,0 +1,49 @@
+summary:
+  created_by: examples/quickstart.ipynb
+configs:
+  quickstart:
+    triangular_lattice_nr5_clean:
+      base_config:
+        generator: trilatthex
+        params:
+          n_rings: 5
+      noise_config:
+        scale: 0.0
+        distribution: normal
+      num_realizations: 1
+      base_seed: 42
+    triangular_lattice_nr5_noise_0p10:
+      base_config:
+        generator: trilatthex
+        params:
+          n_rings: 5
+      noise_config:
+        scale: 0.1
+        distribution: normal
+      num_realizations: 1
+      base_seed: 42
+    triangular_lattice_nr5_noise_0p25:
+      base_config:
+        generator: trilatthex
+        params:
+          n_rings: 5
+      noise_config:
+        scale: 0.25
+        distribution: normal
+      num_realizations: 1
+      base_seed: 42
+    triangular_lattice_nr5_noise_0p40:
+      base_config:
+        generator: trilatthex
+        params:
+          n_rings: 5
+      noise_config:
+        scale: 0.4
+        distribution: normal
+      num_realizations: 1
+      base_seed: 42
+runtime:
+  verbose: true
+outputs:
+  stage_name: point_data
+  data_dir: examples/data/raw

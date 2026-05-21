@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "holspec"
 version = "0.1.0"
-description = "A scientific Python framework for Hodge Laplacian spectral analysis of point-cloud data."
+description = "A scientific Python framework for Hodge Laplacian spectral analysis of point cloud data."
 readme = "README.md"
 requires-python = ">=3.12"
 authors = [
