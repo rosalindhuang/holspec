@@ -158,10 +158,11 @@ def run_data_generation(
         if select_categories and not any(fnmatch(category, pat) for pat in select_categories):
             continue
 
-        print(f"-" * 60)
-        print(f"{category}")
-        print(f"-" * 60)
-        print()
+        if verbose:
+            print(f"-" * 60)
+            print(f"{category}")
+            print(f"-" * 60)
+            print()
 
         output_filepaths[category] = {}
 

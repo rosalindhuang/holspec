@@ -585,7 +585,7 @@ def run_geometry_metric(
                     f" ({num_failed} skipped)" if num_failed > 0 else ""
                 )
                 print(
-                    f"Constructed {num_succeeded} cochain "
+                    f"Defined {num_succeeded} cochain "
                     f"metrics for {ptd_label} / {output_label}{skip_suffix}"
                 )
                 if verbose and num_succeeded > 0:
@@ -811,7 +811,7 @@ def run_hodge_laplacian(
                 f" ({num_failed} skipped)" if num_failed > 0 else ""
             )
             print(
-                f"Constructed {num_succeeded} Hodge Laplacians "
+                f"Assembled {num_succeeded} Hodge Laplacians "
                 f"for {ptd_label} / {cm_label}{skip_suffix}"
             )
             if verbose and num_succeeded > 0:
