@@ -2,43 +2,33 @@ summary:
   created_by: examples/quickstart.ipynb
 configs:
   quickstart:
-    triangular_lattice_nr5_clean:
+    triangular_lattice_nr10_noise_0p05:
       base_config:
         generator: trilatthex
         params:
-          n_rings: 5
+          n_rings: 10
       noise_config:
-        scale: 0.0
+        scale: 0.05
         distribution: normal
       num_realizations: 1
       base_seed: 42
-    triangular_lattice_nr5_noise_0p10:
+    triangular_lattice_nr10_noise_0p25:
       base_config:
         generator: trilatthex
         params:
-          n_rings: 5
-      noise_config:
-        scale: 0.1
-        distribution: normal
-      num_realizations: 1
-      base_seed: 42
-    triangular_lattice_nr5_noise_0p25:
-      base_config:
-        generator: trilatthex
-        params:
-          n_rings: 5
+          n_rings: 10
       noise_config:
         scale: 0.25
         distribution: normal
       num_realizations: 1
       base_seed: 42
-    triangular_lattice_nr5_noise_0p40:
+    triangular_lattice_nr10_noise_0p45:
       base_config:
         generator: trilatthex
         params:
-          n_rings: 5
+          n_rings: 10
       noise_config:
-        scale: 0.4
+        scale: 0.45
         distribution: normal
       num_realizations: 1
       base_seed: 42
