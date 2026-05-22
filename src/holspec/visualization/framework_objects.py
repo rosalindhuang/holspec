@@ -1011,7 +1011,7 @@ def plot_eigval_distribution(
     subplot_size : tuple of float, optional
         Size per subplot (width, height). Total figure size scales with
         the number of degrees along the layout axis. Defaults depend on
-        ``layout``: ``(4.5, 4)`` for horizontal, ``(4.5, 3)`` for vertical.
+        ``layout``: ``(4.5, 3.6)`` for horizontal, ``(4.5, 3)`` for vertical.
     layout : {'horizontal', 'vertical'}, default 'horizontal'
         Direction along which the per-degree subplots are arranged.
         ``'horizontal'`` lays them out left-to-right (one row);
@@ -1036,7 +1036,7 @@ def plot_eigval_distribution(
             f"layout must be 'horizontal' or 'vertical', got {layout!r}"
         )
     if subplot_size is None:
-        subplot_size = (4.5, 4) if layout == 'horizontal' else (4.5, 3)
+        subplot_size = (4.5, 3.6) if layout == 'horizontal' else (4.5, 3)
 
     degrees = analysis_config['degrees']
     components = analysis_config['components']

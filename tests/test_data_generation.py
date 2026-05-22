@@ -34,6 +34,23 @@ def test_run_data_generation_with_category_filter(tmp_path: Path):
     assert ensemble.members[0].has_positions
 
 
+def test_run_data_generation_without_category_subdirs(tmp_path: Path):
+    config = _tiny_data_generation_config()
+    config["outputs"]["category_subdirs"] = False
+
+    results = run_data_generation(
+        config=config,
+        project_root=tmp_path,
+        select_categories=["api"],
+    )
+
+    expected_path = tmp_path / "data" / "raw" / "regpoly_ns3__BASE.h5"
+
+    assert results["api"] == {"regpoly_ns3__BASE": expected_path}
+    assert expected_path.exists()
+    assert not (tmp_path / "data" / "raw" / "api").exists()
+
+
 def _tiny_data_generation_config() -> dict:
     return {
         "summary": {

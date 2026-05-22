@@ -43,7 +43,8 @@ configs:
       num_realizations: 1
       base_seed: 42
 runtime:
-  verbose: true
+  verbose: false
 outputs:
   stage_name: point_data
   data_dir: examples/data/raw
+  category_subdirs: false

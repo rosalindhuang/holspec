@@ -123,7 +123,10 @@ def run_data_generation(
     config : dict
         Data generation config dict with keys: ``summary``, ``configs``,
         ``runtime``, ``outputs``. The ``configs`` value is a nested dict
-        ``{category: {ensemble_label: ensemble_config}}``.
+        ``{category: {ensemble_label: ensemble_config}}``. By default,
+        outputs are saved under ``{data_dir}/{category}/``; set
+        ``outputs.category_subdirs`` to false to save directly under
+        ``{data_dir}/``.
     project_root : str or Path
         Project root for resolving relative paths.
     select_categories : list of str or None, optional
@@ -141,6 +144,7 @@ def run_data_generation(
     # --- Extract settings ---
 
     output_data_dir = project_root / config['outputs']['data_dir']
+    category_subdirs = config['outputs'].get('category_subdirs', True)
     stage_name = config['outputs']['stage_name']
     created_by = config['summary']['created_by']
     verbose = config['runtime']['verbose']
@@ -172,7 +176,12 @@ def run_data_generation(
             )
 
             # Save to HDF5
-            output_filepath = output_data_dir / category / f"{ensemble_label}.h5"
+            if category_subdirs:
+                output_filepath = (
+                    output_data_dir / category / f"{ensemble_label}.h5"
+                )
+            else:
+                output_filepath = output_data_dir / f"{ensemble_label}.h5"
             output_filepath.parent.mkdir(parents=True, exist_ok=True)
             ptd_ensemble.save(output_filepath)
 

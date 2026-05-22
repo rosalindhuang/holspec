@@ -3,10 +3,10 @@ summary:
 inputs:
   data_dir: examples/data/raw
   filepaths:
-    triangular_lattice_nr5_clean: examples/data/raw/quickstart/triangular_lattice_nr5_clean.h5
-    triangular_lattice_nr5_noise_0p10: examples/data/raw/quickstart/triangular_lattice_nr5_noise_0p10.h5
-    triangular_lattice_nr5_noise_0p25: examples/data/raw/quickstart/triangular_lattice_nr5_noise_0p25.h5
-    triangular_lattice_nr5_noise_0p40: examples/data/raw/quickstart/triangular_lattice_nr5_noise_0p40.h5
+    triangular_lattice_nr5_clean: examples/data/raw/triangular_lattice_nr5_clean.h5
+    triangular_lattice_nr5_noise_0p10: examples/data/raw/triangular_lattice_nr5_noise_0p10.h5
+    triangular_lattice_nr5_noise_0p25: examples/data/raw/triangular_lattice_nr5_noise_0p25.h5
+    triangular_lattice_nr5_noise_0p40: examples/data/raw/triangular_lattice_nr5_noise_0p40.h5
 stages:
   topology_simplicial:
     configs:
@@ -41,7 +41,7 @@ stages:
     runtime:
       verbose: false
 runtime:
-  verbose: true
+  verbose: false
   save_stage_configs: false
 outputs:
   data_dir: examples/data/interim
