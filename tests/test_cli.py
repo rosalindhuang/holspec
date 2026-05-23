@@ -38,8 +38,9 @@ def test_cli_run_help():
 
     assert result.exit_code == 0
     assert "CONFIG" in result.output
-    assert "--project-root" in result.output
-    assert "--quiet" in result.output
+    assert "Run the full holspec pipeline" in result.output
+    assert "Project root" in result.output
+    assert "Suppress pipeline progress" in result.output
 
 
 def test_cli_generate_data_help():
@@ -47,8 +48,9 @@ def test_cli_generate_data_help():
 
     assert result.exit_code == 0
     assert "CONFIG" in result.output
-    assert "--category" in result.output
-    assert "--quiet" in result.output
+    assert "Generate synthetic point cloud data" in result.output
+    assert "Category glob" in result.output
+    assert "Suppress generation progress" in result.output
 
 
 def test_cli_inspect_help():
@@ -56,7 +58,8 @@ def test_cli_inspect_help():
 
     assert result.exit_code == 0
     assert "PATH" in result.output
-    assert "--project-root" in result.output
+    assert "Inspect the structure" in result.output
+    assert "Project root" in result.output
 
 
 def test_cli_run_missing_config():
