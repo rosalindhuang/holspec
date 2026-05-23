@@ -1,5 +1,7 @@
 # holspec: Hodge Laplacian spectra for analyzing point cloud data
 
+[![CI](https://github.com/rosalindhuang/holspec/actions/workflows/ci.yml/badge.svg)](https://github.com/rosalindhuang/holspec/actions/workflows/ci.yml)
+
 `holspec` is a scientific Python framework for studying the structure of point cloud data through simplicial complexes, cochain metrics, and eigenvalue spectra of Hodge Laplacian operators. Starting from point coordinates or pairwise distances, the pipeline builds topological and geometric representations of the data, computes Hodge Laplacians and their spectra, and enables spectral analysis and comparisons across point cloud datasets.
 
 The `holspec` package supports:
