@@ -3,9 +3,9 @@ summary:
 inputs:
   data_dir: examples/data/raw
   filepaths:
-    triangular_lattice_nr10_noise_0p05: examples/data/raw/triangular_lattice_nr10_noise_0p05.h5
-    triangular_lattice_nr10_noise_0p25: examples/data/raw/triangular_lattice_nr10_noise_0p25.h5
-    triangular_lattice_nr10_noise_0p45: examples/data/raw/triangular_lattice_nr10_noise_0p45.h5
+    triangular_lattice_nr12_noise_0p05: examples/data/raw/triangular_lattice_nr12_noise_0p05.h5
+    triangular_lattice_nr12_noise_0p25: examples/data/raw/triangular_lattice_nr12_noise_0p25.h5
+    triangular_lattice_nr12_noise_0p45: examples/data/raw/triangular_lattice_nr12_noise_0p45.h5
 stages:
   topology_simplicial:
     configs:
