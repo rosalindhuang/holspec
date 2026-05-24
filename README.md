@@ -26,9 +26,7 @@ The modular pipeline in `holspec` makes these questions computationally accessib
 
 The `holspec` pipeline turns point cloud data into spectral signatures through a sequence of configurable stages.
 
-```text
-Point cloud data -> Topology (simplicial complex) -> Geometry (cochain metric) -> Hodge Laplacians -> Spectra
-```
+![Pipeline diagram](docs/figures/pipeline.png)
 
 ### Pipeline stages
 
