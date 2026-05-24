@@ -40,6 +40,10 @@ dependencies = [
   "typer",
 ]
 
+[project.urls]
+Repository = "https://github.com/rosalindhuang/holspec"
+Issues = "https://github.com/rosalindhuang/holspec/issues"
+
 [project.scripts]
 holspec = "holspec.cli:main"
 

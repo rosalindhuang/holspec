@@ -159,9 +159,9 @@ def run_data_generation(
             continue
 
         if verbose:
-            print(f"-" * 60)
+            print("-" * 60)
             print(f"{category}")
-            print(f"-" * 60)
+            print("-" * 60)
             print()
 
         output_filepaths[category] = {}

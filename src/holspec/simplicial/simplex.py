@@ -3,7 +3,6 @@ Operations and computations on simplices.
 """
 
 from itertools import combinations
-import numpy as np
 
 
 def get_faces(simplex: tuple, face_dim: int) -> list[tuple]:

@@ -8,7 +8,6 @@ of positions or pairwise distances.
 
 import numpy as np
 from datetime import datetime
-import json
 from pathlib import Path
 from scipy.spatial.distance import pdist, squareform
 

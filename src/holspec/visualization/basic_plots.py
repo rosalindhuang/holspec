@@ -616,7 +616,6 @@ def plot_spheres(
     -----
     Spheres are rendered using scatter plot with sizes proportional to radius squared.
     """
-    from mpl_toolkits.mplot3d import Axes3D
     
     # Create figure and axes if not provided
     if ax is None:

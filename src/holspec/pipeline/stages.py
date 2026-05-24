@@ -357,7 +357,8 @@ def run_topology_simplicial(
                     )
                     failures.append(failure_record)
 
-                    if num_failed == 1: print()
+                    if num_failed == 1:
+                        print()
                     print(f"[SKIP] {member_key} | {type(exc).__name__}: {exc}")
                     print(f"    input_file:  {failure_record['input_file']}")
                     print(f"    output_file: {failure_record['output_file']}")
@@ -380,7 +381,7 @@ def run_topology_simplicial(
             if verbose and num_succeeded > 0:
                 print(f"  {sc}")
                 print(f"  simplicial construction: {sc_label}")
-                print(f"  incidence matrices:")
+                print("  incidence matrices:")
                 for k in range(sc.max_dim + 1):
                     if k in sc._incidence_cache:
                         D_k = sc._incidence_cache[k]
@@ -392,7 +393,8 @@ def run_topology_simplicial(
                 print(f"  file size: "
                       f"{output_filepath.stat().st_size / 1024:.2f} KB")
                 print()
-            if num_succeeded == 0: print()
+            if num_succeeded == 0:
+                print()
 
             # Output retention
             file_deleted = False
@@ -568,7 +570,8 @@ def run_geometry_metric(
                         )
                         failures.append(failure_record)
 
-                        if num_failed == 1: print()
+                        if num_failed == 1:
+                            print()
                         print(f"[SKIP] {member_key} | {type(exc).__name__}: {exc}")
                         print(f"    input_file:  {failure_record['input_file']}")
                         print(f"    output_file: {failure_record['output_file']}")
@@ -591,7 +594,7 @@ def run_geometry_metric(
                 if verbose and num_succeeded > 0:
                     print(f"  {cm}")
                     print(f"  cochain metric model: {cm_label}")
-                    print(f"  metric tensors:")
+                    print("  metric tensors:")
                     for k in range(cm.max_dim + 1):
                         G_k = cm[k]
                         print(
@@ -603,7 +606,8 @@ def run_geometry_metric(
                     print(f"  file size: "
                           f"{output_filepath.stat().st_size / 1024:.2f} KB")
                     print()
-                if num_succeeded == 0: print()
+                if num_succeeded == 0:
+                    print()
 
                 # Output retention
                 file_deleted = False
@@ -794,7 +798,8 @@ def run_hodge_laplacian(
                     )
                     failures.append(failure_record)
 
-                    if num_failed == 1: print()
+                    if num_failed == 1:
+                        print()
                     print(f"[SKIP] {member_key} | {type(exc).__name__}: {exc}")
                     print(f"    input_file:  {failure_record['input_file']}")
                     print(f"    output_file: {failure_record['output_file']}")
@@ -816,7 +821,7 @@ def run_hodge_laplacian(
             )
             if verbose and num_succeeded > 0:
                 print(f"  {hl}")
-                print(f"  hodge laplacian matrices:")
+                print("  hodge laplacian matrices:")
                 for k in range(hl.max_dim + 1):
                     for comp in LAPLACIAN_COMPONENT_NAMES:
                         if (k, comp) in hl._laplacian_cache:
@@ -832,7 +837,8 @@ def run_hodge_laplacian(
                 print(f"  file size: "
                       f"{output_filepath.stat().st_size / 1024:.2f} KB")
                 print()
-            if num_succeeded == 0: print()
+            if num_succeeded == 0:
+                print()
 
             # Output retention
             file_deleted = False
@@ -1020,7 +1026,8 @@ def run_spectra(
                     )
                     failures.append(failure_record)
 
-                    if num_failed == 1: print()
+                    if num_failed == 1:
+                        print()
                     print(f"[SKIP] {member_key} | {type(exc).__name__}: {exc}")
                     print(f"    input_file:  {failure_record['input_file']}")
                     print(f"    output_file: {failure_record['output_file']}")
@@ -1047,7 +1054,7 @@ def run_spectra(
                 if solver_params:
                     print(f"  solver_params: {solver_params}")
                 print(f"  compute_eigenvectors: {compute_eigenvectors}")
-                print(f"  hodge laplacian spectra:")
+                print("  hodge laplacian spectra:")
                 for k in hlsp.degrees:
                     for comp in LAPLACIAN_COMPONENT_NAMES:
                         if (k, comp) in hlsp._spectrum_cache:
@@ -1064,7 +1071,8 @@ def run_spectra(
                 print(f"  file size: "
                       f"{output_filepath.stat().st_size / 1024:.2f} KB")
                 print()
-            if num_succeeded == 0: print()
+            if num_succeeded == 0:
+                print()
 
             # Output retention
             file_deleted = False

@@ -8,13 +8,7 @@ Helper functions including:
 """
 
 import numpy as np
-import pandas as pd
-import h5py
-import os
-import json
 from pathlib import Path
-import shutil
-from natsort import natsorted
 import time
 import textwrap
 import re
@@ -618,7 +612,7 @@ def convert_notebook(notebook_name, output_format='html', exclude=('input',), ou
     
     try:
         # Execute the conversion
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        subprocess.run(cmd, capture_output=True, text=True, check=True)
         print(f"Converted {notebook_name}.ipynb to {output_name}" + (f" excluding: {', '.join(exclude)}" if exclude else ""))
         
         return str(Path(output_name).resolve())
@@ -627,5 +621,4 @@ def convert_notebook(notebook_name, output_format='html', exclude=('input',), ou
         print(f"Command output: {e.stdout}")
         print(f"Command error: {e.stderr}")
         return None
-
 

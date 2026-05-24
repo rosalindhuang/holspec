@@ -6,11 +6,8 @@ Provides PointDataEnsemble class for managing collections of PointData objects
 that share a common base configuration with variations (e.g., noise realizations).
 """
 
-import numpy as np
 from pathlib import Path
-import json
 from datetime import datetime
-import h5py
 
 from holspec.point_data.base import PointData
 from holspec.point_data.point_generators import generate_points_from_config
@@ -166,7 +163,7 @@ class PointDataEnsemble:
         
         # Extract and validate ensemble metadata
         if 'ensemble_size' not in attributes:
-            raise ValueError(f"Missing 'ensemble_size' in root attributes")
+            raise ValueError("Missing 'ensemble_size' in root attributes")
         
         ensemble_size = attributes['ensemble_size']
         base_config = attributes.get('base_config')  # Already parsed from JSON by read_h5

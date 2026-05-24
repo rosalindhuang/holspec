@@ -14,6 +14,7 @@ from .io import (
     repack_h5,
     save_h5,
 )
+from natsort import natsorted
 from .validation import check_raises
 from .numerical import add_noise, compute_content_hash, create_noise_label
 from .helpers import (
@@ -25,7 +26,6 @@ from .helpers import (
     format_float_str,
     format_text,
     inspect_dict,
-    natsorted,
     print_dict,
     print_pipeline_config,
     timed,

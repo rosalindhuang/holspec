@@ -72,7 +72,7 @@ src/holspec/
 
 `holspec` requires Python 3.12 or newer.
 
-For local development, examples, notebooks, and visualization, the recommended setup is to create the Conda environment included with the repository and install the package in editable mode:
+For local development, examples, notebook workflows, and visualization, the recommended setup is to create the Conda environment included with the repository and install the package in editable mode:
 
 ```bash
 git clone https://github.com/rosalindhuang/holspec.git

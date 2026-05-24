@@ -21,7 +21,6 @@ from holspec.hodge_laplacian.base import LAPLACIAN_COMPONENT_NAMES
 
 from .spectrum import Spectrum
 from .eigensolvers import compute_eigendecomposition, VALID_SOLVER_NAMES, validate_solver_params
-from .validation import ZERO_EIGENVALUE_TOL
 
 if TYPE_CHECKING:
     from holspec.hodge_laplacian import HodgeLaplacian

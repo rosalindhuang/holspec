@@ -403,12 +403,11 @@ class SimplicialComplex:
         # Read root-level attributes
         _, attributes = read_h5(filepath, group=group)
         
-        # Extract metadata and max_dim
+        # Extract metadata
         metadata = attributes.get('metadata', {})
         
         if 'max_dim' not in attributes:
             raise ValueError(f"Missing 'max_dim' in {filepath}")
-        max_dim = attributes['max_dim']
         
         # Read all simplices from /simplices group
         datasets, _ = read_h5(filepath, group=join_h5_group(group, 'simplices'))
