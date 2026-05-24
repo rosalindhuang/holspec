@@ -1,6 +1,9 @@
 # holspec/paths.py
 """
-Project paths and directory utilities.
+Project path conventions and directory utilities.
+
+The top-level configs, data, notebooks, and outputs paths are local workspace
+conventions for development and exploratory workflows.
 """
 from pathlib import Path
 from fnmatch import fnmatch

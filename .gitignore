@@ -1,36 +1,23 @@
-# Python
+# Python and tooling artifacts
 __pycache__/
 *.py[cod]
 *.egg-info/
 .pytest_cache/
+.ruff_cache/
 
-# Environments
+# Local environments and system files
 .venv/
 .conda/
-
-# System files
 .DS_Store
-
-# Jupyter
 .ipynb_checkpoints/
 
-# Project files
-data/*
-!data/.gitkeep
+# Local project workspaces
+configs/
+data/
+notebooks/
+outputs/
 
-outputs/*
-!outputs/.gitkeep
-
-# AI Assistants
+# AI assistant context
 .claude/
-.codex/config.toml
-.codex/rules/
+.codex/
 AGENTS.md
-
-# Miscellaneous
-.attic
-*.code-workspace
-
-# Date/time-stamped backups
-*_[0-9][0-9]-[0-9][0-9]-[0-9][0-9]*
-*_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]*

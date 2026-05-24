@@ -361,8 +361,6 @@ def construct_vr_complex(
             'epsilon is required. '
             'Set it to the maximum pairwise distance to include all edges.'
         )
-    # if epsilon <= 0: # is this really needed?
-    #     raise ValueError(f"epsilon must be positive, got {epsilon}")
     
     # Build GUDHI Rips complex
     if positions is not None:
@@ -603,4 +601,3 @@ def create_simplicial_construction_label(
         parts.append(f"{param_abbr}{value_str}")
 
     return '_'.join(parts)
-
