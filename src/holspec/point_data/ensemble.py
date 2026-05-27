@@ -187,6 +187,191 @@ class PointDataEnsemble:
 
 
     @classmethod
+    def from_files(
+        cls,
+        configs: list[dict],
+        base_dir: str | Path | None = None,
+        metadata: dict | None = None,
+        member_metadata: dict | None = None,
+    ) -> 'PointDataEnsemble':
+        """
+        Load an ensemble from external point data file configurations.
+
+        Each config is passed to ``PointData.from_file`` and becomes one
+        ensemble member. First-pass imported ensembles are strict: all members
+        must have the same data type and array shape.
+
+        Parameters
+        ----------
+        configs : list of dict
+            File loading configurations. Each config must have ``data_type``
+            and ``filepath`` keys, plus optional ``file_format`` and ``params``.
+        base_dir : str or Path, optional
+            Base directory for resolving relative filepaths.
+        metadata : dict, optional
+            Ensemble-level metadata.
+        member_metadata : dict, optional
+            Additional metadata applied to every member. The per-member
+            ``member_index`` field is added automatically.
+
+        Returns
+        -------
+        ensemble : PointDataEnsemble
+            Imported point data ensemble.
+        """
+        if not configs:
+            raise ValueError("configs must contain at least one file config")
+
+        members = []
+        for i, config in enumerate(configs):
+            member_metadata_all = (
+                dict(member_metadata) if member_metadata is not None else {}
+            )
+            member_metadata_all["member_index"] = i
+            point_data = PointData.from_file(
+                config,
+                base_dir=base_dir,
+                metadata=member_metadata_all,
+            )
+            members.append(point_data)
+
+        _validate_imported_members(members)
+
+        ensemble_metadata = dict(metadata) if metadata is not None else {}
+        ensemble_metadata.update(
+            {
+                "import_mode": "files",
+                "data_type": members[0].data_type,
+                "source_files": [config["filepath"] for config in configs],
+            }
+        )
+        if base_dir is not None:
+            ensemble_metadata["base_dir"] = str(Path(base_dir))
+
+        return cls(members=members, metadata=ensemble_metadata)
+
+
+    @classmethod
+    def from_file_with_noise(
+        cls,
+        config: dict,
+        noise_config: dict,
+        num_realizations: int,
+        base_dir: str | Path | None = None,
+        base_seed: int = 42,
+        include_base: bool = False,
+        metadata: dict | None = None,
+        member_metadata: dict | None = None,
+    ) -> 'PointDataEnsemble':
+        """
+        Load one positions file and construct a noisy ensemble from it.
+
+        The imported file provides the base coordinates. Each noisy realization
+        is generated with absolute coordinate noise and seed ``base_seed + i``.
+        Distance-matrix perturbations are intentionally not supported.
+
+        Parameters
+        ----------
+        config : dict
+            File loading configuration for position data.
+        noise_config : dict
+            Noise parameters. Must include ``scale``. Optional
+            ``distribution`` defaults to ``"uniform"``.
+        num_realizations : int
+            Number of noisy realizations to generate. If ``include_base=True``,
+            the unperturbed imported data is prepended in addition to these
+            noisy realizations.
+        base_dir : str or Path, optional
+            Base directory for resolving relative filepaths.
+        base_seed : int, default=42
+            Starting seed. Noisy realization i uses seed = base_seed + i.
+        include_base : bool, default=False
+            Whether to include the unperturbed imported point data as the first
+            ensemble member.
+        metadata : dict, optional
+            Ensemble-level metadata.
+        member_metadata : dict, optional
+            Additional metadata applied to every member.
+
+        Returns
+        -------
+        ensemble : PointDataEnsemble
+            Imported noisy point data ensemble.
+        """
+        if num_realizations < 1:
+            raise ValueError("num_realizations must be at least 1")
+        if "scale" not in noise_config:
+            raise ValueError("noise_config must include 'scale'")
+
+        base_point_data = PointData.from_file(config, base_dir=base_dir)
+        if not base_point_data.has_positions:
+            raise ValueError("from_file_with_noise only supports position data")
+
+        base_positions = base_point_data.get_positions()
+        members = []
+
+        if include_base:
+            base_member_metadata = _imported_noise_member_metadata(
+                config=config,
+                noise_config=noise_config,
+                member_index=0,
+                noise_index=None,
+                seed=None,
+                is_base=True,
+                base_dir=base_dir,
+                member_metadata=member_metadata,
+            )
+            members.append(
+                PointData(
+                    positions=base_positions.copy(),
+                    metadata=base_member_metadata,
+                )
+            )
+
+        for i in range(num_realizations):
+            seed = base_seed + i
+            member_index = i + 1 if include_base else i
+            noisy_positions = add_noise(
+                base_positions,
+                scale=noise_config["scale"],
+                distribution=noise_config.get("distribution", "uniform"),
+                seed=seed,
+            )
+            member_metadata_all = _imported_noise_member_metadata(
+                config=config,
+                noise_config=noise_config,
+                member_index=member_index,
+                noise_index=i,
+                seed=seed,
+                is_base=False,
+                base_dir=base_dir,
+                member_metadata=member_metadata,
+            )
+            members.append(
+                PointData(positions=noisy_positions, metadata=member_metadata_all)
+            )
+
+        ensemble_metadata = dict(metadata) if metadata is not None else {}
+        ensemble_metadata.update(
+            {
+                "import_mode": "file_with_noise",
+                "num_realizations": num_realizations,
+                "base_seed": base_seed,
+                "include_base": include_base,
+            }
+        )
+        if base_dir is not None:
+            ensemble_metadata["base_dir"] = str(Path(base_dir))
+
+        return cls(
+            members=members,
+            base_config=config,
+            noise_config=noise_config,
+            metadata=ensemble_metadata,
+        )
+
+
+    @classmethod
     def from_base_config(
         cls,
         base_config: dict,
@@ -308,3 +493,62 @@ class PointDataEnsemble:
         """String representation of ensemble."""
         return (f"PointDataEnsemble(size={self.size}, "
                 f"N={self.num_points}, d={self.dimension})")
+
+
+# =============================================================================
+# Helpers
+# =============================================================================
+
+def _validate_imported_members(members: list[PointData]) -> None:
+    """Validate imported ensemble members have one data type and shape."""
+    first = members[0]
+    data_type = first.data_type
+    shape = _point_data_shape(first)
+
+    for i, member in enumerate(members[1:], start=1):
+        if member.data_type != data_type:
+            raise ValueError(
+                "Imported ensemble members must have the same data_type; "
+                f"member 0 has {data_type!r}, member {i} has {member.data_type!r}"
+            )
+        member_shape = _point_data_shape(member)
+        if member_shape != shape:
+            raise ValueError(
+                "Imported ensemble members must have the same array shape; "
+                f"member 0 has shape {shape}, member {i} has shape {member_shape}"
+            )
+
+
+def _point_data_shape(point_data: PointData) -> tuple[int, ...]:
+    """Return the stored array shape for a PointData object."""
+    if point_data.has_positions:
+        return point_data.get_positions().shape
+    return point_data.get_distances().shape
+
+
+def _imported_noise_member_metadata(
+    config: dict,
+    noise_config: dict,
+    member_index: int,
+    noise_index: int | None,
+    seed: int | None,
+    is_base: bool,
+    base_dir: str | Path | None,
+    member_metadata: dict | None,
+) -> dict:
+    """Build member metadata for noisy ensembles from imported data."""
+    metadata = dict(member_metadata) if member_metadata is not None else {}
+    metadata.update(
+        {
+            "base_config": config,
+            "noise_config": noise_config,
+            "member_index": member_index,
+            "noise_index": noise_index,
+            "is_base": is_base,
+        }
+    )
+    if seed is not None:
+        metadata["seed"] = seed
+    if base_dir is not None:
+        metadata["base_dir"] = str(Path(base_dir))
+    return metadata

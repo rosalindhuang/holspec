@@ -5,6 +5,8 @@ These tests verify HDF5 persistence for standalone objects and lazy-cache
 objects using tiny in-memory examples and temporary files only.
 """
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -80,6 +82,28 @@ def test_point_data_distances_round_trips(tmp_path):
         loaded.get_positions()
 
 
+def test_point_data_metadata_with_paths_round_trips(tmp_path):
+    positions = np.array([[0.0, 0.0], [1.0, 0.0]])
+    point_data = PointData(
+        positions=positions,
+        metadata={
+            "config": {
+                "filepath": Path("positions.npy"),
+                "nested": {
+                    "paths": [Path("a.csv"), Path("b.csv")],
+                },
+            },
+        },
+    )
+    path = tmp_path / "point_metadata_paths.h5"
+
+    point_data.save(path)
+    loaded = PointData.load(path)
+
+    assert loaded.metadata["config"]["filepath"] == "positions.npy"
+    assert loaded.metadata["config"]["nested"]["paths"] == ["a.csv", "b.csv"]
+
+
 def test_point_data_ensemble_round_trips(tmp_path):
     members = [
         PointData(
@@ -115,6 +139,46 @@ def test_point_data_ensemble_round_trips(tmp_path):
             loaded_member.get_positions(),
             original_member.get_positions(),
         )
+
+
+def test_imported_noisy_point_data_ensemble_round_trips(tmp_path):
+    positions = np.array(
+        [
+            [0.0, 0.0],
+            [1.0, 0.0],
+            [0.5, 0.8],
+        ],
+    )
+    np.save(tmp_path / "positions.npy", positions)
+    config = {
+        "data_type": "positions",
+        "filepath": "positions.npy",
+    }
+    noise_config = {"scale": 0.05, "distribution": "normal"}
+    ensemble = PointDataEnsemble.from_file_with_noise(
+        config,
+        noise_config,
+        num_realizations=2,
+        base_dir=tmp_path,
+        base_seed=5,
+        include_base=True,
+    )
+    path = tmp_path / "imported_noisy_ensemble.h5"
+
+    ensemble.save(path)
+    loaded = PointDataEnsemble.load(path)
+
+    assert loaded.size == 3
+    assert loaded.base_config == config
+    assert loaded.noise_config == noise_config
+    assert loaded.metadata["import_mode"] == "file_with_noise"
+    assert loaded.metadata["num_realizations"] == 2
+    assert loaded.metadata["base_seed"] == 5
+    assert loaded.metadata["include_base"] is True
+    np.testing.assert_allclose(loaded[0].get_positions(), positions)
+    assert loaded[0].metadata["is_base"] is True
+    assert loaded[1].metadata["seed"] == 5
+    assert loaded[2].metadata["seed"] == 6
 
 
 def test_simplicial_complex_round_trips_with_incidence_cache(

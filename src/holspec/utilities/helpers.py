@@ -23,12 +23,13 @@ import subprocess
 
 def convert_numpy_to_python(obj):
     """
-    Recursively convert numpy types to native Python types.
+    Recursively convert numpy and path-like types to native Python types.
     
     Parameters
     ----------
     obj : any
-        Object to convert. Can be a dict, list, numpy array, numpy scalar, or any other type.
+        Object to convert. Can be a dict, list, numpy array, numpy scalar, Path,
+        or any other type.
     
     Returns
     -------
@@ -41,6 +42,7 @@ def convert_numpy_to_python(obj):
     - numpy floats → float
     - numpy bool → bool
     - numpy arrays → list (recursively)
+    - pathlib Path objects → str
     - dict values → recursively converted
     - list items → recursively converted
     - other types → unchanged
@@ -66,6 +68,8 @@ def convert_numpy_to_python(obj):
         return float(obj)
     elif isinstance(obj, np.bool_):
         return bool(obj)
+    elif isinstance(obj, Path):
+        return str(obj)
     else:
         return obj
 
@@ -621,4 +625,3 @@ def convert_notebook(notebook_name, output_format='html', exclude=('input',), ou
         print(f"Command output: {e.stdout}")
         print(f"Command error: {e.stderr}")
         return None
-

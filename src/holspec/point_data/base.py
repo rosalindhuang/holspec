@@ -11,6 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from scipy.spatial.distance import pdist, squareform
 
+from holspec.point_data.data_loaders import load_array_from_config
 from holspec.point_data.point_generators import generate_points_from_config
 from holspec.point_data.validation import validate_positions, validate_distances
 from holspec.utilities import save_h5, read_h5, compute_content_hash, add_noise
@@ -288,6 +289,52 @@ class PointData:
         metadata = attributes.get('metadata', {})
         
         return cls(positions=positions, distances=distances, metadata=metadata)
+
+    @classmethod
+    def from_file(
+        cls,
+        config: dict,
+        base_dir: str | Path | None = None,
+        metadata: dict | None = None,
+    ) -> 'PointData':
+        """
+        Load point data from an external file configuration.
+
+        Parameters
+        ----------
+        config : dict
+            File loading configuration with ``data_type`` and ``filepath`` keys.
+            ``data_type`` must be either ``"positions"`` or ``"distances"``.
+            Optional ``file_format`` and ``params`` entries are passed to the
+            low-level array loaders.
+        base_dir : str or Path, optional
+            Base directory for resolving relative filepaths.
+        metadata : dict, optional
+            Additional metadata to store on the ``PointData`` object. The file
+            loading config is stored under ``metadata["config"]``.
+
+        Returns
+        -------
+        point_data : PointData
+            Imported point data object.
+        """
+        data_array = load_array_from_config(config, base_dir=base_dir)
+        data_type = config["data_type"]
+
+        point_metadata = dict(metadata) if metadata is not None else {}
+        point_metadata["config"] = config
+        if base_dir is not None:
+            point_metadata["base_dir"] = str(Path(base_dir))
+
+        if data_type == "positions":
+            return cls(positions=data_array, metadata=point_metadata)
+        if data_type == "distances":
+            return cls(distances=data_array, metadata=point_metadata)
+
+        raise ValueError(
+            "Config 'data_type' must be either 'positions' or 'distances', "
+            f"got {data_type!r}"
+        )
 
     @classmethod
     def from_config(
