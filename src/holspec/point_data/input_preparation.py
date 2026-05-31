@@ -16,6 +16,13 @@ from holspec.utilities import create_noise_label, save_h5
 
 
 # =============================================================================
+# Constants
+# =============================================================================
+
+SUPPORTED_IMPORT_MODES = {"files", "file_with_noise"}
+
+
+# =============================================================================
 # Utilities
 # =============================================================================
 
@@ -220,3 +227,146 @@ def run_data_generation(
                 print()
 
     return output_filepaths
+
+
+def run_data_import(
+    config: dict,
+    project_root: str | Path,
+    select_categories: list[str] | None = None,
+) -> dict[str, dict[str, Path]]:
+    """
+    Import point data ensembles from a config dictionary.
+
+    Iterates over dataset categories and import configs, constructs each
+    ``PointDataEnsemble`` from external files, and saves to HDF5 files with
+    provenance metadata. Input filepaths in import configs are resolved relative
+    to ``project_root``.
+
+    Parameters
+    ----------
+    config : dict
+        Data import config dict with keys: ``summary``, ``configs``,
+        ``runtime``, ``outputs``. The ``configs`` value is a nested dict
+        ``{category: {ensemble_label: import_config}}``. Supported import modes
+        are ``"files"`` and ``"file_with_noise"``.
+    project_root : str or Path
+        Project root for resolving relative input and output paths.
+    select_categories : list of str or None, optional
+        Glob patterns for category names. If None, imports all categories
+        present in the config. Exact names are valid patterns.
+
+    Returns
+    -------
+    dict[str, dict[str, Path]]
+        Nested mapping ``{category: {ensemble_label: output_filepath}}``.
+    """
+    project_root = Path(project_root)
+
+    # --- Extract settings ---
+
+    output_data_dir = project_root / config["outputs"]["data_dir"]
+    category_subdirs = config["outputs"].get("category_subdirs", True)
+    stage_name = config["outputs"]["stage_name"]
+    created_by = config["summary"]["created_by"]
+    verbose = config.get("runtime", {}).get("verbose", False)
+    dataset_configs = config["configs"]
+
+    # --- Import ensembles ---
+
+    output_filepaths: dict[str, dict[str, Path]] = {}
+
+    for category, configs_dict in dataset_configs.items():
+        if select_categories and not any(fnmatch(category, pat) for pat in select_categories):
+            continue
+
+        if verbose:
+            print("-" * 60)
+            print(f"{category}")
+            print("-" * 60)
+            print()
+
+        output_filepaths[category] = {}
+
+        for ensemble_label, import_config in configs_dict.items():
+
+            # Construct PointDataEnsemble
+            ptd_ensemble = _import_ensemble_from_config(
+                import_config,
+                project_root=project_root,
+            )
+
+            # Save to HDF5
+            if category_subdirs:
+                output_filepath = (
+                    output_data_dir / category / f"{ensemble_label}.h5"
+                )
+            else:
+                output_filepath = output_data_dir / f"{ensemble_label}.h5"
+            output_filepath.parent.mkdir(parents=True, exist_ok=True)
+            ptd_ensemble.save(output_filepath)
+
+            # Add metadata
+            save_h5(
+                output_filepath,
+                attributes={
+                    "created_by": created_by,
+                    "creation_time": datetime.now().isoformat(),
+                    "stage_name": stage_name,
+                    "stage_config": import_config,
+                },
+                group=None,
+                mode="update",
+            )
+
+            output_filepaths[category][ensemble_label] = output_filepath
+
+            # Completion
+            print(
+                f"Imported {ptd_ensemble.size} members "
+                f"for {category} / {ensemble_label}"
+            )
+            if verbose:
+                print(f"  {ptd_ensemble}")
+                print(f"  import mode: "
+                      f"{import_config['import_mode']}")
+                print(f"  data type: "
+                      f"{ptd_ensemble.members[0].data_type}")
+                print(f"  file path: "
+                      f"{output_filepath.relative_to(project_root)}")
+                print(f"  file size: "
+                      f"{output_filepath.stat().st_size / 1024:.2f} KB")
+                print()
+
+    return output_filepaths
+
+
+# =============================================================================
+# Helpers
+# =============================================================================
+
+def _import_ensemble_from_config(
+    import_config: dict,
+    project_root: Path,
+) -> PointDataEnsemble:
+    """Construct a PointDataEnsemble from one import config."""
+    import_mode = import_config.get("import_mode")
+
+    if import_mode == "files":
+        return PointDataEnsemble.from_files(
+            import_config["file_configs"],
+            base_dir=project_root,
+        )
+    if import_mode == "file_with_noise":
+        return PointDataEnsemble.from_file_with_noise(
+            import_config["base_config"],
+            noise_config=import_config["noise_config"],
+            num_realizations=import_config["num_realizations"],
+            base_dir=project_root,
+            base_seed=import_config.get("base_seed", 42),
+            include_base=import_config.get("include_base", False),
+        )
+
+    raise ValueError(
+        f"Unsupported import_mode {import_mode!r}. "
+        f"Supported modes: {sorted(SUPPORTED_IMPORT_MODES)}"
+    )
