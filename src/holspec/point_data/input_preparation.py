@@ -1,16 +1,16 @@
-# holspec/point_data/data_generation.py
+# holspec/point_data/input_preparation.py
 """
-Data generation utilities for point data ensembles.
+Input preparation utilities for point data ensembles.
 
-Provides config construction, labeling, and orchestration for generating
-point data ensembles from configuration dictionaries.
+Provides config construction, labeling, and orchestration for preparing point
+data ensembles from configuration dictionaries.
 """
 
 from pathlib import Path
 from datetime import datetime
 from fnmatch import fnmatch
 
-from holspec.point_data.point_generators import create_point_generator_label
+from holspec.point_data.data_generators import create_point_generator_label
 from holspec.point_data.ensemble import PointDataEnsemble
 from holspec.utilities import create_noise_label, save_h5
 

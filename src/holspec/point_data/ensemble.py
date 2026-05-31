@@ -10,7 +10,7 @@ from pathlib import Path
 from datetime import datetime
 
 from holspec.point_data.base import PointData
-from holspec.point_data.point_generators import generate_points_from_config
+from holspec.point_data.data_generators import generate_points_from_config
 from holspec.utilities import save_h5, read_h5, add_noise
 
 

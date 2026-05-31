@@ -1,15 +1,15 @@
 # holspec/point_data/__init__.py
 """
-Point cloud data containers and synthetic data generation.
+Point cloud data containers and input preparation.
 
 This subpackage defines the input layer of the holspec pipeline: point data,
-point data ensembles, configurable generators, and orchestration helpers for
-reproducible synthetic datasets.
+point data ensembles, configurable data generators, external data loaders, and
+orchestration helpers for reproducible input datasets.
 """
 
 from .base import PointData
 from .ensemble import PointDataEnsemble
-from .point_generators import (
+from .data_generators import (
     POINT_GENERATOR_REGISTRY,
     create_point_generator_label,
     generate_bcc_lattice,
@@ -22,7 +22,7 @@ from .point_generators import (
     generate_triangular_lattice_hex,
     generate_triangular_lattice_rect,
 )
-from .data_generation import (
+from .input_preparation import (
     create_ensemble_label,
     make_ensemble_config,
     run_data_generation,
@@ -47,7 +47,7 @@ __all__ = [
     'validate_distances',
 
     # Utilities (for data creation/loading)
-    # generators.py
+    # data_generators.py
     'generate_triangular_lattice_hex',
     'generate_triangular_lattice_rect',
     'generate_square_lattice',
@@ -61,7 +61,7 @@ __all__ = [
     'generate_points_from_config',
     'create_point_generator_label',
 
-    # data_generation.py
+    # input_preparation.py
     'make_ensemble_config',
     'create_ensemble_label',
     'run_data_generation',

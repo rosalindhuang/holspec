@@ -1,8 +1,8 @@
-# holspec/point_data/point_generators.py
+# holspec/point_data/data_generators.py
 """
-Point data generation functions.
+Synthetic data generation functions.
 
-This module provides functions to generate point data for lattices, random 
+This module provides functions to generate datasets for lattices, random 
 distributions, and simple shapes in 2D and 3D.
 """
 
@@ -449,5 +449,3 @@ def create_point_generator_label(
         return f"{dimension}d_{base_label}"
     
     return base_label
-
-
