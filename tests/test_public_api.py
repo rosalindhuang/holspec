@@ -22,6 +22,7 @@ def test_top_level_public_api_imports():
         "__version__",
         "PointData",
         "PointDataEnsemble",
+        "run_data_import",
         "run_data_generation",
         "SimplicialComplex",
         "MetricTensor",

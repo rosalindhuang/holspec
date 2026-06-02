@@ -8,7 +8,12 @@ and I/O helpers are available from their subpackages.
 
 from importlib.metadata import PackageNotFoundError, version
 
-from holspec.point_data import PointData, PointDataEnsemble, run_data_generation
+from holspec.point_data import (
+    PointData,
+    PointDataEnsemble,
+    run_data_import,
+    run_data_generation,
+)
 from holspec.simplicial import SimplicialComplex
 from holspec.cochain_metric import CochainMetric, MetricTensor
 from holspec.hodge_laplacian import HodgeLaplacian
@@ -33,6 +38,7 @@ __all__ = [
     # Point data
     "PointData",
     "PointDataEnsemble",
+    "run_data_import",
     "run_data_generation",
 
     # Core framework objects

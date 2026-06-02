@@ -17,7 +17,7 @@ import typer
 import yaml
 
 from holspec.pipeline import run_pipeline
-from holspec.point_data import run_data_generation
+from holspec.point_data import run_data_import, run_data_generation
 from holspec.utilities import inspect_h5
 
 
@@ -132,6 +132,96 @@ def _print_generate_data_summary(
     typer.echo(f"selected categories:  {selected}")
     typer.echo(f"generated categories: {generated}")
     typer.echo(f"output files:         {output_file_count}")
+
+
+def _print_import_data_summary(
+    *,
+    config_path: Path,
+    project_root: Path,
+    config: dict[str, Any],
+    select_categories: list[str] | None,
+    results: dict[str, dict[str, Path]],
+) -> None:
+    """Print a concise data-import summary for CLI users."""
+    output_dir = config.get("outputs", {}).get("data_dir", "(not configured)")
+    selected = ", ".join(select_categories) if select_categories else "(all)"
+    imported = ", ".join(results) if results else "(none)"
+    output_file_count = _count_nested_files(results)
+
+    typer.echo()
+    typer.secho("holspec data import complete.", bold=True)
+    typer.echo(f"\nconfig:               {_display_path(config_path, project_root)}")
+    typer.echo(f"project root:         {project_root}")
+    typer.echo(f"output dir:           {output_dir}")
+    typer.echo(f"selected categories:  {selected}")
+    typer.echo(f"imported categories:  {imported}")
+    typer.echo(f"output files:         {output_file_count}")
+
+
+@app.command()
+def import_data(
+    config_path: Path = typer.Argument(
+        ...,
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+        resolve_path=True,
+        metavar="CONFIG",
+        help="Path to a holspec data-import YAML config.",
+    ),
+    project_root: Path = typer.Option(
+        Path("."),
+        "--project-root",
+        "-r",
+        file_okay=False,
+        dir_okay=True,
+        readable=True,
+        resolve_path=True,
+        help="Project root for resolving relative paths in the config.",
+    ),
+    select_categories: list[str] | None = typer.Option(
+        None,
+        "--category",
+        "-c",
+        help="Category glob to import. Can be supplied multiple times.",
+    ),
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        help="Override the config and print detailed import output.",
+    ),
+    quiet: bool = typer.Option(
+        False,
+        "--quiet",
+        help="Suppress import progress output and print only the summary.",
+    ),
+) -> None:
+    """Import external point data ensembles from a YAML config."""
+    try:
+        _validate_output_options(verbose, quiet)
+        config = _load_yaml_config(config_path)
+        if verbose or quiet:
+            _set_config_verbose(config, verbose=verbose and not quiet)
+
+        output_context = redirect_stdout(StringIO()) if quiet else nullcontext()
+        with output_context:
+            results = run_data_import(
+                config=config,
+                project_root=project_root,
+                select_categories=select_categories,
+            )
+    except (OSError, yaml.YAMLError, ValueError, KeyError) as exc:
+        typer.secho(f"Error: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from exc
+
+    _print_import_data_summary(
+        config_path=config_path,
+        project_root=project_root,
+        config=config,
+        select_categories=select_categories,
+        results=results,
+    )
 
 
 @app.command()

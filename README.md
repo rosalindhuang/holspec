@@ -6,7 +6,7 @@
 
 The `holspec` package supports:
 
-- **Point cloud inputs:** Represent point cloud data from coordinates or pairwise distances, including built-in data generation and noisy ensembles.
+- **Point cloud inputs:** Represent point cloud data from coordinates or pairwise distances, supporting external data import and built-in data generation.
 - **Configurable pipeline stages:** Construct simplicial complexes, assign cochain metrics, assemble Hodge Laplacians, and compute spectra through modular stage configurations.
 - **Reproducible workflows:** Run config-driven workflows using the Python API and `holspec` CLI, with persisted intermediate artifacts and provenance tracking.
 - **Analysis and visualization:** Analyze, compare, and visualize structural signatures across families of point cloud datasets and modeling choices.
@@ -32,7 +32,7 @@ The `holspec` pipeline turns point cloud data into spectral signatures through a
 
 | Stage            | Framework objects       | Role                                                                                                                                                                                                                                       |
 | ---------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Point cloud data | `PointData`             | Represent input data as coordinates or pairwise distances. Supports built-in point cloud generators and noisy ensembles.                                                                                                                   |
+| Point cloud data | `PointData`             | Represent input data as coordinates or pairwise distances with support for noisy ensembles. Includes external point cloud data import and built-in generators.                                                                             |
 | Topology         | `SimplicialComplex`     | Establish connectivity by constructing a simplicial complex from the point cloud; determines which higher-order local groups are represented. Options include Delaunay, alpha, and Vietoris-Rips constructions.                            |
 | Geometry         | `CochainMetric`         | Incorporate geometric or weighting information by defining an inner product on cochain spaces of the complex. Options include combinatorial and Hodge star metrics; custom cochain metrics can also be constructed through the Python API. |
 | Hodge Laplacians | `HodgeLaplacian`        | Construct Hodge Laplacians and other discrete differential operators from the topological and geometric data.                                                                                                                              |
@@ -44,7 +44,7 @@ The main pipeline stages are implemented as separate subpackages, each with its 
 
 ```text
 src/holspec/
-├── point_data/          # PointData, PointDataEnsemble, point cloud generators
+├── point_data/          # PointData, PointDataEnsemble, data import/generation
 ├── simplicial/          # SimplicialComplex, complex construction methods
 ├── cochain_metric/      # CochainMetric, metric models
 ├── hodge_laplacian/     # HodgeLaplacian, discrete differential operators
@@ -58,7 +58,7 @@ src/holspec/
 
 ### Design features
 
-- **Config-driven pipeline execution:** Pipeline runs are specified through YAML configuration files and executed through the Python API or `holspec` CLI. Configurations define input selections, stage options, runtime settings, and output locations.
+- **Config-driven workflows:** Data import, data generation, and pipeline runs are specified through YAML configuration files and executed through the Python API or `holspec` CLI. Configurations define input selections, stage options, runtime settings, and output locations.
 - **Object persistence and cache loading:** `PointData`, `SimplicialComplex`, and `CochainMetric` can be saved and loaded as standalone HDF5 data objects. `HodgeLaplacian` and `HodgeLaplacianSpectra` persist derived quantities from upstream objects and support cache loading through the pipeline.
 - **Provenance tracking:** Pipeline outputs store stage metadata, configuration data, upstream file references, and content hashes. Provenance utilities can trace a downstream file back through prior stages to the input point cloud data.
 - **Ensemble-aware workflows:** Point cloud ensembles are represented explicitly through `PointDataEnsemble` and processed member-by-member through the pipeline. Spectral analysis utilities summarize eigenvalue spectra and derived quantities across ensemble members.
@@ -107,14 +107,15 @@ pip install -e ".[dev,viz,notebook]"
 
 | Interface  | Use it for                                                                                                      | Examples                                                                                                           |
 | ---------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| CLI        | Running reproducible data generation and pipeline workflows from YAML configuration files.                      | `holspec run`, `holspec generate-data`                                                                             |
-| Python API | Analyzing and visualizing pipeline outputs, working directly with framework objects, building custom workflows. | `load_spectra`, `EnsembleSpectraAnalysis`, `PointData`, `SimplicialComplex`, `run_pipeline`, `run_data_generation` |
+| CLI        | Running reproducible data import, data generation, and pipeline workflows from YAML configuration files.        | `holspec run`, `holspec import-data`, `holspec generate-data`                                                      |
+| Python API | Analyzing and visualizing pipeline outputs, working directly with framework objects, building custom workflows. | `load_spectra`, `EnsembleSpectraAnalysis`, `PointData`, `SimplicialComplex`, `run_pipeline`, `run_data_import`     |
 
 The two interfaces are complementary and cover different needs. Typical workflows can combine them: run reproducible computations from the CLI, then use the Python API for interactive exploration, analysis, and visualization. See the **Quickstart** section for an example.
 
 The CLI is the main interface for running config-driven workflows.
 
 - `holspec run <pipeline_config.yml>`: Run the full pipeline from a YAML config.
+- `holspec import-data <data_import_config.yml>`: Import external point cloud data files specified by a YAML config.
 - `holspec generate-data <data_generation_config.yml>`: Generate point cloud data from a YAML config.
 - `holspec inspect <output_file.h5>`: Optionally inspect an HDF5 output file.
 
@@ -128,7 +129,7 @@ The quickstart notebook is a small demo of the kinds of structural studies that 
 
 ### Running the example
 
-The notebook is found at `examples/quickstart.ipynb`. It walks through the full workflow:
+The notebook is found at `examples/quickstart.ipynb`. It walks through a full workflow:
 
 1. Generates point cloud ensembles at several noise levels.
 2. Runs the `holspec` pipeline on each ensemble.
@@ -169,7 +170,7 @@ The test suite includes:
 - **Mathematical and numerical checks:** Small hand-checkable examples to verify simplicial complex invariants, cochain metric behavior, Hodge Laplacian operator identities, eigensolver behavior, and spectra on known examples.
 - **Object contracts and validation:** Tests covering construction, access methods, validation behavior, and error handling for framework objects.
 - **Persistence and provenance:** HDF5 round-trip tests to verify framework objects can be saved, loaded, and cache-loaded consistently, with content-hash mismatch detection and provenance-based pipeline loading.
-- **Pipeline and interfaces:** End-to-end and staged pipeline execution, top-level Python API, CLI workflows, and config-driven data generation.
+- **Pipeline and interfaces:** End-to-end and staged pipeline execution, top-level Python API, CLI workflows, and config-driven data import and generation.
 
 ## Future directions
 

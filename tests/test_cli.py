@@ -1,7 +1,7 @@
 """
 CLI smoke tests for the public holspec command-line interface.
 
-These tests exercise help output, option handling, tiny data generation,
+These tests exercise help output, option handling, tiny data import/generation,
 pipeline execution, and HDF5 inspection through Typer. They verify the public
 CLI path, not deep mathematical correctness.
 """
@@ -30,6 +30,9 @@ def test_cli_help():
 
     assert result.exit_code == 0
     assert "Run holspec workflows" in result.output
+    assert "import-data" in result.output
+    assert "generate-data" in result.output
+    assert result.output.index("import-data") < result.output.index("generate-data")
     assert "run" in result.output
 
 
@@ -41,6 +44,16 @@ def test_cli_run_help():
     assert "Run the full holspec pipeline" in result.output
     assert "Project root" in result.output
     assert "Suppress pipeline progress" in result.output
+
+
+def test_cli_import_data_help():
+    result = runner.invoke(app, ["import-data", "--help"])
+
+    assert result.exit_code == 0
+    assert "CONFIG" in result.output
+    assert "Import external point data" in result.output
+    assert "Category glob" in result.output
+    assert "Suppress import progress" in result.output
 
 
 def test_cli_generate_data_help():
@@ -154,6 +167,77 @@ def test_cli_run_rejects_conflicting_output_options(tmp_path: Path):
 
 
 # Tiny workflow smoke tests
+
+def test_cli_import_data_with_category_filter(tmp_path: Path):
+    project_root = tmp_path
+    config_path = project_root / "configs" / "data_import.yml"
+
+    _write_tiny_data_import_files(project_root)
+    _write_tiny_data_import_config(config_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "import-data",
+            str(config_path),
+            "--project-root",
+            str(project_root),
+            "--category",
+            "cli",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "holspec data import complete." in result.output
+    assert "config:               configs/data_import.yml" in result.output
+    assert "selected categories:  cli" in result.output
+    assert "imported categories:  cli" in result.output
+    assert "output files:         1" in result.output
+
+    output_path = project_root / "data" / "imported" / "cli" / "positions_csv.h5"
+    assert output_path.exists()
+    assert not (project_root / "data" / "imported" / "skip").exists()
+
+    ensemble = PointDataEnsemble.load(output_path)
+    assert ensemble.size == 1
+    assert ensemble.num_points == 3
+    assert ensemble.dimension == 2
+    np.testing.assert_allclose(
+        ensemble[0].get_positions(),
+        np.array(
+            [
+                [0.0, 0.0],
+                [1.0, 0.0],
+                [0.5, 0.8],
+            ],
+        ),
+    )
+
+
+def test_cli_import_data_quiet_suppresses_import_progress(tmp_path: Path):
+    project_root = tmp_path
+    config_path = project_root / "configs" / "data_import.yml"
+
+    _write_tiny_data_import_files(project_root)
+    _write_tiny_data_import_config(config_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "import-data",
+            str(config_path),
+            "--project-root",
+            str(project_root),
+            "--category",
+            "cli",
+            "--quiet",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "holspec data import complete." in result.output
+    assert "Imported 1 members" not in result.output
+
 
 def test_cli_generate_data_with_category_filter(tmp_path: Path):
     project_root = tmp_path
@@ -273,6 +357,67 @@ def _save_triangle_input(input_path: Path) -> None:
         group=None,
         mode="update",
     )
+
+
+def _write_tiny_data_import_files(project_root: Path) -> None:
+    input_dir = project_root / "inputs"
+    input_dir.mkdir(parents=True, exist_ok=True)
+    (input_dir / "positions.csv").write_text(
+        "x,y\n"
+        "0.0,0.0\n"
+        "1.0,0.0\n"
+        "0.5,0.8\n"
+    )
+
+
+def _write_tiny_data_import_config(config_path: Path) -> None:
+    config = {
+        "summary": {
+            "created_by": "tests/test_cli.py",
+            "creation_time": "2026-05-11T00:00:00",
+        },
+        "configs": {
+            "cli": {
+                "positions_csv": {
+                    "import_mode": "files",
+                    "file_configs": [
+                        {
+                            "data_type": "positions",
+                            "filepath": "inputs/positions.csv",
+                            "params": {
+                                "columns": ["x", "y"],
+                            },
+                        },
+                    ],
+                },
+            },
+            "skip": {
+                "positions_csv": {
+                    "import_mode": "files",
+                    "file_configs": [
+                        {
+                            "data_type": "positions",
+                            "filepath": "inputs/positions.csv",
+                            "params": {
+                                "columns": ["x", "y"],
+                            },
+                        },
+                    ],
+                },
+            },
+        },
+        "runtime": {
+            "verbose": False,
+        },
+        "outputs": {
+            "stage_name": "point_data",
+            "data_dir": "data/imported",
+        },
+    }
+
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(config_path, "w") as f:
+        yaml.safe_dump(config, f, sort_keys=False)
 
 
 def _write_tiny_data_generation_config(config_path: Path) -> None:
