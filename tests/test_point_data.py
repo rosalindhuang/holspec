@@ -11,7 +11,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from holspec.point_data import PointData, PointDataEnsemble
+from holspec.point_data import (
+    PointData,
+    PointDataEnsemble,
+    generate_points_from_config,
+)
 
 
 # PointData construction and access
@@ -492,6 +496,199 @@ def test_point_data_ensemble_from_file_with_noise_rejects_missing_scale(
             num_realizations=2,
             base_dir=tmp_path,
         )
+
+
+# PointDataEnsemble reference point data
+
+def test_point_data_ensemble_from_base_config_reference_equals_base():
+    base_config = {
+        "generator": "trilatthex",
+        "params": {"n_rings": 2, "spacing": 1.0},
+    }
+    noise_config = {"scale": 0.1, "distribution": "uniform"}
+
+    ensemble = PointDataEnsemble.from_base_config(
+        base_config,
+        noise_config,
+        num_realizations=3,
+        base_seed=7,
+    )
+
+    expected_base = generate_points_from_config(base_config)
+    assert ensemble.has_reference
+    np.testing.assert_allclose(
+        ensemble.get_reference_positions(),
+        expected_base,
+    )
+    # The reference is the unperturbed base, distinct from any noisy member.
+    assert not np.allclose(
+        ensemble.get_reference_positions(),
+        ensemble[0].get_positions(),
+    )
+
+
+def test_point_data_ensemble_from_file_with_noise_reference_equals_original(
+    tmp_path: Path,
+):
+    positions = np.array(
+        [
+            [0.0, 0.0],
+            [1.0, 0.0],
+            [0.5, 0.8],
+        ],
+    )
+    _write_positions_csv(tmp_path / "positions.csv", positions)
+    config = _positions_config("positions.csv")
+    noise_config = {"scale": 0.05, "distribution": "normal"}
+
+    ensemble_excluded = PointDataEnsemble.from_file_with_noise(
+        config,
+        noise_config,
+        num_realizations=2,
+        base_dir=tmp_path,
+        include_base=False,
+    )
+    ensemble_included = PointDataEnsemble.from_file_with_noise(
+        config,
+        noise_config,
+        num_realizations=2,
+        base_dir=tmp_path,
+        include_base=True,
+    )
+
+    for ensemble in (ensemble_excluded, ensemble_included):
+        assert ensemble.has_reference
+        np.testing.assert_allclose(
+            ensemble.get_reference_positions(),
+            positions,
+        )
+
+
+def test_point_data_ensemble_from_files_uses_reference_index(tmp_path: Path):
+    positions_0 = np.array(
+        [
+            [0.0, 0.0],
+            [1.0, 0.0],
+            [0.5, 0.8],
+        ],
+    )
+    positions_1 = positions_0 + 0.1
+    _write_positions_csv(tmp_path / "positions_0.csv", positions_0)
+    _write_positions_csv(tmp_path / "positions_1.csv", positions_1)
+    configs = [
+        _positions_config("positions_0.csv"),
+        _positions_config("positions_1.csv"),
+    ]
+
+    default_ensemble = PointDataEnsemble.from_files(configs, base_dir=tmp_path)
+    assert default_ensemble.has_reference
+    np.testing.assert_allclose(
+        default_ensemble.get_reference_positions(),
+        positions_0,
+    )
+
+    second_ensemble = PointDataEnsemble.from_files(
+        configs,
+        base_dir=tmp_path,
+        reference_index=1,
+    )
+    np.testing.assert_allclose(
+        second_ensemble.get_reference_positions(),
+        positions_1,
+    )
+
+
+def test_point_data_ensemble_from_files_reference_index_none(tmp_path: Path):
+    positions = np.array([[0.0, 0.0], [1.0, 0.0], [0.5, 0.8]])
+    _write_positions_csv(tmp_path / "positions.csv", positions)
+    configs = [_positions_config("positions.csv")]
+
+    ensemble = PointDataEnsemble.from_files(
+        configs,
+        base_dir=tmp_path,
+        reference_index=None,
+    )
+
+    assert not ensemble.has_reference
+    with pytest.raises(ValueError, match="No reference point data available"):
+        ensemble.get_reference_positions()
+
+
+def test_point_data_ensemble_from_files_rejects_out_of_range_reference_index(
+    tmp_path: Path,
+):
+    positions_0 = np.array([[0.0, 0.0], [1.0, 0.0], [0.5, 0.8]])
+    positions_1 = positions_0 + 0.1
+    _write_positions_csv(tmp_path / "positions_0.csv", positions_0)
+    _write_positions_csv(tmp_path / "positions_1.csv", positions_1)
+    configs = [
+        _positions_config("positions_0.csv"),
+        _positions_config("positions_1.csv"),
+    ]
+
+    with pytest.raises(ValueError, match="out of range"):
+        PointDataEnsemble.from_files(
+            configs,
+            base_dir=tmp_path,
+            reference_index=5,
+        )
+
+
+def test_point_data_ensemble_distance_reference_raises_on_positions(
+    tmp_path: Path,
+):
+    distances = np.array(
+        [
+            [0.0, 1.0, 1.2],
+            [1.0, 0.0, 0.8],
+            [1.2, 0.8, 0.0],
+        ],
+    )
+    np.savetxt(tmp_path / "distances.csv", distances, delimiter=",")
+    configs = [{"data_type": "distances", "filepath": "distances.csv"}]
+
+    ensemble = PointDataEnsemble.from_files(configs, base_dir=tmp_path)
+
+    assert ensemble.has_reference
+    with pytest.raises(ValueError, match="distance-only"):
+        ensemble.get_reference_positions()
+
+
+def test_point_data_ensemble_distance_reference_matches_distance_members():
+    distances = np.array(
+        [
+            [0.0, 1.0],
+            [1.0, 0.0],
+        ],
+    )
+    members = [PointData(distances=distances)]
+    reference = PointData(distances=distances)
+
+    ensemble = PointDataEnsemble(members, reference_point_data=reference)
+
+    assert ensemble.has_reference
+    assert ensemble.reference_point_data is reference
+    np.testing.assert_allclose(
+        ensemble.reference_point_data.get_distances(),
+        reference.get_distances(),
+    )
+
+
+def test_point_data_ensemble_rejects_reference_shape_mismatch():
+    members = [PointData(positions=np.array([[0.0, 0.0], [1.0, 0.0]]))]
+    reference = PointData(
+        positions=np.array([[0.0, 0.0], [1.0, 0.0], [0.5, 0.8]]),
+    )
+
+    with pytest.raises(ValueError, match="does not match ensemble member shape"):
+        PointDataEnsemble(members, reference_point_data=reference)
+
+
+def test_point_data_ensemble_rejects_non_point_data_reference():
+    members = [PointData(positions=np.array([[0.0, 0.0], [1.0, 0.0]]))]
+
+    with pytest.raises(TypeError, match="must be a PointData"):
+        PointDataEnsemble(members, reference_point_data=object())
 
 
 def _write_positions_csv(path: Path, positions: np.ndarray) -> None:

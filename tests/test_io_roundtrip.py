@@ -179,6 +179,44 @@ def test_imported_noisy_point_data_ensemble_round_trips(tmp_path):
     assert loaded[0].metadata["is_base"] is True
     assert loaded[1].metadata["seed"] == 5
     assert loaded[2].metadata["seed"] == 6
+    assert loaded.has_reference
+    np.testing.assert_allclose(loaded.get_reference_positions(), positions)
+
+
+def test_point_data_ensemble_reference_round_trips(tmp_path):
+    members = [
+        PointData(positions=np.array([[0.1, 0.0], [1.1, 0.0]])),
+        PointData(positions=np.array([[0.0, 1.0], [1.0, 1.2]])),
+    ]
+    reference = PointData(positions=np.array([[0.0, 0.0], [1.0, 0.0]]))
+    ensemble = PointDataEnsemble(members, reference_point_data=reference)
+    path = tmp_path / "ensemble_with_reference.h5"
+
+    ensemble.save(path)
+    loaded = PointDataEnsemble.load(path)
+
+    assert loaded.has_reference
+    np.testing.assert_allclose(
+        loaded.get_reference_positions(),
+        reference.get_positions(),
+    )
+    assert loaded.reference_point_data.content_hash == reference.content_hash
+
+
+def test_point_data_ensemble_without_reference_round_trips(tmp_path):
+    members = [
+        PointData(positions=np.array([[0.0, 0.0], [1.0, 0.0]])),
+        PointData(positions=np.array([[0.0, 1.0], [1.0, 1.0]])),
+    ]
+    ensemble = PointDataEnsemble(members)
+    path = tmp_path / "ensemble_without_reference.h5"
+
+    ensemble.save(path)
+    loaded = PointDataEnsemble.load(path)
+
+    assert not loaded.has_reference
+    with pytest.raises(ValueError, match="No reference point data available"):
+        loaded.get_reference_positions()
 
 
 def test_simplicial_complex_round_trips_with_incidence_cache(

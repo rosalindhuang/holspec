@@ -9,6 +9,8 @@ that share a common base configuration with variations (e.g., noise realizations
 from pathlib import Path
 from datetime import datetime
 
+import numpy as np
+
 from holspec.point_data.base import PointData
 from holspec.point_data.data_generators import generate_points_from_config
 from holspec.utilities import save_h5, read_h5, add_noise
@@ -31,6 +33,10 @@ class PointDataEnsemble:
         Configuration for noise applied to base.
     metadata : dict, optional
         Additional ensemble-level metadata.
+    reference_point_data : PointData, optional
+        Reference/base point cloud for the ensemble (e.g. the unperturbed
+        positions underlying a noisy ensemble). When provided, its stored
+        array shape must match the ensemble members.
 
     Notes
     -----
@@ -47,19 +53,40 @@ class PointDataEnsemble:
         members: list[PointData],
         base_config: dict | None = None,
         noise_config: dict | None = None,
-        metadata: dict | None = None
+        metadata: dict | None = None,
+        reference_point_data: PointData | None = None
     ):
         # Validation
         if not members:
             raise ValueError("Ensemble must contain at least one member")
         if not all(isinstance(m, PointData) for m in members):
             raise TypeError("All members must be PointData objects")
-        
+
+        # Validate reference compatibility
+        if reference_point_data is not None:
+            if not isinstance(reference_point_data, PointData):
+                raise TypeError("reference_point_data must be a PointData object")
+            if reference_point_data.data_type != members[0].data_type:
+                raise ValueError(
+                    "reference_point_data data_type "
+                    f"{reference_point_data.data_type!r} does not match ensemble "
+                    f"member data_type {members[0].data_type!r}"
+                )
+            reference_shape = _point_data_shape(reference_point_data)
+            member_shape = _point_data_shape(members[0])
+            if reference_shape != member_shape:
+                raise ValueError(
+                    "reference_point_data array shape "
+                    f"{reference_shape} does not match ensemble member shape "
+                    f"{member_shape}"
+                )
+
         # Store data
         self.members = members
         self.base_config = base_config
         self.noise_config = noise_config
         self.metadata = metadata if metadata is not None else {}
+        self.reference_point_data = reference_point_data
         
         # Auto-set creation time if not present
         if 'creation_time' not in self.metadata:
@@ -84,7 +111,37 @@ class PointDataEnsemble:
     def dimension(self) -> int | None:
         """Ambient dimension (None if only distances available)."""
         return self.members[0].dimension
-    
+
+    @property
+    def has_reference(self) -> bool:
+        """Whether a reference/base point cloud is available."""
+        return self.reference_point_data is not None
+
+    def get_reference_positions(self) -> np.ndarray:
+        """
+        Return the reference/base positions for the ensemble.
+
+        Returns
+        -------
+        positions : ndarray, shape (N, d)
+            Reference point positions.
+
+        Raises
+        ------
+        ValueError
+            If no reference point data exists, or if the reference is
+            distance-only and positions are unavailable.
+        """
+        if self.reference_point_data is None:
+            raise ValueError(
+                "No reference point data available for this ensemble"
+            )
+        if not self.reference_point_data.has_positions:
+            raise ValueError(
+                "Reference point data is distance-only; positions are unavailable"
+            )
+        return self.reference_point_data.get_positions()
+
 
     # =========================================================================
     # I/O and Factory Methods
@@ -108,32 +165,41 @@ class PointDataEnsemble:
         Notes
         -----
         Creates hierarchical structure:
-        - Root attributes: ensemble_size, base_config, noise_config, metadata
+        - Root attributes: ensemble_size, has_reference, base_config,
+          noise_config, metadata
         - Groups: member_0000, member_0001, ... (one per ensemble member)
-        
+        - Group: reference (only when a reference point cloud is present)
+
         Each member saved using PointData.save() with mode='replace'.
         """
         # Prepare ensemble-level attributes
         attributes = {
             'ensemble_size': self.size,
+            'has_reference': self.has_reference,
         }
-        
+
         if self.base_config is not None:
             attributes['base_config'] = self.base_config
-        
+
         if self.noise_config is not None:
             attributes['noise_config'] = self.noise_config
-        
+
         if self.metadata:
             attributes['metadata'] = self.metadata
-        
+
         # Save root-level attributes
         save_h5(filepath, attributes=attributes, group=None, mode=mode)
-        
+
         # Save each member to a numbered group
         for i, point_data in enumerate(self.members):
             group_name = f"member_{i:04d}"
             point_data.save(filepath, group=group_name, mode='replace')
+
+        # Save reference point data
+        if self.reference_point_data is not None:
+            self.reference_point_data.save(
+                filepath, group="reference", mode='replace'
+            )
     
 
     @classmethod
@@ -169,20 +235,27 @@ class PointDataEnsemble:
         base_config = attributes.get('base_config')  # Already parsed from JSON by read_h5
         noise_config = attributes.get('noise_config')
         metadata = attributes.get('metadata', {})
-        
+        has_reference = attributes.get('has_reference', False)  # Default for legacy files
+
         # Load all members
         members = []
         for i in range(ensemble_size):
             group_name = f"member_{i:04d}"
             point_data = PointData.load(filepath, group=group_name)
             members.append(point_data)
-        
+
+        # Load reference when declared by file metadata
+        reference_point_data = None
+        if has_reference:
+            reference_point_data = PointData.load(filepath, group="reference")
+
         # Construct and return ensemble
         return cls(
             members=members,
             base_config=base_config,
             noise_config=noise_config,
-            metadata=metadata
+            metadata=metadata,
+            reference_point_data=reference_point_data
         )
 
 
@@ -193,6 +266,7 @@ class PointDataEnsemble:
         base_dir: str | Path | None = None,
         metadata: dict | None = None,
         member_metadata: dict | None = None,
+        reference_index: int | None = 0,
     ) -> 'PointDataEnsemble':
         """
         Load an ensemble from external point data file configurations.
@@ -213,6 +287,9 @@ class PointDataEnsemble:
         member_metadata : dict, optional
             Additional metadata applied to every member. The per-member
             ``member_index`` field is added automatically.
+        reference_index : int or None, default=0
+            Index of the member to use as the ensemble reference point cloud.
+            Defaults to the first member. Set to ``None`` for no reference.
 
         Returns
         -------
@@ -237,6 +314,16 @@ class PointDataEnsemble:
 
         _validate_imported_members(members)
 
+        if reference_index is None:
+            reference_point_data = None
+        elif reference_index < 0 or reference_index >= len(members):
+            raise ValueError(
+                f"reference_index {reference_index} is out of range for "
+                f"ensemble of size {len(members)}"
+            )
+        else:
+            reference_point_data = members[reference_index]
+
         ensemble_metadata = dict(metadata) if metadata is not None else {}
         ensemble_metadata.update(
             {
@@ -248,7 +335,11 @@ class PointDataEnsemble:
         if base_dir is not None:
             ensemble_metadata["base_dir"] = str(Path(base_dir))
 
-        return cls(members=members, metadata=ensemble_metadata)
+        return cls(
+            members=members,
+            metadata=ensemble_metadata,
+            reference_point_data=reference_point_data,
+        )
 
 
     @classmethod
@@ -363,11 +454,13 @@ class PointDataEnsemble:
         if base_dir is not None:
             ensemble_metadata["base_dir"] = str(Path(base_dir))
 
+        # The imported base is the ensemble reference.
         return cls(
             members=members,
             base_config=config,
             noise_config=noise_config,
             metadata=ensemble_metadata,
+            reference_point_data=base_point_data,
         )
 
 
@@ -453,11 +546,15 @@ class PointDataEnsemble:
         ensemble_metadata = dict(metadata) if metadata is not None else {}
         ensemble_metadata['base_seed'] = base_seed
 
+        # Store the unperturbed base as reference.
+        reference_point_data = PointData(positions=base_positions)
+
         return cls(
             members=members,
             base_config=base_config,
             noise_config=noise_config,
             metadata=ensemble_metadata,
+            reference_point_data=reference_point_data,
         )
     
 
