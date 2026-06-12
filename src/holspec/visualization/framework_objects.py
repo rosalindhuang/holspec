@@ -53,7 +53,7 @@ def make_Lk_label(k, comp):
 
 def plot_point_data(
     positions: np.ndarray,
-    radius: float = 0.1,
+    radius: Union[float, np.ndarray] = 0.1,
     # Coloring
     colors: Optional[Union[str, List, np.ndarray]] = None,
     color_values: Optional[np.ndarray] = None,
@@ -69,8 +69,9 @@ def plot_point_data(
     ----------
     positions : np.ndarray
         Array of shape (N, d) where d is 2 or 3.
-    radius : float, default=0.1
-        Radius for circles/spheres.
+    radius : float or ndarray, default=0.1
+        Radius for circles/spheres. Can be a single value for all points, or a
+        length-N array for per-point radii.
     colors : str, list, or array, optional
         Colors for points. Can be:
         - Single color string: all points same color
@@ -95,6 +96,9 @@ def plot_point_data(
     
     >>> # Colormap
     >>> plot_point_data(positions, color_values=np.arange(n))
+
+    >>> # Per-point radii from particle diameters
+    >>> plot_point_data(positions, radius=0.5 * diameters)
     
     >>> # Explicit control with overrides
     >>> colors = [plt.get_cmap('viridis')(i/n) for i in range(n)]
@@ -1642,4 +1646,3 @@ def _draw_transition_marker(
         raise ValueError(
             f"orientation must be 'vertical' or 'horizontal', got {orientation!r}."
         )
-
