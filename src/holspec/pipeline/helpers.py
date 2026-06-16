@@ -18,11 +18,13 @@ def select_pipeline_inputs(
     project_root: str | Path,
     select_categories: list[str] | None = None,
     select_point_data: list[str] | None = None,
+    select_datasets: list[str] | None = None,
+    raw_data_dir: str | Path | None = None,
 ) -> dict[str, Path]:
     """
-    Select raw point data files by category and glob filters.
+    Select raw point data files by dataset and glob filters.
 
-    Scans the raw data directory (``data/raw/``) for HDF5 files matching
+    Scans a raw data directory for HDF5 files matching
     the selection criteria. This is the entry point data for the pipeline
     (stage 0 outputs / stage 1 inputs).
 
@@ -30,14 +32,19 @@ def select_pipeline_inputs(
     ----------
     project_root : str or Path
         Project root directory.
+    select_datasets : list of str, optional
+        Glob patterns for raw point data dataset names (e.g.
+        ``['test_examples', 'exp_noise_trilatt_nr*']``). Datasets correspond
+        to subdirectory names under ``raw_data_dir``. If None or empty, all
+        datasets are included. Exact names are valid patterns.
     select_categories : list of str, optional
-        Glob patterns for raw data category names (e.g. ``['test_examples',
-        'exp_noise_trilatt_nr*']``). Categories correspond to subdirectory
-        names under ``data/raw/``. If None or empty, all categories are
-        included. Exact names are valid patterns.
+        Backward-compatible alias for ``select_datasets``.
     select_point_data : list of str, optional
-        Glob patterns for point data labels (e.g. ``['trilatthex*', 'randunif*']``).
-        If None or empty, all point data labels are included.
+        Glob patterns for point data labels (e.g. ``['trilatthex*',
+        'randunif*']``). If None or empty, all point data labels are included.
+    raw_data_dir : str or Path, optional
+        Raw point data directory to scan. Relative paths are resolved from
+        ``project_root``. Defaults to ``data/raw``.
 
     Returns
     -------
@@ -45,23 +52,32 @@ def select_pipeline_inputs(
         Dictionary ``{ptd_label: filepath}`` mapping point data labels
         (file stems) to their absolute file paths.
     """
-    raw_data_dir = Path(project_root) / 'data' / 'raw'
+    project_root = Path(project_root)
+    raw_data_dir = _resolve_raw_data_dir(project_root, raw_data_dir)
+    select_datasets = _resolve_dataset_patterns(select_datasets, select_categories)
 
     filepaths: dict[str, Path] = {}
 
-    for category_dir in sorted(raw_data_dir.iterdir()):
-        if not category_dir.is_dir():
+    if not raw_data_dir.is_dir():
+        return filepaths
+
+    for dataset_dir in sorted(raw_data_dir.iterdir()):
+        if not dataset_dir.is_dir():
             continue
 
-        # Filter by category
-        if select_categories and not any(fnmatch(category_dir.name, pat) for pat in select_categories):
+        # Filter by dataset
+        if select_datasets and not any(
+            fnmatch(dataset_dir.name, pat) for pat in select_datasets
+        ):
             continue
 
-        for filepath in sorted(category_dir.glob('*.h5')):
+        for filepath in sorted(dataset_dir.glob('*.h5')):
             ptd_label = filepath.stem
 
             # Filter by point data label
-            if select_point_data and not any(fnmatch(ptd_label, g) for g in select_point_data):
+            if select_point_data and not any(
+                fnmatch(ptd_label, g) for g in select_point_data
+            ):
                 continue
 
             filepaths[ptd_label] = filepath
@@ -77,9 +93,11 @@ def select_stage_outputs(
     select_point_data: list[str] | None = None,
     select_simplicial_complex: list[str] | None = None,
     select_cochain_metric: list[str] | None = None,
+    select_datasets: list[str] | None = None,
+    raw_data_dir: str | Path | None = None,
 ) -> dict[str, dict[str, Path]]:
     """
-    Select pipeline stage output files by category and glob filters.
+    Select pipeline stage output files by dataset and glob filters.
 
     Scans the output directory for the given stage and returns file paths
     matching the selection criteria. Supports stages 1--4.
@@ -96,15 +114,16 @@ def select_stage_outputs(
         instead of the default ``data/interim/stage_name``. Use this to
         select outputs from a specific per-dataset pipeline run (e.g.
         ``'data/interim/exp_noise_trilatt'``).
+    select_datasets : list of str, optional
+        Glob patterns for raw point data dataset names. Datasets are derived
+        from subdirectory names under ``raw_data_dir``. If None or empty, all
+        datasets are included. Not needed when ``base_dir`` already isolates
+        outputs by dataset. Exact names are valid patterns.
     select_categories : list of str, optional
-        Glob patterns for raw data category names (e.g. ``['test_examples',
-        'exp_noise_trilatt_nr*']``). Categories are derived from subdirectory
-        names under ``data/raw/``. If None or empty, all categories are
-        included. Not needed when ``base_dir`` already isolates outputs by
-        dataset. Exact names are valid patterns.
+        Backward-compatible alias for ``select_datasets``.
     select_point_data : list of str, optional
-        Glob patterns for point data labels (e.g. ``['trilatthex*', 'randunif*']``).
-        If None or empty, all point data labels are included.
+        Glob patterns for point data labels (e.g. ``['trilatthex*',
+        'randunif*']``). If None or empty, all point data labels are included.
     select_simplicial_complex : list of str, optional
         Glob patterns for simplicial complex labels (e.g. ``['delaunay*']``).
         Applies to stages 1--4. If None or empty, all are included.
@@ -112,6 +131,9 @@ def select_stage_outputs(
         Glob patterns for cochain metric labels (e.g. ``['combinatorial*']``).
         Applies to stages 2--4 (ignored for stage 1). If None or empty, all
         are included.
+    raw_data_dir : str or Path, optional
+        Raw point data directory used only for dataset filtering. Relative
+        paths are resolved from ``project_root``. Defaults to ``data/raw``.
 
     Returns
     -------
@@ -131,20 +153,21 @@ def select_stage_outputs(
         output_data_dir = project_root / base_dir / stage_name
     else:
         output_data_dir = project_root / 'data' / 'interim' / stage_name
-    raw_data_dir = project_root / 'data' / 'raw'
+    raw_data_dir = _resolve_raw_data_dir(project_root, raw_data_dir)
+    select_datasets = _resolve_dataset_patterns(select_datasets, select_categories)
 
     if not output_data_dir.is_dir():
         return {}
 
-    # Build category mapping: point_data_label -> set of categories
-    # (a label can appear in multiple raw categories)
-    ptd_categories: dict[str, set[str]] = {}
-    if select_categories:
-        for category_dir in sorted(raw_data_dir.iterdir()):
-            if not category_dir.is_dir():
+    # Build dataset mapping: point_data_label -> set of datasets
+    # (a label can appear in multiple raw datasets)
+    ptd_datasets: dict[str, set[str]] = {}
+    if select_datasets and raw_data_dir.is_dir():
+        for dataset_dir in sorted(raw_data_dir.iterdir()):
+            if not dataset_dir.is_dir():
                 continue
-            for raw_file in category_dir.glob('*.h5'):
-                ptd_categories.setdefault(raw_file.stem, set()).add(category_dir.name)
+            for raw_file in dataset_dir.glob('*.h5'):
+                ptd_datasets.setdefault(raw_file.stem, set()).add(dataset_dir.name)
 
     # Whether filenames have the {sc}__{cm} format (stage 2+)
     has_metric_suffix = stage_num >= 2
@@ -156,14 +179,20 @@ def select_stage_outputs(
             continue
         ptd_label = ptd_subdir.name
 
-        # Filter by category
-        if select_categories:
-            ptd_cat_set = ptd_categories.get(ptd_label, set())
-            if not any(fnmatch(cat, pat) for cat in ptd_cat_set for pat in select_categories):
+        # Filter by dataset
+        if select_datasets:
+            ptd_dataset_set = ptd_datasets.get(ptd_label, set())
+            if not any(
+                fnmatch(dataset, pat)
+                for dataset in ptd_dataset_set
+                for pat in select_datasets
+            ):
                 continue
 
         # Filter by point data label
-        if select_point_data and not any(fnmatch(ptd_label, g) for g in select_point_data):
+        if select_point_data and not any(
+            fnmatch(ptd_label, g) for g in select_point_data
+        ):
             continue
 
         # Collect matching output files
@@ -180,11 +209,19 @@ def select_stage_outputs(
                 cm_label = None
 
             # Filter by simplicial complex label
-            if select_simplicial_complex and not any(fnmatch(sc_label, g) for g in select_simplicial_complex):
+            if select_simplicial_complex and not any(
+                fnmatch(sc_label, g) for g in select_simplicial_complex
+            ):
                 continue
 
             # Filter by cochain metric label (stages 2+ only)
-            if has_metric_suffix and select_cochain_metric and not any(fnmatch(cm_label, g) for g in select_cochain_metric):
+            if (
+                has_metric_suffix
+                and select_cochain_metric
+                and not any(
+                    fnmatch(cm_label, g) for g in select_cochain_metric
+                )
+            ):
                 continue
 
             ptd_filepaths[stem] = filepath
@@ -235,3 +272,31 @@ def split_pipeline_config(
         )
 
     return stage_configs
+
+
+# Private Helpers
+
+
+def _resolve_raw_data_dir(
+    project_root: Path,
+    raw_data_dir: str | Path | None,
+) -> Path:
+    """Resolve a raw point data directory relative to the project root."""
+    if raw_data_dir is None:
+        return project_root / 'data' / 'raw'
+    raw_data_dir = Path(raw_data_dir)
+    if raw_data_dir.is_absolute():
+        return raw_data_dir
+    return project_root / raw_data_dir
+
+
+def _resolve_dataset_patterns(
+    select_datasets: list[str] | None,
+    select_categories: list[str] | None,
+) -> list[str] | None:
+    """Resolve preferred dataset patterns and legacy category patterns."""
+    if select_datasets is not None and select_categories is not None:
+        raise ValueError(
+            "Pass only one of 'select_datasets' or 'select_categories'"
+        )
+    return select_datasets if select_datasets is not None else select_categories

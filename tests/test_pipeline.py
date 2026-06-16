@@ -14,6 +14,8 @@ from holspec.pipeline import (
     load_spectra,
     run_pipeline,
     run_pipeline_stages,
+    select_pipeline_inputs,
+    select_stage_outputs,
     trace_provenance,
 )
 from holspec.point_data import PointData, PointDataEnsemble
@@ -122,6 +124,85 @@ def test_run_pipeline_stages_tiny_vietoris_rips_workflow(tmp_path: Path):
     assert spectra.dimensions == {0: 3, 1: 3, 2: 1}
     assert spectra.spectrum(0, "full").is_complete
     assert spectra.spectrum(0, "full").eigenvectors is None
+
+
+def test_select_pipeline_inputs_with_generated_raw_data_dir(tmp_path: Path):
+    project_root = tmp_path
+    generated_raw_dir = project_root / "data" / "raw" / "generated"
+    selected_path = generated_raw_dir / "smoke" / "triangle.h5"
+    skipped_path = generated_raw_dir / "skip" / "square.h5"
+    selected_path.parent.mkdir(parents=True)
+    skipped_path.parent.mkdir(parents=True)
+    selected_path.touch()
+    skipped_path.touch()
+
+    results = select_pipeline_inputs(
+        project_root,
+        raw_data_dir="data/raw/generated",
+        select_datasets=["smoke"],
+    )
+
+    assert results == {"triangle": selected_path}
+
+    alias_results = select_pipeline_inputs(
+        project_root,
+        raw_data_dir="data/raw/generated",
+        select_categories=["smoke"],
+    )
+
+    assert alias_results == results
+
+
+def test_select_stage_outputs_with_generated_raw_data_dir(tmp_path: Path):
+    project_root = tmp_path
+
+    raw_selected = (
+        project_root / "data" / "raw" / "generated" / "smoke" / "triangle.h5"
+    )
+    raw_skipped = (
+        project_root / "data" / "raw" / "generated" / "skip" / "square.h5"
+    )
+    raw_selected.parent.mkdir(parents=True)
+    raw_skipped.parent.mkdir(parents=True)
+    raw_selected.touch()
+    raw_skipped.touch()
+
+    selected_output = (
+        project_root
+        / "data"
+        / "interim"
+        / "stage_smoke"
+        / "spectra"
+        / "triangle"
+        / "vr__combinatorial.h5"
+    )
+    skipped_output = (
+        project_root
+        / "data"
+        / "interim"
+        / "stage_smoke"
+        / "spectra"
+        / "square"
+        / "vr__combinatorial.h5"
+    )
+    selected_output.parent.mkdir(parents=True)
+    skipped_output.parent.mkdir(parents=True)
+    selected_output.touch()
+    skipped_output.touch()
+
+    results = select_stage_outputs(
+        stage_num=4,
+        project_root=project_root,
+        base_dir="data/interim/stage_smoke",
+        raw_data_dir="data/raw/generated",
+        select_datasets=["smoke"],
+    )
+
+    assert results == {
+        "triangle": {
+            "vr__combinatorial": selected_output,
+        },
+    }
 
 
 def _save_triangle_point_data_input(input_path: Path) -> None:
