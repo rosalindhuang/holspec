@@ -16,7 +16,6 @@ from .orchestration import _assemble_stage_config
 
 def select_pipeline_inputs(
     project_root: str | Path,
-    select_categories: list[str] | None = None,
     select_point_data: list[str] | None = None,
     select_datasets: list[str] | None = None,
     raw_data_dir: str | Path | None = None,
@@ -37,8 +36,6 @@ def select_pipeline_inputs(
         ``['test_examples', 'exp_noise_trilatt_nr*']``). Datasets correspond
         to subdirectory names under ``raw_data_dir``. If None or empty, all
         datasets are included. Exact names are valid patterns.
-    select_categories : list of str, optional
-        Backward-compatible alias for ``select_datasets``.
     select_point_data : list of str, optional
         Glob patterns for point data labels (e.g. ``['trilatthex*',
         'randunif*']``). If None or empty, all point data labels are included.
@@ -54,7 +51,6 @@ def select_pipeline_inputs(
     """
     project_root = Path(project_root)
     raw_data_dir = _resolve_raw_data_dir(project_root, raw_data_dir)
-    select_datasets = _resolve_dataset_patterns(select_datasets, select_categories)
 
     filepaths: dict[str, Path] = {}
 
@@ -89,7 +85,6 @@ def select_stage_outputs(
     stage_num: int,
     project_root: str | Path,
     base_dir: str | Path | None = None,
-    select_categories: list[str] | None = None,
     select_point_data: list[str] | None = None,
     select_simplicial_complex: list[str] | None = None,
     select_cochain_metric: list[str] | None = None,
@@ -119,8 +114,6 @@ def select_stage_outputs(
         from subdirectory names under ``raw_data_dir``. If None or empty, all
         datasets are included. Not needed when ``base_dir`` already isolates
         outputs by dataset. Exact names are valid patterns.
-    select_categories : list of str, optional
-        Backward-compatible alias for ``select_datasets``.
     select_point_data : list of str, optional
         Glob patterns for point data labels (e.g. ``['trilatthex*',
         'randunif*']``). If None or empty, all point data labels are included.
@@ -154,7 +147,6 @@ def select_stage_outputs(
     else:
         output_data_dir = project_root / 'data' / 'interim' / stage_name
     raw_data_dir = _resolve_raw_data_dir(project_root, raw_data_dir)
-    select_datasets = _resolve_dataset_patterns(select_datasets, select_categories)
 
     if not output_data_dir.is_dir():
         return {}
@@ -288,15 +280,3 @@ def _resolve_raw_data_dir(
     if raw_data_dir.is_absolute():
         return raw_data_dir
     return project_root / raw_data_dir
-
-
-def _resolve_dataset_patterns(
-    select_datasets: list[str] | None,
-    select_categories: list[str] | None,
-) -> list[str] | None:
-    """Resolve preferred dataset patterns and legacy category patterns."""
-    if select_datasets is not None and select_categories is not None:
-        raise ValueError(
-            "Pass only one of 'select_datasets' or 'select_categories'"
-        )
-    return select_datasets if select_datasets is not None else select_categories

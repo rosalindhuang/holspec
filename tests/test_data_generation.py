@@ -7,16 +7,18 @@ from YAML loading and Typer command-line behavior covered by CLI tests.
 
 from pathlib import Path
 
+import pytest
+
 from holspec.point_data import PointDataEnsemble, run_data_generation
 
 
-def test_run_data_generation_with_category_filter(tmp_path: Path):
+def test_run_data_generation_with_dataset_filter(tmp_path: Path):
     config = _tiny_data_generation_config()
 
     results = run_data_generation(
         config=config,
         project_root=tmp_path,
-        select_categories=["api"],
+        select_datasets=["api"],
     )
 
     expected_path = tmp_path / "data" / "raw" / "api" / "regpoly_ns3__BASE.h5"
@@ -34,14 +36,14 @@ def test_run_data_generation_with_category_filter(tmp_path: Path):
     assert ensemble.members[0].has_positions
 
 
-def test_run_data_generation_without_category_subdirs(tmp_path: Path):
+def test_run_data_generation_without_dataset_subdirs(tmp_path: Path):
     config = _tiny_data_generation_config()
-    config["outputs"]["category_subdirs"] = False
+    config["outputs"]["dataset_subdirs"] = False
 
     results = run_data_generation(
         config=config,
         project_root=tmp_path,
-        select_categories=["api"],
+        select_datasets=["api"],
     )
 
     expected_path = tmp_path / "data" / "raw" / "regpoly_ns3__BASE.h5"
@@ -49,6 +51,14 @@ def test_run_data_generation_without_category_subdirs(tmp_path: Path):
     assert results["api"] == {"regpoly_ns3__BASE": expected_path}
     assert expected_path.exists()
     assert not (tmp_path / "data" / "raw" / "api").exists()
+
+
+def test_run_data_generation_rejects_category_subdirs(tmp_path: Path):
+    config = _tiny_data_generation_config()
+    config["outputs"]["category_subdirs"] = False
+
+    with pytest.raises(ValueError, match="outputs.dataset_subdirs"):
+        run_data_generation(config=config, project_root=tmp_path)
 
 
 def _tiny_data_generation_config() -> dict:

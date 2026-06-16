@@ -52,7 +52,7 @@ def test_cli_import_data_help():
     assert result.exit_code == 0
     assert "CONFIG" in result.output
     assert "Import external point data" in result.output
-    assert "Category glob" in result.output
+    assert "Dataset glob" in result.output
     assert "Suppress import progress" in result.output
 
 
@@ -62,7 +62,7 @@ def test_cli_generate_data_help():
     assert result.exit_code == 0
     assert "CONFIG" in result.output
     assert "Generate synthetic point cloud data" in result.output
-    assert "Category glob" in result.output
+    assert "Dataset glob" in result.output
     assert "Suppress generation progress" in result.output
 
 
@@ -168,7 +168,7 @@ def test_cli_run_rejects_conflicting_output_options(tmp_path: Path):
 
 # Tiny workflow smoke tests
 
-def test_cli_import_data_with_category_filter(tmp_path: Path):
+def test_cli_import_data_with_dataset_filter(tmp_path: Path):
     project_root = tmp_path
     config_path = project_root / "configs" / "data_import.yml"
 
@@ -182,7 +182,7 @@ def test_cli_import_data_with_category_filter(tmp_path: Path):
             str(config_path),
             "--project-root",
             str(project_root),
-            "--category",
+            "--dataset",
             "cli",
         ],
     )
@@ -190,8 +190,8 @@ def test_cli_import_data_with_category_filter(tmp_path: Path):
     assert result.exit_code == 0
     assert "holspec data import complete." in result.output
     assert "config:               configs/data_import.yml" in result.output
-    assert "selected categories:  cli" in result.output
-    assert "imported categories:  cli" in result.output
+    assert "selected datasets:    cli" in result.output
+    assert "imported datasets:    cli" in result.output
     assert "output files:         1" in result.output
 
     output_path = project_root / "data" / "imported" / "cli" / "positions_csv.h5"
@@ -228,7 +228,7 @@ def test_cli_import_data_quiet_suppresses_import_progress(tmp_path: Path):
             str(config_path),
             "--project-root",
             str(project_root),
-            "--category",
+            "--dataset",
             "cli",
             "--quiet",
         ],
@@ -239,7 +239,7 @@ def test_cli_import_data_quiet_suppresses_import_progress(tmp_path: Path):
     assert "Imported 1 members" not in result.output
 
 
-def test_cli_generate_data_with_category_filter(tmp_path: Path):
+def test_cli_generate_data_with_dataset_filter(tmp_path: Path):
     project_root = tmp_path
     config_path = project_root / "configs" / "data_generation.yml"
 
@@ -252,7 +252,7 @@ def test_cli_generate_data_with_category_filter(tmp_path: Path):
             str(config_path),
             "--project-root",
             str(project_root),
-            "--category",
+            "--dataset",
             "cli",
         ],
     )
@@ -260,8 +260,8 @@ def test_cli_generate_data_with_category_filter(tmp_path: Path):
     assert result.exit_code == 0
     assert "holspec data generation complete." in result.output
     assert "config:               configs/data_generation.yml" in result.output
-    assert "selected categories:  cli" in result.output
-    assert "generated categories: cli" in result.output
+    assert "selected datasets:    cli" in result.output
+    assert "generated datasets:   cli" in result.output
     assert "output files:         1" in result.output
     assert (project_root / "data" / "raw" / "cli" / "regpoly_ns3__BASE.h5").exists()
     assert not (project_root / "data" / "raw" / "skip").exists()
@@ -280,7 +280,7 @@ def test_cli_generate_data_quiet_suppresses_generation_progress(tmp_path: Path):
             str(config_path),
             "--project-root",
             str(project_root),
-            "--category",
+            "--dataset",
             "cli",
             "--quiet",
         ],
@@ -289,6 +289,28 @@ def test_cli_generate_data_quiet_suppresses_generation_progress(tmp_path: Path):
     assert result.exit_code == 0
     assert "holspec data generation complete." in result.output
     assert "Generated 1 members" not in result.output
+
+
+def test_cli_generate_data_rejects_category_option(tmp_path: Path):
+    project_root = tmp_path
+    config_path = project_root / "configs" / "data_generation.yml"
+
+    _write_tiny_data_generation_config(config_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "generate-data",
+            str(config_path),
+            "--project-root",
+            str(project_root),
+            "--category",
+            "cli",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "No such option" in result.output
 
 
 def test_cli_inspect_hdf5_file(tmp_path: Path):

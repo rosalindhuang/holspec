@@ -24,14 +24,14 @@ POSITIONS = np.array(
 )
 
 
-def test_run_data_import_files_with_category_filter(tmp_path: Path):
+def test_run_data_import_files_with_dataset_filter(tmp_path: Path):
     _write_import_files(tmp_path)
     config = _tiny_data_import_config()
 
     results = run_data_import(
         config=config,
         project_root=tmp_path,
-        select_categories=["api"],
+        select_datasets=["api"],
     )
 
     expected_path = tmp_path / "data" / "imported" / "api" / "positions_csv.h5"
@@ -56,18 +56,18 @@ def test_run_data_import_files_with_category_filter(tmp_path: Path):
     assert "creation_time" in attributes
 
 
-def test_run_data_import_file_with_noise_without_category_subdirs(
+def test_run_data_import_file_with_noise_without_dataset_subdirs(
     tmp_path: Path,
 ):
     _write_import_files(tmp_path)
     config = _tiny_data_import_config()
     config.pop("runtime")
-    config["outputs"]["category_subdirs"] = False
+    config["outputs"]["dataset_subdirs"] = False
 
     results = run_data_import(
         config=config,
         project_root=tmp_path,
-        select_categories=["api_noise"],
+        select_datasets=["api_noise"],
     )
 
     expected_path = tmp_path / "data" / "imported" / "positions_noise.h5"
@@ -94,7 +94,7 @@ def test_run_data_import_rejects_unknown_import_mode(tmp_path: Path):
         run_data_import(
             config=config,
             project_root=tmp_path,
-            select_categories=["api"],
+            select_datasets=["api"],
         )
 
 

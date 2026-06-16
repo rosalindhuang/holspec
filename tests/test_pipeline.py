@@ -144,14 +144,6 @@ def test_select_pipeline_inputs_with_generated_raw_data_dir(tmp_path: Path):
 
     assert results == {"triangle": selected_path}
 
-    alias_results = select_pipeline_inputs(
-        project_root,
-        raw_data_dir="data/raw/generated",
-        select_categories=["smoke"],
-    )
-
-    assert alias_results == results
-
 
 def test_select_stage_outputs_with_generated_raw_data_dir(tmp_path: Path):
     project_root = tmp_path

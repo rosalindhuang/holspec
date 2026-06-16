@@ -117,41 +117,41 @@ def create_ensemble_label(
 def run_data_generation(
     config: dict,
     project_root: str | Path,
-    select_categories: list[str] | None = None,
+    select_datasets: list[str] | None = None,
 ) -> dict[str, dict[str, Path]]:
     """
     Generate point data ensembles from a config dictionary.
 
-    Iterates over dataset categories and ensemble configs, generates
-    each PointDataEnsemble, and saves to HDF5 files with metadata.
+    Iterates over dataset configs, generates each PointDataEnsemble, and saves
+    to HDF5 files with metadata.
 
     Parameters
     ----------
     config : dict
         Data generation config dict with keys: ``summary``, ``configs``,
         ``runtime``, ``outputs``. The ``configs`` value is a nested dict
-        ``{category: {ensemble_label: ensemble_config}}``. By default,
-        outputs are saved under ``{data_dir}/{category}/``; set
-        ``outputs.category_subdirs`` to false to save directly under
+        ``{dataset: {ensemble_label: ensemble_config}}``. By default,
+        outputs are saved under ``{data_dir}/{dataset}/``; set
+        ``outputs.dataset_subdirs`` to false to save directly under
         ``{data_dir}/``.
     project_root : str or Path
         Project root for resolving relative paths.
-    select_categories : list of str or None, optional
-        Glob patterns for category names (e.g. ``['test_examples',
-        'exp_noise_trilatt_nr*']``). If None, generates all categories
+    select_datasets : list of str or None, optional
+        Glob patterns for dataset names (e.g. ``['test_examples',
+        'exp_noise_trilatt_nr*']``). If None, generates all datasets
         present in the config. Exact names are valid patterns.
 
     Returns
     -------
     dict[str, dict[str, Path]]
-        Nested mapping ``{category: {ensemble_label: output_filepath}}``.
+        Nested mapping ``{dataset: {ensemble_label: output_filepath}}``.
     """
     project_root = Path(project_root)
 
     # --- Extract settings ---
 
     output_data_dir = project_root / config['outputs']['data_dir']
-    category_subdirs = config['outputs'].get('category_subdirs', True)
+    dataset_subdirs = _get_dataset_subdirs(config['outputs'])
     stage_name = config['outputs']['stage_name']
     created_by = config['summary']['created_by']
     verbose = config['runtime']['verbose']
@@ -161,17 +161,19 @@ def run_data_generation(
 
     output_filepaths: dict[str, dict[str, Path]] = {}
 
-    for category, configs_dict in dataset_configs.items():
-        if select_categories and not any(fnmatch(category, pat) for pat in select_categories):
+    for dataset, configs_dict in dataset_configs.items():
+        if select_datasets and not any(
+            fnmatch(dataset, pat) for pat in select_datasets
+        ):
             continue
 
         if verbose:
             print("-" * 60)
-            print(f"{category}")
+            print(f"{dataset}")
             print("-" * 60)
             print()
 
-        output_filepaths[category] = {}
+        output_filepaths[dataset] = {}
 
         for ensemble_label, ensemble_config in configs_dict.items():
 
@@ -184,9 +186,9 @@ def run_data_generation(
             )
 
             # Save to HDF5
-            if category_subdirs:
+            if dataset_subdirs:
                 output_filepath = (
-                    output_data_dir / category / f"{ensemble_label}.h5"
+                    output_data_dir / dataset / f"{ensemble_label}.h5"
                 )
             else:
                 output_filepath = output_data_dir / f"{ensemble_label}.h5"
@@ -206,12 +208,12 @@ def run_data_generation(
                 mode='update',
             )
 
-            output_filepaths[category][ensemble_label] = output_filepath
+            output_filepaths[dataset][ensemble_label] = output_filepath
 
             # Completion
             print(
                 f"Generated {ptd_ensemble.size} members "
-                f"for {category} / {ensemble_label}"
+                f"for {dataset} / {ensemble_label}"
             )
             if verbose:
                 print(f"  {ptd_ensemble}")
@@ -232,40 +234,39 @@ def run_data_generation(
 def run_data_import(
     config: dict,
     project_root: str | Path,
-    select_categories: list[str] | None = None,
+    select_datasets: list[str] | None = None,
 ) -> dict[str, dict[str, Path]]:
     """
     Import point data ensembles from a config dictionary.
 
-    Iterates over dataset categories and import configs, constructs each
-    ``PointDataEnsemble`` from external files, and saves to HDF5 files with
-    provenance metadata. Input filepaths in import configs are resolved relative
-    to ``project_root``.
+    Iterates over dataset configs, constructs each ``PointDataEnsemble`` from
+    external files, and saves to HDF5 files with provenance metadata. Input
+    filepaths in import configs are resolved relative to ``project_root``.
 
     Parameters
     ----------
     config : dict
         Data import config dict with keys: ``summary``, ``configs``,
         ``runtime``, ``outputs``. The ``configs`` value is a nested dict
-        ``{category: {ensemble_label: import_config}}``. Supported import modes
+        ``{dataset: {ensemble_label: import_config}}``. Supported import modes
         are ``"files"`` and ``"file_with_noise"``.
     project_root : str or Path
         Project root for resolving relative input and output paths.
-    select_categories : list of str or None, optional
-        Glob patterns for category names. If None, imports all categories
+    select_datasets : list of str or None, optional
+        Glob patterns for dataset names. If None, imports all datasets
         present in the config. Exact names are valid patterns.
 
     Returns
     -------
     dict[str, dict[str, Path]]
-        Nested mapping ``{category: {ensemble_label: output_filepath}}``.
+        Nested mapping ``{dataset: {ensemble_label: output_filepath}}``.
     """
     project_root = Path(project_root)
 
     # --- Extract settings ---
 
     output_data_dir = project_root / config["outputs"]["data_dir"]
-    category_subdirs = config["outputs"].get("category_subdirs", True)
+    dataset_subdirs = _get_dataset_subdirs(config["outputs"])
     stage_name = config["outputs"]["stage_name"]
     created_by = config["summary"]["created_by"]
     verbose = config.get("runtime", {}).get("verbose", False)
@@ -275,17 +276,19 @@ def run_data_import(
 
     output_filepaths: dict[str, dict[str, Path]] = {}
 
-    for category, configs_dict in dataset_configs.items():
-        if select_categories and not any(fnmatch(category, pat) for pat in select_categories):
+    for dataset, configs_dict in dataset_configs.items():
+        if select_datasets and not any(
+            fnmatch(dataset, pat) for pat in select_datasets
+        ):
             continue
 
         if verbose:
             print("-" * 60)
-            print(f"{category}")
+            print(f"{dataset}")
             print("-" * 60)
             print()
 
-        output_filepaths[category] = {}
+        output_filepaths[dataset] = {}
 
         for ensemble_label, import_config in configs_dict.items():
 
@@ -296,9 +299,9 @@ def run_data_import(
             )
 
             # Save to HDF5
-            if category_subdirs:
+            if dataset_subdirs:
                 output_filepath = (
-                    output_data_dir / category / f"{ensemble_label}.h5"
+                    output_data_dir / dataset / f"{ensemble_label}.h5"
                 )
             else:
                 output_filepath = output_data_dir / f"{ensemble_label}.h5"
@@ -318,12 +321,12 @@ def run_data_import(
                 mode="update",
             )
 
-            output_filepaths[category][ensemble_label] = output_filepath
+            output_filepaths[dataset][ensemble_label] = output_filepath
 
             # Completion
             print(
                 f"Imported {ptd_ensemble.size} members "
-                f"for {category} / {ensemble_label}"
+                f"for {dataset} / {ensemble_label}"
             )
             if verbose:
                 print(f"  {ptd_ensemble}")
@@ -343,6 +346,15 @@ def run_data_import(
 # =============================================================================
 # Helpers
 # =============================================================================
+
+def _get_dataset_subdirs(outputs_config: dict) -> bool:
+    """Return whether point data outputs should be grouped by dataset."""
+    if "category_subdirs" in outputs_config:
+        raise ValueError(
+            "Use outputs.dataset_subdirs instead of outputs.category_subdirs."
+        )
+    return outputs_config.get("dataset_subdirs", True)
+
 
 def _import_ensemble_from_config(
     import_config: dict,

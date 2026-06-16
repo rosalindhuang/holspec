@@ -115,12 +115,12 @@ def _print_generate_data_summary(
     config_path: Path,
     project_root: Path,
     config: dict[str, Any],
-    select_categories: list[str] | None,
+    select_datasets: list[str] | None,
     results: dict[str, dict[str, Path]],
 ) -> None:
     """Print a concise data-generation summary for CLI users."""
     output_dir = config.get("outputs", {}).get("data_dir", "(not configured)")
-    selected = ", ".join(select_categories) if select_categories else "(all)"
+    selected = ", ".join(select_datasets) if select_datasets else "(all)"
     generated = ", ".join(results) if results else "(none)"
     output_file_count = _count_nested_files(results)
 
@@ -129,8 +129,8 @@ def _print_generate_data_summary(
     typer.echo(f"\nconfig:               {_display_path(config_path, project_root)}")
     typer.echo(f"project root:         {project_root}")
     typer.echo(f"output dir:           {output_dir}")
-    typer.echo(f"selected categories:  {selected}")
-    typer.echo(f"generated categories: {generated}")
+    typer.echo(f"selected datasets:    {selected}")
+    typer.echo(f"generated datasets:   {generated}")
     typer.echo(f"output files:         {output_file_count}")
 
 
@@ -139,12 +139,12 @@ def _print_import_data_summary(
     config_path: Path,
     project_root: Path,
     config: dict[str, Any],
-    select_categories: list[str] | None,
+    select_datasets: list[str] | None,
     results: dict[str, dict[str, Path]],
 ) -> None:
     """Print a concise data-import summary for CLI users."""
     output_dir = config.get("outputs", {}).get("data_dir", "(not configured)")
-    selected = ", ".join(select_categories) if select_categories else "(all)"
+    selected = ", ".join(select_datasets) if select_datasets else "(all)"
     imported = ", ".join(results) if results else "(none)"
     output_file_count = _count_nested_files(results)
 
@@ -153,8 +153,8 @@ def _print_import_data_summary(
     typer.echo(f"\nconfig:               {_display_path(config_path, project_root)}")
     typer.echo(f"project root:         {project_root}")
     typer.echo(f"output dir:           {output_dir}")
-    typer.echo(f"selected categories:  {selected}")
-    typer.echo(f"imported categories:  {imported}")
+    typer.echo(f"selected datasets:    {selected}")
+    typer.echo(f"imported datasets:    {imported}")
     typer.echo(f"output files:         {output_file_count}")
 
 
@@ -180,11 +180,11 @@ def import_data(
         resolve_path=True,
         help="Project root for resolving relative paths in the config.",
     ),
-    select_categories: list[str] | None = typer.Option(
+    select_datasets: list[str] | None = typer.Option(
         None,
-        "--category",
-        "-c",
-        help="Category glob to import. Can be supplied multiple times.",
+        "--dataset",
+        "-d",
+        help="Dataset glob to import. Can be supplied multiple times.",
     ),
     verbose: bool = typer.Option(
         False,
@@ -209,7 +209,7 @@ def import_data(
             results = run_data_import(
                 config=config,
                 project_root=project_root,
-                select_categories=select_categories,
+                select_datasets=select_datasets,
             )
     except (OSError, yaml.YAMLError, ValueError, KeyError) as exc:
         typer.secho(f"Error: {exc}", fg=typer.colors.RED, err=True)
@@ -219,7 +219,7 @@ def import_data(
         config_path=config_path,
         project_root=project_root,
         config=config,
-        select_categories=select_categories,
+        select_datasets=select_datasets,
         results=results,
     )
 
@@ -246,11 +246,11 @@ def generate_data(
         resolve_path=True,
         help="Project root for resolving relative paths in the config.",
     ),
-    select_categories: list[str] | None = typer.Option(
+    select_datasets: list[str] | None = typer.Option(
         None,
-        "--category",
-        "-c",
-        help="Category glob to generate. Can be supplied multiple times.",
+        "--dataset",
+        "-d",
+        help="Dataset glob to generate. Can be supplied multiple times.",
     ),
     verbose: bool = typer.Option(
         False,
@@ -275,7 +275,7 @@ def generate_data(
             results = run_data_generation(
                 config=config,
                 project_root=project_root,
-                select_categories=select_categories,
+                select_datasets=select_datasets,
             )
     except (OSError, yaml.YAMLError, ValueError, KeyError) as exc:
         typer.secho(f"Error: {exc}", fg=typer.colors.RED, err=True)
@@ -285,7 +285,7 @@ def generate_data(
         config_path=config_path,
         project_root=project_root,
         config=config,
-        select_categories=select_categories,
+        select_datasets=select_datasets,
         results=results,
     )
 
