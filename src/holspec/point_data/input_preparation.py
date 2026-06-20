@@ -367,6 +367,7 @@ def _import_ensemble_from_config(
         return PointDataEnsemble.from_files(
             import_config["file_configs"],
             base_dir=project_root,
+            metadata=import_config.get("metadata"),
         )
     if import_mode == "file_with_noise":
         return PointDataEnsemble.from_file_with_noise(
@@ -376,6 +377,7 @@ def _import_ensemble_from_config(
             base_dir=project_root,
             base_seed=import_config.get("base_seed", 42),
             include_base=import_config.get("include_base", False),
+            metadata=import_config.get("metadata"),
         )
 
     raise ValueError(
