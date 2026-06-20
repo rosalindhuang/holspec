@@ -14,6 +14,7 @@ import textwrap
 import re
 import yaml
 import nbformat
+import shutil
 import subprocess
 
 
@@ -159,6 +160,69 @@ def convert_relative_to_paths(obj, root: Path):
         return root / obj
     else:
         raise TypeError(f"Expected str, dict, or list; got {type(obj).__name__!r}.")
+
+
+# =============================================================================
+# File inspection utilities
+# =============================================================================
+
+def count_text_lines(paths, method="auto"):
+    """
+    Count physical newline-delimited lines in text files.
+
+    Parameters
+    ----------
+    paths : path-like or iterable of path-like
+        Text file path(s) to count.
+    method : {'auto', 'wc', 'python'}, default='auto'
+        Counting backend. ``'wc'`` shells out to ``wc -l`` and is fast on
+        Unix-like systems. ``'python'`` uses a portable binary chunk reader.
+        ``'auto'`` uses ``wc`` when available and otherwise falls back to
+        ``'python'``.
+
+    Returns
+    -------
+    dict[Path, int]
+        Mapping from input path to line count.
+    """
+    if isinstance(paths, (str, Path)):
+        paths = [paths]
+    paths = [Path(path) for path in paths]
+    if not paths:
+        return {}
+
+    if method not in {"auto", "wc", "python"}:
+        raise ValueError("method must be one of {'auto', 'wc', 'python'}")
+
+    if method == "auto":
+        method = "wc" if shutil.which("wc") is not None else "python"
+
+    if method == "wc":
+        result = subprocess.run(
+            ["wc", "-l", *[str(path) for path in paths]],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        line_counts = {}
+        for line in result.stdout.splitlines():
+            parts = line.strip().split(maxsplit=1)
+            if len(parts) != 2:
+                continue
+            count, filename = parts
+            if filename == "total":
+                continue
+            line_counts[Path(filename)] = int(count)
+        return {path: line_counts[path] for path in paths}
+
+    line_counts = {}
+    for path in paths:
+        count = 0
+        with open(path, "rb") as f:
+            for chunk in iter(lambda: f.read(1024 * 1024), b""):
+                count += chunk.count(b"\n")
+        line_counts[path] = count
+    return line_counts
 
 
 # =============================================================================

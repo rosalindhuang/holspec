@@ -41,6 +41,7 @@ PROJECT_ROOT = get_project_root()
 CONFIGS_DIR = PROJECT_ROOT / "configs"
 
 DATA_DIR = PROJECT_ROOT / "data"
+DATA_EXTERNAL_DIR = DATA_DIR / "external"
 DATA_RAW_DIR = DATA_DIR / "raw"
 DATA_RAW_GENERATED_DIR = DATA_RAW_DIR / "generated"
 DATA_RAW_IMPORTED_DIR = DATA_RAW_DIR / "imported"
