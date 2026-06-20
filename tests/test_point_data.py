@@ -213,8 +213,27 @@ def test_point_data_ensemble_accepts_point_data_members():
 
     assert ensemble.size == 2
     assert ensemble.num_points == 2
+    assert ensemble.num_points_per_member == (2, 2)
+    assert ensemble.has_uniform_num_points
     assert ensemble.dimension == 2
     assert ensemble.members == members
+
+
+def test_point_data_ensemble_num_points_rejects_variable_size_members():
+    members = [
+        PointData(positions=np.array([[0.0, 0.0], [1.0, 0.0]])),
+        PointData(
+            positions=np.array([[0.0, 1.0], [1.0, 1.0], [0.5, 0.8]]),
+        ),
+    ]
+
+    ensemble = PointDataEnsemble(members)
+
+    assert ensemble.num_points_per_member == (2, 3)
+    assert not ensemble.has_uniform_num_points
+    assert repr(ensemble) == "PointDataEnsemble(size=2, N=variable(2-3), d=2)"
+    with pytest.raises(ValueError, match="num_points_per_member"):
+        ensemble.num_points
 
 
 def test_point_data_ensemble_rejects_empty_members():
@@ -310,6 +329,41 @@ def test_point_data_ensemble_from_files_loads_distances(tmp_path: Path):
     np.testing.assert_allclose(ensemble[1].get_distances(), distances_1)
 
 
+def test_point_data_ensemble_from_files_accepts_variable_size_distances(
+    tmp_path: Path,
+):
+    distances_0 = np.array(
+        [
+            [0.0, 1.0],
+            [1.0, 0.0],
+        ],
+    )
+    distances_1 = np.array(
+        [
+            [0.0, 1.0, 1.2],
+            [1.0, 0.0, 0.8],
+            [1.2, 0.8, 0.0],
+        ],
+    )
+    np.savetxt(tmp_path / "distances_0.csv", distances_0, delimiter=",")
+    np.savetxt(tmp_path / "distances_1.csv", distances_1, delimiter=",")
+    configs = [
+        {"data_type": "distances", "filepath": "distances_0.csv"},
+        {"data_type": "distances", "filepath": "distances_1.csv"},
+    ]
+
+    ensemble = PointDataEnsemble.from_files(configs, base_dir=tmp_path)
+
+    assert ensemble.size == 2
+    assert ensemble.num_points_per_member == (2, 3)
+    assert not ensemble.has_uniform_num_points
+    assert ensemble.dimension is None
+    np.testing.assert_allclose(ensemble[0].get_distances(), distances_0)
+    np.testing.assert_allclose(ensemble[1].get_distances(), distances_1)
+    with pytest.raises(ValueError, match="num_points_per_member"):
+        ensemble.num_points
+
+
 def test_point_data_ensemble_from_files_rejects_empty_configs():
     with pytest.raises(ValueError, match="at least one file config"):
         PointDataEnsemble.from_files([])
@@ -329,7 +383,7 @@ def test_point_data_ensemble_from_files_rejects_mixed_data_types(tmp_path: Path)
         PointDataEnsemble.from_files(configs, base_dir=tmp_path)
 
 
-def test_point_data_ensemble_from_files_rejects_position_shape_mismatch(
+def test_point_data_ensemble_from_files_accepts_variable_size_positions(
     tmp_path: Path,
 ):
     positions_0 = np.array([[0.0, 0.0], [1.0, 0.0]])
@@ -341,7 +395,43 @@ def test_point_data_ensemble_from_files_rejects_position_shape_mismatch(
         _positions_config("positions_1.csv"),
     ]
 
-    with pytest.raises(ValueError, match="same array shape"):
+    ensemble = PointDataEnsemble.from_files(configs, base_dir=tmp_path)
+
+    assert ensemble.size == 2
+    assert ensemble.num_points_per_member == (2, 3)
+    assert not ensemble.has_uniform_num_points
+    assert ensemble.dimension == 2
+    np.testing.assert_allclose(ensemble[0].get_positions(), positions_0)
+    np.testing.assert_allclose(ensemble[1].get_positions(), positions_1)
+    with pytest.raises(ValueError, match="num_points_per_member"):
+        ensemble.num_points
+
+
+def test_point_data_ensemble_from_files_rejects_position_dimension_mismatch(
+    tmp_path: Path,
+):
+    positions_2d = np.array([[0.0, 0.0], [1.0, 0.0]])
+    positions_3d = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.5]])
+    _write_positions_csv(tmp_path / "positions_2d.csv", positions_2d)
+    pd.DataFrame(
+        {
+            "x": positions_3d[:, 0],
+            "y": positions_3d[:, 1],
+            "z": positions_3d[:, 2],
+        },
+    ).to_csv(tmp_path / "positions_3d.csv", index=False)
+    configs = [
+        _positions_config("positions_2d.csv"),
+        {
+            "data_type": "positions",
+            "filepath": "positions_3d.csv",
+            "params": {
+                "columns": ["x", "y", "z"],
+            },
+        },
+    ]
+
+    with pytest.raises(ValueError, match="same ambient dimension"):
         PointDataEnsemble.from_files(configs, base_dir=tmp_path)
 
 
@@ -674,13 +764,28 @@ def test_point_data_ensemble_distance_reference_matches_distance_members():
     )
 
 
-def test_point_data_ensemble_rejects_reference_shape_mismatch():
+def test_point_data_ensemble_accepts_reference_point_count_mismatch():
     members = [PointData(positions=np.array([[0.0, 0.0], [1.0, 0.0]]))]
     reference = PointData(
         positions=np.array([[0.0, 0.0], [1.0, 0.0], [0.5, 0.8]]),
     )
 
-    with pytest.raises(ValueError, match="does not match ensemble member shape"):
+    ensemble = PointDataEnsemble(members, reference_point_data=reference)
+
+    assert ensemble.has_reference
+    np.testing.assert_allclose(
+        ensemble.get_reference_positions(),
+        reference.get_positions(),
+    )
+
+
+def test_point_data_ensemble_rejects_reference_dimension_mismatch():
+    members = [PointData(positions=np.array([[0.0, 0.0], [1.0, 0.0]]))]
+    reference = PointData(
+        positions=np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.5]]),
+    )
+
+    with pytest.raises(ValueError, match="ambient dimension"):
         PointDataEnsemble(members, reference_point_data=reference)
 
 

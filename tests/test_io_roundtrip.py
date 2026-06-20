@@ -141,6 +141,45 @@ def test_point_data_ensemble_round_trips(tmp_path):
         )
 
 
+def test_variable_size_point_data_ensemble_round_trips(tmp_path):
+    members = [
+        PointData(
+            positions=np.array([[0.0, 0.0], [1.0, 0.0]]),
+            metadata={"member": 0},
+        ),
+        PointData(
+            positions=np.array([[0.0, 1.0], [1.0, 1.0], [0.5, 0.8]]),
+            metadata={"member": 1},
+        ),
+    ]
+    reference = PointData(positions=np.array([[0.0, 0.0], [1.0, 0.0]]))
+    ensemble = PointDataEnsemble(
+        members,
+        metadata={"label": "variable-size ensemble"},
+        reference_point_data=reference,
+    )
+    path = tmp_path / "variable_size_ensemble.h5"
+
+    ensemble.save(path)
+    loaded = PointDataEnsemble.load(path)
+
+    assert loaded.size == 2
+    assert loaded.num_points_per_member == (2, 3)
+    assert not loaded.has_uniform_num_points
+    assert loaded.dimension == 2
+    assert loaded.metadata["label"] == "variable-size ensemble"
+    assert loaded.has_reference
+    with pytest.raises(ValueError, match="num_points_per_member"):
+        loaded.num_points
+    for original_member, loaded_member in zip(members, loaded.members, strict=True):
+        assert loaded_member.content_hash == original_member.content_hash
+        assert loaded_member.metadata["member"] == original_member.metadata["member"]
+        np.testing.assert_allclose(
+            loaded_member.get_positions(),
+            original_member.get_positions(),
+        )
+
+
 def test_imported_noisy_point_data_ensemble_round_trips(tmp_path):
     positions = np.array(
         [

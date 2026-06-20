@@ -2,8 +2,8 @@
 """
 Ensemble container for related point clouds.
 
-Provides PointDataEnsemble class for managing collections of PointData objects
-that share a common base configuration with variations (e.g., noise realizations).
+Provides PointDataEnsemble class for managing compatible collections of
+PointData objects.
 """
 
 from pathlib import Path
@@ -20,9 +20,6 @@ class PointDataEnsemble:
     """
     Container for ensemble of related point clouds.
     
-    Stores multiple PointData objects that share a common base configuration
-    with variations (e.g., different noise realizations).
-    
     Parameters
     ----------
     members : list[PointData]
@@ -35,14 +32,16 @@ class PointDataEnsemble:
         Additional ensemble-level metadata.
     reference_point_data : PointData, optional
         Reference/base point cloud for the ensemble (e.g. the unperturbed
-        positions underlying a noisy ensemble). When provided, its stored
-        array shape must match the ensemble members.
+        positions underlying a noisy ensemble). When provided, it must match
+        the member data type and, for position data, the ambient dimension.
 
     Notes
     -----
     - All members are stored in memory; for very large ensembles (>1000 members),
       consider processing in batches.
-    - Members are typically generated with same structure but different random seeds.
+    - Members must share a data type. Position-data members must also share
+      an ambient dimension, but may have different point counts.
+    - Generated members are typically the same size with different random seeds.
     - Ensemble metadata is auto-populated with 'creation_time'.
     - Use `from_base_config()` class method for standard workflow of generating
       multiple noise realizations.
@@ -61,25 +60,11 @@ class PointDataEnsemble:
             raise ValueError("Ensemble must contain at least one member")
         if not all(isinstance(m, PointData) for m in members):
             raise TypeError("All members must be PointData objects")
+        _validate_member_compatibility(members, context="Ensemble")
 
         # Validate reference compatibility
         if reference_point_data is not None:
-            if not isinstance(reference_point_data, PointData):
-                raise TypeError("reference_point_data must be a PointData object")
-            if reference_point_data.data_type != members[0].data_type:
-                raise ValueError(
-                    "reference_point_data data_type "
-                    f"{reference_point_data.data_type!r} does not match ensemble "
-                    f"member data_type {members[0].data_type!r}"
-                )
-            reference_shape = _point_data_shape(reference_point_data)
-            member_shape = _point_data_shape(members[0])
-            if reference_shape != member_shape:
-                raise ValueError(
-                    "reference_point_data array shape "
-                    f"{reference_shape} does not match ensemble member shape "
-                    f"{member_shape}"
-                )
+            _validate_reference_compatibility(reference_point_data, members[0])
 
         # Store data
         self.members = members
@@ -104,8 +89,31 @@ class PointDataEnsemble:
     
     @property
     def num_points(self) -> int:
-        """Number of points per member (assumes all members have same N)."""
+        """
+        Shared number of points per member.
+
+        Raises
+        ------
+        ValueError
+            If ensemble members have variable point counts. Use
+            ``num_points_per_member`` for per-member sizes.
+        """
+        if not self.has_uniform_num_points:
+            raise ValueError(
+                "Ensemble members have variable numbers of points; use "
+                "num_points_per_member for per-member sizes"
+            )
         return self.members[0].num_points
+
+    @property
+    def num_points_per_member(self) -> tuple[int, ...]:
+        """Number of points in each ensemble member."""
+        return tuple(member.num_points for member in self.members)
+
+    @property
+    def has_uniform_num_points(self) -> bool:
+        """Whether all ensemble members have the same number of points."""
+        return len(set(self.num_points_per_member)) == 1
     
     @property
     def dimension(self) -> int | None:
@@ -272,8 +280,9 @@ class PointDataEnsemble:
         Load an ensemble from external point data file configurations.
 
         Each config is passed to ``PointData.from_file`` and becomes one
-        ensemble member. First-pass imported ensembles are strict: all members
-        must have the same data type and array shape.
+        ensemble member. Imported ensembles must have one data type. Position
+        data members must share an ambient dimension, but may have different
+        numbers of points.
 
         Parameters
         ----------
@@ -588,8 +597,13 @@ class PointDataEnsemble:
     
     def __repr__(self) -> str:
         """String representation of ensemble."""
+        counts = self.num_points_per_member
+        if self.has_uniform_num_points:
+            num_points_repr = str(counts[0])
+        else:
+            num_points_repr = f"variable({min(counts)}-{max(counts)})"
         return (f"PointDataEnsemble(size={self.size}, "
-                f"N={self.num_points}, d={self.dimension})")
+                f"N={num_points_repr}, d={self.dimension})")
 
 
 # =============================================================================
@@ -597,30 +611,55 @@ class PointDataEnsemble:
 # =============================================================================
 
 def _validate_imported_members(members: list[PointData]) -> None:
-    """Validate imported ensemble members have one data type and shape."""
+    """Validate imported ensemble members have compatible data arrays."""
+    _validate_member_compatibility(members, context="Imported ensemble")
+
+
+def _validate_member_compatibility(
+    members: list[PointData],
+    context: str,
+) -> None:
+    """Validate ensemble members share data type and position dimension."""
     first = members[0]
     data_type = first.data_type
-    shape = _point_data_shape(first)
+    dimension = first.dimension
 
     for i, member in enumerate(members[1:], start=1):
         if member.data_type != data_type:
             raise ValueError(
-                "Imported ensemble members must have the same data_type; "
+                f"{context} members must have the same data_type; "
                 f"member 0 has {data_type!r}, member {i} has {member.data_type!r}"
             )
-        member_shape = _point_data_shape(member)
-        if member_shape != shape:
+        if data_type == "positions" and member.dimension != dimension:
             raise ValueError(
-                "Imported ensemble members must have the same array shape; "
-                f"member 0 has shape {shape}, member {i} has shape {member_shape}"
+                f"{context} position members must have the same ambient "
+                f"dimension; member 0 has dimension {dimension}, member {i} "
+                f"has dimension {member.dimension}"
             )
 
 
-def _point_data_shape(point_data: PointData) -> tuple[int, ...]:
-    """Return the stored array shape for a PointData object."""
-    if point_data.has_positions:
-        return point_data.get_positions().shape
-    return point_data.get_distances().shape
+def _validate_reference_compatibility(
+    reference_point_data: PointData,
+    member: PointData,
+) -> None:
+    """Validate reference point data against ensemble member compatibility."""
+    if not isinstance(reference_point_data, PointData):
+        raise TypeError("reference_point_data must be a PointData object")
+    if reference_point_data.data_type != member.data_type:
+        raise ValueError(
+            "reference_point_data data_type "
+            f"{reference_point_data.data_type!r} does not match ensemble "
+            f"member data_type {member.data_type!r}"
+        )
+    if (
+        reference_point_data.has_positions
+        and reference_point_data.dimension != member.dimension
+    ):
+        raise ValueError(
+            "reference_point_data ambient dimension "
+            f"{reference_point_data.dimension} does not match ensemble "
+            f"member dimension {member.dimension}"
+        )
 
 
 def _imported_noise_member_metadata(
