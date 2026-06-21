@@ -56,8 +56,8 @@ def test_run_data_import_files_with_dataset_filter(tmp_path: Path):
     assert ensemble.dimension == 2
     assert ensemble.metadata["import_mode"] == "files"
     assert ensemble.metadata["data_type"] == "positions"
-    assert ensemble.metadata["control_parameter"] == "area_fraction"
-    assert ensemble.metadata["control_value"] == 0.74
+    assert ensemble.metadata["exp_param"] == "area_fraction"
+    assert ensemble.metadata["exp_value"] == 0.74
     np.testing.assert_allclose(ensemble[0].get_positions(), POSITIONS)
 
     _, attributes = read_h5(expected_path)
@@ -147,8 +147,8 @@ def test_run_data_import_file_with_noise_without_dataset_subdirs(
     assert ensemble.metadata["import_mode"] == "file_with_noise"
     assert ensemble.metadata["num_realizations"] == 2
     assert ensemble.metadata["include_base"] is True
-    assert ensemble.metadata["control_parameter"] == "noise_control"
-    assert ensemble.metadata["control_value"] == 1.5
+    assert ensemble.metadata["exp_param"] == "noise_control"
+    assert ensemble.metadata["exp_value"] == 1.5
     np.testing.assert_allclose(ensemble[0].get_positions(), POSITIONS)
     assert ensemble[1].metadata["seed"] == 11
     assert ensemble[2].metadata["seed"] == 12
@@ -209,8 +209,8 @@ def _tiny_data_import_config() -> dict:
                         },
                     ],
                     "metadata": {
-                        "control_parameter": "area_fraction",
-                        "control_value": 0.74,
+                        "exp_param": "area_fraction",
+                        "exp_value": 0.74,
                     },
                 },
             },
@@ -232,8 +232,8 @@ def _tiny_data_import_config() -> dict:
                     "base_seed": 11,
                     "include_base": True,
                     "metadata": {
-                        "control_parameter": "noise_control",
-                        "control_value": 1.5,
+                        "exp_param": "noise_control",
+                        "exp_value": 1.5,
                     },
                 },
             },

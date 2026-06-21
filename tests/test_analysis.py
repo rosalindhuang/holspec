@@ -5,11 +5,14 @@ These tests use hand-written Spectrum objects to verify public construction and
 access-method behavior without covering HDF5 persistence.
 """
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 
-from holspec.analysis import EnsembleSpectraAnalysis
+from holspec.analysis import EnsembleSpectraAnalysis, extract_exp_params
 from holspec.spectra import Spectrum
+from holspec.utilities import save_h5
 
 
 def _member_spectra() -> dict[tuple[int, str], list[Spectrum]]:
@@ -158,3 +161,24 @@ def test_ensemble_spectra_analysis_rejects_invalid_eigenvector_spectra(
 
     with pytest.raises(ValueError, match=match):
         analysis.set_eigenvector_spectra(eigenvector_spectra)
+
+
+def test_extract_exp_params_reads_generic_point_data_metadata(tmp_path: Path):
+    point_data_path = tmp_path / "point_data.h5"
+    save_h5(
+        point_data_path,
+        attributes={
+            "metadata": {
+                "exp_param": "area_fraction",
+                "exp_value": 0.74,
+            },
+        },
+    )
+
+    exp_params = extract_exp_params(
+        {"point_data": point_data_path},
+        ["area_fraction", "gamma"],
+    )
+
+    assert exp_params["area_fraction"] == 0.74
+    assert exp_params["gamma"] is None

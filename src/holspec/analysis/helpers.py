@@ -116,7 +116,11 @@ def extract_exp_params(provenance: dict, exp_params: list[str]) -> dict:
     """
     Extract experimental parameters from a provenance chain.
 
-    Reads upstream file attributes to recover parameter values.
+    Reads upstream file attributes to recover parameter values. External
+    imported datasets can expose arbitrary experiment parameters through
+    point-data metadata fields ``exp_param`` and ``exp_value``. Built-in
+    generated-data parameters such as ``noise`` and ``alpha`` are recovered
+    from their stage-specific provenance metadata.
     Returns a dict with keys for all requested parameters; missing
     parameters are stored as None.
 
@@ -125,7 +129,8 @@ def extract_exp_params(provenance: dict, exp_params: list[str]) -> dict:
     provenance : dict
         Provenance dict mapping stage names to file paths.
     exp_params : list of str
-        Names of experimental parameters to extract (e.g. ['noise', 'alpha']).
+        Names of experimental parameters to extract (e.g.
+        ``['noise', 'alpha', 'area_fraction']``).
 
     Returns
     -------
@@ -135,11 +140,22 @@ def extract_exp_params(provenance: dict, exp_params: list[str]) -> dict:
     result = {name: None for name in exp_params}
 
     for name in exp_params:
-        if name == 'noise':
-            ptd_filepath = provenance.get('point_data')
-            if ptd_filepath is None:
-                continue
+        ptd_filepath = provenance.get('point_data')
+        ptd_attrs = None
+
+        if ptd_filepath is not None:
             _, ptd_attrs = read_h5(ptd_filepath, dataset_names=[])
+            metadata = ptd_attrs.get('metadata', {})
+            if (
+                isinstance(metadata, dict)
+                and metadata.get('exp_param') == name
+            ):
+                result[name] = metadata.get('exp_value')
+                continue
+
+        if name == 'noise':
+            if ptd_attrs is None:
+                continue
             noise_config = ptd_attrs.get('noise_config')
             if noise_config is not None:
                 result['noise'] = noise_config.get('scale')
