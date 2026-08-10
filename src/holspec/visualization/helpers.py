@@ -13,7 +13,7 @@ import os
 import shutil
 import subprocess
 import warnings
-from typing import Optional, Tuple, Dict, Any, List, Union
+from typing import Optional, Tuple, Dict, Any, List, Union, Sequence
 from pathlib import Path
 
 # =============================================================================
@@ -33,6 +33,14 @@ def format_axis(
     zscale: Optional[str] = None,
     aspect: Optional[str] = None,
     margins: Optional[Tuple[float, ...]] = None,
+    axis_visible: Optional[bool] = None,
+    axis_lines_visible: Optional[bool] = None,
+    xticks: Optional[Sequence] = None,
+    yticks: Optional[Sequence] = None,
+    zticks: Optional[Sequence] = None,
+    xticklabels: Optional[Sequence[str]] = None,
+    yticklabels: Optional[Sequence[str]] = None,
+    zticklabels: Optional[Sequence[str]] = None,
     # View angles (3D only)
     view_angles: Optional[Tuple[float, float]] = None,
     # Labels and title
@@ -76,6 +84,19 @@ def format_axis(
         For 3D: 'equal' is implemented manually due to matplotlib limitations.
     margins : tuple of float, optional
         Margins as (x_margin, y_margin) for 2D or (x_margin, y_margin, z_margin) for 3D.
+    axis_visible : bool, optional
+        Whether to show the axis decoration layer. If False, hides axis lines,
+        ticks, tick labels, axis labels, and grid, while leaving plotted data
+        visible.
+    axis_lines_visible : bool, optional
+        Whether to show axis lines. For 2D axes, controls all spines. For 3D
+        axes, controls the x, y, and z axis lines.
+    xticks, yticks, zticks : sequence, optional
+        Tick locations for each axis. Pass an empty list to remove ticks.
+        ``zticks`` is only applied to 3D axes.
+    xticklabels, yticklabels, zticklabels : sequence of str, optional
+        Tick labels for each axis. Pass an empty list to hide tick labels.
+        ``zticklabels`` is only applied to 3D axes.
     view_angles : tuple of float, optional
         View angles as (elevation, azimuth) in degrees. Only for 3D axes.
         Elevation is the angle above the horizontal plane (typically 0-90).
@@ -144,6 +165,20 @@ def format_axis(
             pass
         else:
             ax.margins(*margins)
+
+    # Ticks and tick labels
+    if xticks is not None:
+        ax.set_xticks(xticks)
+    if yticks is not None:
+        ax.set_yticks(yticks)
+    if zticks is not None and is_3d:
+        ax.set_zticks(zticks)
+    if xticklabels is not None:
+        ax.set_xticklabels(xticklabels)
+    if yticklabels is not None:
+        ax.set_yticklabels(yticklabels)
+    if zticklabels is not None and is_3d:
+        ax.set_zticklabels(zticklabels)
     
     # View angles (3D only)
     if view_angles is not None and is_3d:
@@ -173,6 +208,22 @@ def format_axis(
     # Legend
     if legend_kwargs is not None:
         ax.legend(**legend_kwargs)
+
+    # Axis visibility
+    if axis_lines_visible is not None:
+        if is_3d:
+            ax.xaxis.line.set_visible(axis_lines_visible)
+            ax.yaxis.line.set_visible(axis_lines_visible)
+            ax.zaxis.line.set_visible(axis_lines_visible)
+        else:
+            for spine in ax.spines.values():
+                spine.set_visible(axis_lines_visible)
+
+    if axis_visible is not None:
+        if axis_visible:
+            ax.set_axis_on()
+        else:
+            ax.set_axis_off()
 
 
 def _set_equal_aspect_3d(
