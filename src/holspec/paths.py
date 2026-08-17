@@ -2,7 +2,7 @@
 """
 Project path conventions and directory utilities.
 
-The top-level configs, data, notebooks, and outputs paths are local workspace
+The local configs, data, notebooks, and outputs paths are local workspace
 conventions for development and exploratory workflows.
 """
 from pathlib import Path
@@ -14,7 +14,7 @@ from functools import lru_cache
 # Project paths
 # =============================================================================
 
-# --- Project root ---
+# Project root
 
 @lru_cache(maxsize=1)
 def get_project_root(start: Path | None = None, root_markers = ("pyproject.toml", ".git")) -> Path:
@@ -36,11 +36,19 @@ def get_project_root(start: Path | None = None, root_markers = ("pyproject.toml"
 PROJECT_ROOT = get_project_root()
 
 
-# --- Directories ---
+# Project directories
 
-CONFIGS_DIR = PROJECT_ROOT / "configs"
+SRC_DIR = PROJECT_ROOT / "src"
+TESTS_DIR = PROJECT_ROOT / "tests"
 
-DATA_DIR = PROJECT_ROOT / "data"
+
+# Local directories
+
+LOCAL_ROOT = PROJECT_ROOT / "local"
+
+CONFIGS_DIR = LOCAL_ROOT / "configs"
+
+DATA_DIR = LOCAL_ROOT / "data"
 DATA_EXTERNAL_DIR = DATA_DIR / "external"
 DATA_RAW_DIR = DATA_DIR / "raw"
 DATA_RAW_GENERATED_DIR = DATA_RAW_DIR / "generated"
@@ -48,11 +56,8 @@ DATA_RAW_IMPORTED_DIR = DATA_RAW_DIR / "imported"
 DATA_INTERIM_DIR = DATA_DIR / "interim"
 DATA_PROCESSED_DIR = DATA_DIR / "processed"
 
-NOTEBOOKS_DIR = PROJECT_ROOT / "notebooks"
-OUTPUTS_DIR = PROJECT_ROOT / "outputs"
-
-SRC_DIR = PROJECT_ROOT / "src"
-TESTS_DIR = PROJECT_ROOT / "tests"
+NOTEBOOKS_DIR = LOCAL_ROOT / "notebooks"
+OUTPUTS_DIR = LOCAL_ROOT / "outputs"
 
 
 # =============================================================================
@@ -282,10 +287,6 @@ def print_directory_tree(
 if __name__ == "__main__":
     print("Project paths:")
     print("  PROJECT_ROOT:".ljust(15), PROJECT_ROOT)
-    print("  CONFIGS_DIR:".ljust(15), CONFIGS_DIR)
-    print("  DATA_DIR:".ljust(15), DATA_DIR)
-    print("  NOTEBOOKS_DIR:".ljust(15), NOTEBOOKS_DIR)
-    print("  OUTPUTS_DIR:".ljust(15), OUTPUTS_DIR)
     print("  SRC_DIR:".ljust(15), SRC_DIR)
     print("  TESTS_DIR:".ljust(15), TESTS_DIR)
     
