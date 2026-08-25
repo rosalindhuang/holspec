@@ -42,10 +42,10 @@ def save_h5(
         If specified, datasets and attributes are saved under this group.
         If None, saved at root level.
     mode : {'update', 'create', 'replace'}, default 'replace'
-        How to handle existing groups:
-        - 'update': Merge with existing group (overwrite conflicting datasets/attributes)
-        - 'create': Raise error if group already exists
-        - 'replace': Delete existing group and recreate
+        How to handle the target file or group:
+        - 'update': Merge with the existing target, overwriting conflicts
+        - 'create': Create a new target and raise if it already exists
+        - 'replace': Recreate the target, discarding existing contents
     hdf5_options : dict, optional
         Additional options for dataset creation (e.g., {'compression': 'gzip'}).
         If compression is specified without chunks, chunks=True is set automatically.
@@ -55,11 +55,13 @@ def save_h5(
     ValueError
         If mode is not one of {'update', 'create', 'replace'}.
     FileExistsError
-        If mode='create' and the group already exists.
+        If mode='create' and the target file or group already exists.
     
     Notes
     -----
     - Parent directories are created automatically if they don't exist.
+    - At the root, ``replace`` recreates the entire file, ``create`` requires
+      a new file, and ``update`` preserves unspecified file contents.
     - For `attributes`, values are automatically converted to HDF5-compatible types.
       Dicts are automatically serialized to JSON strings. Numpy types are converted to native Python types.
     
@@ -88,8 +90,19 @@ def save_h5(
         hdf5_options = {}
     if 'compression' in hdf5_options and 'chunks' not in hdf5_options:
         hdf5_options['chunks'] = True
+
+    # File modes implement root-level semantics. Named-group operations
+    # always open the containing file for update and apply mode to the group.
+    if group is None:
+        file_mode = {
+            'update': 'a',
+            'create': 'x',
+            'replace': 'w',
+        }[mode]
+    else:
+        file_mode = 'a'
     
-    with h5py.File(str(filepath), 'a') as f:
+    with h5py.File(str(filepath), file_mode) as f:
         
         # Determine target location (root or group)
         if group is None:

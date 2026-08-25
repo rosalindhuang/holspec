@@ -18,6 +18,7 @@ from holspec.hodge_laplacian import HodgeLaplacian
 from holspec.point_data import PointData, PointDataEnsemble
 from holspec.simplicial import SimplicialComplex
 from holspec.spectra import HodgeLaplacianSpectra
+from holspec.utilities import get_keys_h5, read_h5, save_h5
 
 from tests.helpers import assert_eigenvalues_allclose, assert_sparse_allclose
 
@@ -29,6 +30,156 @@ def _scaled_metric(sc: SimplicialComplex, scale: float = 2.0) -> CochainMetric:
             for k, n_k in sc.num_simplices.items()
         },
     )
+
+
+# HDF5 writer modes
+
+def test_save_h5_root_replace_recreates_file(tmp_path):
+    path = tmp_path / "root_replace.h5"
+    save_h5(
+        path,
+        datasets={"stale_dataset": [1]},
+        attributes={"stale_attribute": "old"},
+        mode="replace",
+    )
+    save_h5(
+        path,
+        datasets={"value": [2]},
+        group="stale_group",
+        mode="create",
+    )
+
+    save_h5(
+        path,
+        datasets={"current_dataset": [3]},
+        attributes={"current_attribute": "new"},
+        mode="replace",
+    )
+
+    datasets, attributes = read_h5(path)
+    assert get_keys_h5(path) == ["current_dataset"]
+    np.testing.assert_array_equal(datasets["current_dataset"], [3])
+    assert attributes == {"current_attribute": "new"}
+
+
+def test_save_h5_root_update_preserves_unspecified_contents(tmp_path):
+    path = tmp_path / "root_update.h5"
+    save_h5(
+        path,
+        datasets={"initial_dataset": [1]},
+        attributes={"initial_attribute": "old"},
+        mode="replace",
+    )
+    save_h5(
+        path,
+        datasets={"value": [2]},
+        group="preserved_group",
+        mode="create",
+    )
+
+    save_h5(
+        path,
+        datasets={"current_dataset": [3]},
+        attributes={"current_attribute": "new"},
+        mode="update",
+    )
+
+    datasets, attributes = read_h5(path)
+    assert get_keys_h5(path) == [
+        "current_dataset",
+        "initial_dataset",
+        "preserved_group",
+    ]
+    np.testing.assert_array_equal(datasets["initial_dataset"], [1])
+    np.testing.assert_array_equal(datasets["current_dataset"], [3])
+    assert attributes == {
+        "current_attribute": "new",
+        "initial_attribute": "old",
+    }
+
+
+def test_save_h5_root_create_requires_new_file(tmp_path):
+    path = tmp_path / "root_create.h5"
+    save_h5(path, datasets={"original": [1]}, mode="create")
+
+    with pytest.raises(FileExistsError):
+        save_h5(path, datasets={"replacement": [2]}, mode="create")
+
+    datasets, _ = read_h5(path)
+    assert set(datasets) == {"original"}
+
+
+def test_save_h5_named_group_modes_are_unchanged(tmp_path):
+    path = tmp_path / "group_modes.h5"
+    save_h5(
+        path,
+        datasets={"initial": [1]},
+        attributes={"initial_attribute": "old"},
+        group="experiment",
+        mode="create",
+    )
+
+    with pytest.raises(FileExistsError, match="Group 'experiment' already exists"):
+        save_h5(path, group="experiment", mode="create")
+
+    save_h5(
+        path,
+        datasets={"updated": [2]},
+        attributes={"updated_attribute": "new"},
+        group="experiment",
+        mode="update",
+    )
+    datasets, attributes = read_h5(path, group="experiment")
+    assert set(datasets) == {"initial", "updated"}
+    assert attributes == {
+        "initial_attribute": "old",
+        "updated_attribute": "new",
+    }
+
+    save_h5(
+        path,
+        datasets={"replacement": [3]},
+        attributes={"replacement_attribute": "current"},
+        group="experiment",
+        mode="replace",
+    )
+    datasets, attributes = read_h5(path, group="experiment")
+    assert set(datasets) == {"replacement"}
+    assert attributes == {"replacement_attribute": "current"}
+
+
+def test_replacing_ensemble_removes_stale_members_and_metadata(tmp_path):
+    path = tmp_path / "ensemble_replace.h5"
+    old_members = [
+        PointData(positions=np.array([[float(i), 0.0]]))
+        for i in range(3)
+    ]
+    old_ensemble = PointDataEnsemble(
+        old_members,
+        base_config={"generator": "old"},
+        noise_config={"scale": 0.1},
+        metadata={"label": "old"},
+        reference_point_data=PointData(positions=np.array([[0.0, 0.0]])),
+    )
+    old_ensemble.save(path)
+
+    new_ensemble = PointDataEnsemble(
+        [PointData(positions=np.array([[10.0, 0.0]]))],
+        metadata={"label": "new"},
+    )
+    new_ensemble.save(path)
+
+    _, attributes = read_h5(path)
+    assert get_keys_h5(path) == ["member_0000"]
+    assert "base_config" not in attributes
+    assert "noise_config" not in attributes
+    assert attributes["metadata"]["label"] == "new"
+    assert not bool(attributes["has_reference"])
+
+    loaded = PointDataEnsemble.load(path)
+    assert loaded.size == 1
+    assert loaded.metadata["label"] == "new"
+    assert not loaded.has_reference
 
 
 # Standalone object round trips

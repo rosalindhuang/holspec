@@ -176,8 +176,8 @@ class PointData:
         ----------
         filepath : str or Path
             Path to HDF5 file.
-        mode : {'replace', 'append'}, default='replace'
-            How to handle existing file.
+        mode : {'replace', 'update', 'create'}, default='replace'
+            How to handle the target file or group.
         group : str, optional
             HDF5 group path for the data.
         hdf5_options : dict, optional
