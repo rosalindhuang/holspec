@@ -19,7 +19,7 @@ from holspec.utilities import save_h5, read_h5, add_noise
 class PointDataEnsemble:
     """
     Container for ensemble of related point clouds.
-    
+
     Parameters
     ----------
     members : list[PointData]
@@ -46,14 +46,14 @@ class PointDataEnsemble:
     - Use `from_base_config()` class method for standard workflow of generating
       multiple noise realizations.
     """
-    
+
     def __init__(
         self,
         members: list[PointData],
         base_config: dict | None = None,
         noise_config: dict | None = None,
         metadata: dict | None = None,
-        reference_point_data: PointData | None = None
+        reference_point_data: PointData | None = None,
     ):
         # Validation
         if not members:
@@ -72,21 +72,20 @@ class PointDataEnsemble:
         self.noise_config = noise_config
         self.metadata = metadata if metadata is not None else {}
         self.reference_point_data = reference_point_data
-        
+
         # Auto-set creation time if not present
-        if 'creation_time' not in self.metadata:
-            self.metadata['creation_time'] = datetime.now().isoformat()
-    
+        if "creation_time" not in self.metadata:
+            self.metadata["creation_time"] = datetime.now().isoformat()
 
     # =========================================================================
     # Properties
     # =========================================================================
-    
+
     @property
     def size(self) -> int:
         """Number of ensemble members."""
         return len(self.members)
-    
+
     @property
     def num_points(self) -> int:
         """
@@ -114,7 +113,7 @@ class PointDataEnsemble:
     def has_uniform_num_points(self) -> bool:
         """Whether all ensemble members have the same number of points."""
         return len(set(self.num_points_per_member)) == 1
-    
+
     @property
     def dimension(self) -> int | None:
         """Ambient dimension (None if only distances available)."""
@@ -141,35 +140,32 @@ class PointDataEnsemble:
             distance-only and positions are unavailable.
         """
         if self.reference_point_data is None:
-            raise ValueError(
-                "No reference point data available for this ensemble"
-            )
+            raise ValueError("No reference point data available for this ensemble")
         if not self.reference_point_data.has_positions:
             raise ValueError(
                 "Reference point data is distance-only; positions are unavailable"
             )
         return self.reference_point_data.get_positions()
 
-
     # =========================================================================
     # I/O and Factory Methods
     # =========================================================================
-    
+
     def save(
         self,
         filepath: str | Path,
-        mode: str = 'replace',
+        mode: str = "replace",
     ) -> None:
         """
         Save ensemble to HDF5 file.
-        
+
         Parameters
         ----------
         filepath : str or Path
             Path to HDF5 file.
         mode : str, default='replace'
             Write mode passed to save_h5. One of 'replace', 'update', or 'create'.
-        
+
         Notes
         -----
         Creates hierarchical structure:
@@ -182,18 +178,18 @@ class PointDataEnsemble:
         """
         # Prepare ensemble-level attributes
         attributes = {
-            'ensemble_size': self.size,
-            'has_reference': self.has_reference,
+            "ensemble_size": self.size,
+            "has_reference": self.has_reference,
         }
 
         if self.base_config is not None:
-            attributes['base_config'] = self.base_config
+            attributes["base_config"] = self.base_config
 
         if self.noise_config is not None:
-            attributes['noise_config'] = self.noise_config
+            attributes["noise_config"] = self.noise_config
 
         if self.metadata:
-            attributes['metadata'] = self.metadata
+            attributes["metadata"] = self.metadata
 
         # Save root-level attributes
         save_h5(filepath, attributes=attributes, group=None, mode=mode)
@@ -201,49 +197,50 @@ class PointDataEnsemble:
         # Save each member to a numbered group
         for i, point_data in enumerate(self.members):
             group_name = f"member_{i:04d}"
-            point_data.save(filepath, group=group_name, mode='replace')
+            point_data.save(filepath, group=group_name, mode="replace")
 
         # Save reference point data
         if self.reference_point_data is not None:
-            self.reference_point_data.save(
-                filepath, group="reference", mode='replace'
-            )
-    
+            self.reference_point_data.save(filepath, group="reference", mode="replace")
 
     @classmethod
-    def load(cls, filepath: str | Path) -> 'PointDataEnsemble':
+    def load(cls, filepath: str | Path) -> "PointDataEnsemble":
         """
         Load ensemble from HDF5 file.
-        
+
         Parameters
         ----------
         filepath : str or Path
             Path to ensemble HDF5 file.
-        
+
         Returns
         -------
         ensemble : PointDataEnsemble
             Loaded ensemble with all members.
-        
+
         Raises
         ------
         ValueError
             If file format is invalid or required attributes missing.
         """
         filepath = Path(filepath)
-        
-        # Read root-level attributes 
+
+        # Read root-level attributes
         _, attributes = read_h5(filepath, group=None)
-        
+
         # Extract and validate ensemble metadata
-        if 'ensemble_size' not in attributes:
+        if "ensemble_size" not in attributes:
             raise ValueError("Missing 'ensemble_size' in root attributes")
-        
-        ensemble_size = attributes['ensemble_size']
-        base_config = attributes.get('base_config')  # Already parsed from JSON by read_h5
-        noise_config = attributes.get('noise_config')
-        metadata = attributes.get('metadata', {})
-        has_reference = attributes.get('has_reference', False)  # Default for legacy files
+
+        ensemble_size = attributes["ensemble_size"]
+        base_config = attributes.get(
+            "base_config"
+        )  # Already parsed from JSON by read_h5
+        noise_config = attributes.get("noise_config")
+        metadata = attributes.get("metadata", {})
+        has_reference = attributes.get(
+            "has_reference", False
+        )  # Default for legacy files
 
         # Load all members
         members = []
@@ -263,9 +260,8 @@ class PointDataEnsemble:
             base_config=base_config,
             noise_config=noise_config,
             metadata=metadata,
-            reference_point_data=reference_point_data
+            reference_point_data=reference_point_data,
         )
-
 
     @classmethod
     def from_files(
@@ -275,7 +271,7 @@ class PointDataEnsemble:
         metadata: dict | None = None,
         member_metadata: dict | None = None,
         reference_index: int | None = 0,
-    ) -> 'PointDataEnsemble':
+    ) -> "PointDataEnsemble":
         """
         Load an ensemble from external point data file configurations.
 
@@ -350,7 +346,6 @@ class PointDataEnsemble:
             reference_point_data=reference_point_data,
         )
 
-
     @classmethod
     def from_file_with_noise(
         cls,
@@ -362,7 +357,7 @@ class PointDataEnsemble:
         include_base: bool = False,
         metadata: dict | None = None,
         member_metadata: dict | None = None,
-    ) -> 'PointDataEnsemble':
+    ) -> "PointDataEnsemble":
         """
         Load one positions file and construct a noisy ensemble from it.
 
@@ -472,7 +467,6 @@ class PointDataEnsemble:
             reference_point_data=base_point_data,
         )
 
-
     @classmethod
     def from_base_config(
         cls,
@@ -482,10 +476,10 @@ class PointDataEnsemble:
         base_seed: int = 42,
         metadata: dict | None = None,
         member_metadata: dict | None = None,
-    ) -> 'PointDataEnsemble':
+    ) -> "PointDataEnsemble":
         """
         Generate ensemble from base config with noise.
-        
+
         Parameters
         ----------
         base_config : dict
@@ -501,12 +495,12 @@ class PointDataEnsemble:
         member_metadata : dict, optional
             Additional metadata applied uniformly to all members.
             Merged with the per-member metadata (seed, member_index, etc.).
-        
+
         Returns
         -------
         ensemble : PointDataEnsemble
             Generated ensemble with noise realizations.
-        
+
         Examples
         --------
         >>> base_config = {
@@ -521,39 +515,45 @@ class PointDataEnsemble:
         # Validate inputs
         if num_realizations < 1:
             raise ValueError("num_realizations must be at least 1")
-        if 'scale' not in noise_config:
+        if "scale" not in noise_config:
             raise ValueError("noise_config must include 'scale'")
-        
+
         # Generate base positions once
         base_positions = generate_points_from_config(base_config)
-        
+
         # Generate noise realizations
         members = []
         for i in range(num_realizations):
             seed = base_seed + i
-            
+
             # Add noise
             noisy_positions = add_noise(
                 base_positions,
-                scale=noise_config['scale'],
-                distribution=noise_config.get('distribution', 'uniform'),
-                seed=seed
+                scale=noise_config["scale"],
+                distribution=noise_config.get("distribution", "uniform"),
+                seed=seed,
             )
-            
+
             # Create PointData with comprehensive metadata
-            member_metadata_all = dict(member_metadata) if member_metadata is not None else {}
-            member_metadata_all.update({
-                'base_config': base_config,
-                'noise_config': noise_config,
-                'seed': seed,
-                'member_index': i,
-            })
-            point_data = PointData(positions=noisy_positions, metadata=member_metadata_all)
+            member_metadata_all = (
+                dict(member_metadata) if member_metadata is not None else {}
+            )
+            member_metadata_all.update(
+                {
+                    "base_config": base_config,
+                    "noise_config": noise_config,
+                    "seed": seed,
+                    "member_index": i,
+                }
+            )
+            point_data = PointData(
+                positions=noisy_positions, metadata=member_metadata_all
+            )
             members.append(point_data)
-        
+
         # Construct and return ensemble
         ensemble_metadata = dict(metadata) if metadata is not None else {}
-        ensemble_metadata['base_seed'] = base_seed
+        ensemble_metadata["base_seed"] = base_seed
 
         # Store the unperturbed base as reference.
         reference_point_data = PointData(positions=base_positions)
@@ -565,36 +565,35 @@ class PointDataEnsemble:
             metadata=ensemble_metadata,
             reference_point_data=reference_point_data,
         )
-    
 
     # =========================================================================
     # Utilities and Protocols
     # =========================================================================
-    
+
     def __len__(self) -> int:
         """Return number of ensemble members."""
         return self.size
-    
+
     def __getitem__(self, index: int) -> PointData:
         """
         Get ensemble member by index.
-        
+
         Parameters
         ----------
         index : int
             Member index (0 to size-1).
-        
+
         Returns
         -------
         PointData
             The requested ensemble member.
         """
         return self.members[index]
-    
+
     def __iter__(self):
         """Iterate over ensemble members."""
         return iter(self.members)
-    
+
     def __repr__(self) -> str:
         """String representation of ensemble."""
         counts = self.num_points_per_member
@@ -602,13 +601,16 @@ class PointDataEnsemble:
             num_points_repr = str(counts[0])
         else:
             num_points_repr = f"variable({min(counts)}-{max(counts)})"
-        return (f"PointDataEnsemble(size={self.size}, "
-                f"N={num_points_repr}, d={self.dimension})")
+        return (
+            f"PointDataEnsemble(size={self.size}, "
+            f"N={num_points_repr}, d={self.dimension})"
+        )
 
 
 # =============================================================================
 # Helpers
 # =============================================================================
+
 
 def _validate_imported_members(members: list[PointData]) -> None:
     """Validate imported ensemble members have compatible data arrays."""

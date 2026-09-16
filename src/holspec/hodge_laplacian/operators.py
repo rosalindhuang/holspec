@@ -2,9 +2,10 @@
 Discrete differential operator matrix computations.
 
 Pure functions for computing coboundary, dual coboundary, and Hodge Laplacian
-matrices from incidence matrices and metric tensors. Decoupled from the 
+matrices from incidence matrices and metric tensors. Decoupled from the
 HodgeLaplacian container class for independent testability.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -19,6 +20,7 @@ if TYPE_CHECKING:
 # Coboundary and Dual Coboundary
 # =============================================================================
 
+
 def compute_coboundary_matrix(
     incidence_kp1: sparse.spmatrix,
 ) -> sparse.csr_matrix:
@@ -29,7 +31,7 @@ def compute_coboundary_matrix(
 
         d^k = D_{k+1}^T
 
-    It is determined entirely by the oriented incidence structure with 
+    It is determined entirely by the oriented incidence structure with
     no metric dependence.
 
     Parameters
@@ -43,8 +45,7 @@ def compute_coboundary_matrix(
     """
     if not sparse.issparse(incidence_kp1):
         raise TypeError(
-            f"incidence_kp1 must be a sparse matrix, "
-            f"got {type(incidence_kp1).__name__}"
+            f"incidence_kp1 must be a sparse matrix, got {type(incidence_kp1).__name__}"
         )
     return incidence_kp1.T.tocsr()
 
@@ -86,8 +87,7 @@ def compute_dual_coboundary_matrix(
     """
     if not sparse.issparse(incidence_k):
         raise TypeError(
-            f"incidence_k must be a sparse matrix, "
-            f"got {type(incidence_k).__name__}"
+            f"incidence_k must be a sparse matrix, got {type(incidence_k).__name__}"
         )
 
     # --- Shape validation ---
@@ -112,6 +112,7 @@ def compute_dual_coboundary_matrix(
 # =============================================================================
 # Hodge Laplacians
 # =============================================================================
+
 
 def compute_laplacian_lower_matrix(
     incidence_k: sparse.spmatrix,
@@ -148,8 +149,8 @@ def compute_laplacian_lower_matrix(
     NotImplementedError
         If either metric tensor is non-diagonal.
     """
-    d_km1 = compute_coboundary_matrix(incidence_k)           # D_k^T
-    delta_k = compute_dual_coboundary_matrix(                # (G^{k-1})^{-1} D_k G^k
+    d_km1 = compute_coboundary_matrix(incidence_k)  # D_k^T
+    delta_k = compute_dual_coboundary_matrix(  # (G^{k-1})^{-1} D_k G^k
         incidence_k, metric_km1, metric_k
     )
     return (d_km1 @ delta_k).tocsr()
@@ -190,10 +191,10 @@ def compute_laplacian_upper_matrix(
     NotImplementedError
         If either metric tensor is non-diagonal.
     """
-    delta_kp1 = compute_dual_coboundary_matrix(               # (G^k)^{-1} D_{k+1} G^{k+1}
+    delta_kp1 = compute_dual_coboundary_matrix(  # (G^k)^{-1} D_{k+1} G^{k+1}
         incidence_kp1, metric_k, metric_kp1
     )
-    d_k = compute_coboundary_matrix(incidence_kp1)            # D_{k+1}^T
+    d_k = compute_coboundary_matrix(incidence_kp1)  # D_{k+1}^T
     return (delta_kp1 @ d_k).tocsr()
 
 
@@ -246,6 +247,7 @@ def compute_laplacian_matrix(
 # =============================================================================
 # Operator Transformations
 # =============================================================================
+
 
 def symmetrize_matrix(
     matrix: sparse.spmatrix,

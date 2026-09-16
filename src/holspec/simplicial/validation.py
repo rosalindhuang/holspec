@@ -4,6 +4,7 @@ Simplicial complex validation.
 Functions for validating structural properties and mathematical invariants
 of simplicial complexes.
 """
+
 import numpy as np
 from scipy import sparse
 
@@ -21,17 +22,17 @@ BOUNDARY_PROPERTY_TOL = 1e-10
 def validate_simplices_structure(simplices: dict[int, list[tuple]]) -> None:
     """
     Validate basic structure of simplices dictionary.
-    
+
     Parameters
     ----------
     simplices : dict[int, list[tuple]]
         Dictionary mapping dimension to list of simplices.
-    
+
     Raises
     ------
     ValueError
         If any structural invariant is violated.
-        
+
     Notes
     -----
     Performs the following checks:
@@ -46,40 +47,40 @@ def validate_simplices_structure(simplices: dict[int, list[tuple]]) -> None:
     """
     if not simplices:
         raise ValueError("Simplices dictionary cannot be empty")
-    
+
     # Check keys are consecutive integers from 0
     keys = sorted(simplices.keys())
     if keys[0] != 0:
         raise ValueError("Simplex dimensions must start at 0")
     if keys != list(range(keys[-1] + 1)):
         raise ValueError("Simplex dimensions must be consecutive integers")
-    
+
     # Check each dimension
     for k, k_simplices in simplices.items():
         if not k_simplices:
             raise ValueError(f"Empty simplex list at dimension {k}")
-        
+
         for simplex in k_simplices:
             # Check is tuple
             if not isinstance(simplex, tuple):
                 raise ValueError(f"Simplex must be tuple, got {type(simplex)}")
-            
+
             # Check length
             if len(simplex) != k + 1:
                 raise ValueError(
                     f"k-simplex must have k+1 vertices: "
                     f"dim {k} has {len(simplex)} vertices"
                 )
-            
+
             # Check sorted
             if simplex != tuple(sorted(simplex)):
                 raise ValueError(f"Simplex {simplex} not in canonical (sorted) form")
-            
+
             # Check valid vertex indices (non-negative integers)
             for v in simplex:
                 if not isinstance(v, (int, np.integer)) or v < 0:
                     raise ValueError(f"Invalid vertex index: {v}")
-        
+
         # Check no duplicates
         if len(k_simplices) != len(set(k_simplices)):
             raise ValueError(f"Duplicate simplices at dimension {k}")
@@ -88,52 +89,52 @@ def validate_simplices_structure(simplices: dict[int, list[tuple]]) -> None:
 def validate_face_closure(simplices: dict[int, list[tuple]]) -> None:
     """
     Validate that all faces of simplices are present.
-    
+
     Parameters
     ----------
     simplices : dict[int, list[tuple]]
         Dictionary mapping dimension to list of simplices.
-    
+
     Raises
     ------
     ValueError
         If any face is missing from the complex.
-        
+
     Notes
     -----
     For each k-simplex (k > 0), verifies that all (k-1)-faces exist
     in simplices[k-1]. This is a fundamental property of simplicial complexes.
-    
+
     This check is more expensive than validate_simplices_structure() as it
     requires examining all faces of all simplices.
     """
     from .simplex import get_faces
-    
+
     max_dim = max(simplices.keys())
-    
+
     # Check each dimension k > 0
     for k in range(1, max_dim + 1):
         # Build set of (k-1)-faces for fast lookup
-        face_set = set(simplices[k-1])
-        
+        face_set = set(simplices[k - 1])
+
         # Check each k-simplex
         for simplex in simplices[k]:
             # Get all (k-1)-faces
             faces = get_faces(simplex, k - 1)
-            
+
             # Verify each face exists
             for face in faces:
                 if face not in face_set:
                     raise ValueError(
                         f"Face {face} of {simplex} (dim {k}) "
-                        f"not found in dimension {k-1}"
+                        f"not found in dimension {k - 1}"
                     )
 
 
 def validate_boundary_property(
     simplices: dict[int, list[tuple]],
     tol: float = BOUNDARY_PROPERTY_TOL,
-    incidence_matrices: dict[int, sparse.csr_matrix] | None = None
+    incidence_matrices: dict[int, sparse.csr_matrix] | None = None,
 ) -> None:
     """
     Verify D_k @ D_{k+1} = 0 for all applicable dimensions.
@@ -202,6 +203,5 @@ def validate_boundary_property(
             for k, max_entry in failures
         )
         raise ValueError(
-            f"Boundary property D_k @ D_{{k+1}} = 0 violated at "
-            f"degrees:\n  {detail}"
+            f"Boundary property D_k @ D_{{k+1}} = 0 violated at degrees:\n  {detail}"
         )

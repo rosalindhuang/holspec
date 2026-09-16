@@ -48,9 +48,7 @@ def test_run_pipeline_tiny_vietoris_rips_workflow(tmp_path: Path):
 
     output_root = project_root / "data" / "interim" / "pipeline_smoke"
     topology_path = output_root / "topology_simplicial" / "triangle" / "vr.h5"
-    metric_path = (
-        output_root / "geometry_metric" / "triangle" / "vr__combinatorial.h5"
-    )
+    metric_path = output_root / "geometry_metric" / "triangle" / "vr__combinatorial.h5"
     hodge_laplacian_path = (
         output_root / "hodge_laplacian" / "triangle" / "vr__combinatorial.h5"
     )
@@ -148,12 +146,8 @@ def test_select_pipeline_inputs_with_generated_raw_data_dir(tmp_path: Path):
 def test_select_stage_outputs_with_generated_raw_data_dir(tmp_path: Path):
     project_root = tmp_path
 
-    raw_selected = (
-        project_root / "data" / "raw" / "generated" / "smoke" / "triangle.h5"
-    )
-    raw_skipped = (
-        project_root / "data" / "raw" / "generated" / "skip" / "square.h5"
-    )
+    raw_selected = project_root / "data" / "raw" / "generated" / "smoke" / "triangle.h5"
+    raw_skipped = project_root / "data" / "raw" / "generated" / "skip" / "square.h5"
     raw_selected.parent.mkdir(parents=True)
     raw_skipped.parent.mkdir(parents=True)
     raw_selected.touch()

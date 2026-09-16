@@ -1,6 +1,7 @@
 """
 Validation utilities.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -12,6 +13,7 @@ if TYPE_CHECKING:
 # =============================================================================
 # Testing Utilities
 # =============================================================================
+
 
 def check_raises(
     label: str,
@@ -57,6 +59,7 @@ def check_raises(
         print(f"{prefix}{label:{label_width}s}: PASS ({type(exc).__name__}: {exc})")
         return True
     except Exception as exc:
-        print(f"{prefix}{label:{label_width}s}: FAIL (unexpected {type(exc).__name__}: {exc})")
+        print(
+            f"{prefix}{label:{label_width}s}: FAIL (unexpected {type(exc).__name__}: {exc})"
+        )
         return False
-

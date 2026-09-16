@@ -4,6 +4,7 @@ Spectrum validation and numerical tolerances.
 Provides input validation for Spectrum construction and the module-level
 zero-eigenvalue tolerance constant used throughout the spectra subpackage.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -21,6 +22,7 @@ ZERO_EIGENVALUE_TOL = 1e-10
 # =============================================================================
 # Validation Functions
 # =============================================================================
+
 
 def validate_spectrum(
     eigenvalues: np.ndarray,
@@ -78,19 +80,13 @@ def validate_spectrum(
 
     # --- eigenvalues is 1D ---
     if eigenvalues.ndim != 1:
-        raise ValueError(
-            f"eigenvalues must be 1D, got shape {eigenvalues.shape}"
-        )
+        raise ValueError(f"eigenvalues must be 1D, got shape {eigenvalues.shape}")
 
     # --- dimension is a non-negative integer ---
     if not isinstance(dimension, (int, np.integer)):
-        raise TypeError(
-            f"dimension must be an integer, got {type(dimension).__name__}"
-        )
+        raise TypeError(f"dimension must be an integer, got {type(dimension).__name__}")
     if dimension < 0:
-        raise ValueError(
-            f"dimension must be non-negative, got {dimension}"
-        )
+        raise ValueError(f"dimension must be non-negative, got {dimension}")
 
     # --- len(eigenvalues) <= dimension ---
     if n > dimension:

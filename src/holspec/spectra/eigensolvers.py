@@ -2,10 +2,11 @@
 Eigendecomposition of self-adjoint operators.
 
 Provides pure eigensolver methods for computing eigenvalues and
-eigenvectors of self-adjoint and PSD operators with respect to a 
-metric. Handles symmetrization, solver dispatch, eigenvalue clamping, 
+eigenvectors of self-adjoint and PSD operators with respect to a
+metric. Handles symmetrization, solver dispatch, eigenvalue clamping,
 and eigenvector back-transformation.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -27,18 +28,19 @@ if TYPE_CHECKING:
 # =============================================================================
 
 # Recognized solver names for eigendecomposition dispatch.
-VALID_SOLVER_NAMES = ('dense', 'sparse')
+VALID_SOLVER_NAMES = ("dense", "sparse")
 
 # Recognized keys for sparse solver parameters.
-VALID_SPARSE_SOLVER_PARAMS_KEYS = ('num_eigenvalues', 'which', 'sigma')
+VALID_SPARSE_SOLVER_PARAMS_KEYS = ("num_eigenvalues", "which", "sigma")
 
 # Recognized values for the eigsh 'which' parameter.
-VALID_EIGSH_WHICH = ('LM', 'SM', 'LA', 'SA', 'BE')
+VALID_EIGSH_WHICH = ("LM", "SM", "LA", "SA", "BE")
 
 
 # =============================================================================
 # Solver Parameter Validation
 # =============================================================================
+
 
 def validate_solver_params(
     solver_params: dict | None,
@@ -83,35 +85,30 @@ def validate_solver_params(
         )
 
     # num_eigenvalues: required, int > 0
-    if 'num_eigenvalues' not in solver_params:
-        raise ValueError(
-            "solver_params must contain 'num_eigenvalues'."
-        )
-    num_eigenvalues = solver_params['num_eigenvalues']
+    if "num_eigenvalues" not in solver_params:
+        raise ValueError("solver_params must contain 'num_eigenvalues'.")
+    num_eigenvalues = solver_params["num_eigenvalues"]
     if not isinstance(num_eigenvalues, (int, np.integer)) or num_eigenvalues <= 0:
         raise ValueError(
             f"num_eigenvalues must be a positive integer, got {num_eigenvalues!r}."
         )
 
     # which: optional, default 'SM'
-    which = solver_params.get('which', 'SM')
+    which = solver_params.get("which", "SM")
     if which not in VALID_EIGSH_WHICH:
-        raise ValueError(
-            f"Invalid which='{which}'. "
-            f"Valid values: {VALID_EIGSH_WHICH}."
-        )
+        raise ValueError(f"Invalid which='{which}'. Valid values: {VALID_EIGSH_WHICH}.")
 
     # sigma: optional, default None
-    sigma = solver_params.get('sigma', None)
-    if sigma is not None and not isinstance(sigma, (int, float, np.integer, np.floating)):
-        raise ValueError(
-            f"sigma must be a number or None, got {type(sigma).__name__}."
-        )
+    sigma = solver_params.get("sigma", None)
+    if sigma is not None and not isinstance(
+        sigma, (int, float, np.integer, np.floating)
+    ):
+        raise ValueError(f"sigma must be a number or None, got {type(sigma).__name__}.")
 
     return {
-        'num_eigenvalues': int(num_eigenvalues),
-        'which': which,
-        'sigma': float(sigma) if sigma is not None else None,
+        "num_eigenvalues": int(num_eigenvalues),
+        "which": which,
+        "sigma": float(sigma) if sigma is not None else None,
     }
 
 
@@ -119,10 +116,11 @@ def validate_solver_params(
 # Eigendecomposition
 # =============================================================================
 
+
 def compute_eigendecomposition(
     matrix: sparse.spmatrix,
     metric: MetricTensor,
-    solver: str = 'dense',
+    solver: str = "dense",
     solver_params: dict | None = None,
     compute_eigenvectors: bool = False,
     tol: float = ZERO_EIGENVALUE_TOL,
@@ -206,8 +204,7 @@ def compute_eigendecomposition(
     # --- Validate solver ---
     if solver not in VALID_SOLVER_NAMES:
         raise ValueError(
-            f"Unknown solver '{solver}'. "
-            f"Valid solvers: {VALID_SOLVER_NAMES}."
+            f"Unknown solver '{solver}'. Valid solvers: {VALID_SOLVER_NAMES}."
         )
 
     N = matrix.shape[0]
@@ -215,14 +212,16 @@ def compute_eigendecomposition(
     # --- N=0 early return ---
     if N == 0:
         eigenvalues = np.array([], dtype=np.float64)
-        eigenvectors = np.empty((0, 0), dtype=np.float64) if compute_eigenvectors else None
+        eigenvectors = (
+            np.empty((0, 0), dtype=np.float64) if compute_eigenvectors else None
+        )
         return eigenvalues, eigenvectors
 
     # --- Symmetrize: M_sym = G^{1/2} M G^{-1/2} ---
     M_sym = symmetrize_matrix(matrix, metric)
 
     # --- Solver dispatch ---
-    if solver == 'dense':
+    if solver == "dense":
         M_dense = M_sym.toarray()
         if compute_eigenvectors:
             eigenvalues, eigenvectors_sym = np.linalg.eigh(M_dense)
@@ -230,27 +229,36 @@ def compute_eigendecomposition(
             eigenvalues = np.linalg.eigvalsh(M_dense)
             eigenvectors_sym = None
 
-    elif solver == 'sparse':
+    elif solver == "sparse":
         solver_params = validate_solver_params(solver_params)
-        num_eigenvalues = solver_params['num_eigenvalues']
-        which = solver_params['which']
-        sigma = solver_params['sigma']
+        num_eigenvalues = solver_params["num_eigenvalues"]
+        which = solver_params["which"]
+        sigma = solver_params["sigma"]
 
         # Dense fallback when num_eigenvalues >= N (eigsh requires k < N)
         if num_eigenvalues >= N:
             return compute_eigendecomposition(
-                matrix, metric, solver='dense',
-                compute_eigenvectors=compute_eigenvectors, tol=tol,
+                matrix,
+                metric,
+                solver="dense",
+                compute_eigenvectors=compute_eigenvectors,
+                tol=tol,
             )
 
         if compute_eigenvectors:
             eigenvalues, eigenvectors_sym = eigsh(
-                M_sym, k=num_eigenvalues, which=which, sigma=sigma,
+                M_sym,
+                k=num_eigenvalues,
+                which=which,
+                sigma=sigma,
                 return_eigenvectors=True,
             )
         else:
             eigenvalues = eigsh(
-                M_sym, k=num_eigenvalues, which=which, sigma=sigma,
+                M_sym,
+                k=num_eigenvalues,
+                which=which,
+                sigma=sigma,
                 return_eigenvectors=False,
             )
             eigenvectors_sym = None

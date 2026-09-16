@@ -4,21 +4,22 @@ Distribution estimation and comparison for 1D samples.
 Standalone mathematical functions used by EnsembleSpectraAnalysis and
 available for direct use on arbitrary eigenvalue or scalar arrays.
 """
+
 from __future__ import annotations
 
 import numpy as np
 
 
 _HISTOGRAM_DEFAULTS = {
-    'bins': 50,
-    'range': None,
-    'density': True,
+    "bins": 50,
+    "range": None,
+    "density": True,
 }
 
 
 def empirical_distribution(
     values: np.ndarray,
-    method: str = 'histogram',
+    method: str = "histogram",
     method_params: dict | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
@@ -54,37 +55,33 @@ def empirical_distribution(
     """
     values = np.asarray(values)
     if values.ndim != 1:
-        raise ValueError(
-            f"values must be 1D, got shape {values.shape}."
-        )
+        raise ValueError(f"values must be 1D, got shape {values.shape}.")
 
-    if method == 'histogram':
+    if method == "histogram":
         params = {**_HISTOGRAM_DEFAULTS, **(method_params or {})}
         hist, bin_edges = np.histogram(
             values,
-            bins=params['bins'],
-            range=params['range'],
-            density=params['density'],
+            bins=params["bins"],
+            range=params["range"],
+            density=params["density"],
         )
         bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
         return bin_centers, hist
 
-    elif method == 'kde':
+    elif method == "kde":
         raise NotImplementedError(
             "KDE distribution estimation is planned but not yet implemented."
         )
 
     else:
-        raise ValueError(
-            f"Unknown method '{method}'. Supported methods: 'histogram'."
-        )
+        raise ValueError(f"Unknown method '{method}'. Supported methods: 'histogram'.")
 
 
 def distribution_distance(
     density_a: np.ndarray,
     density_b: np.ndarray,
     x: np.ndarray | None = None,
-    metric: str = 'l2',
+    metric: str = "l2",
     p: float | None = None,
 ) -> float:
     """
@@ -113,8 +110,7 @@ def distribution_distance(
 
     if density_a.ndim != 1 or density_b.ndim != 1:
         raise ValueError(
-            f"Densities must be 1D. Got shapes {density_a.shape} "
-            f"and {density_b.shape}."
+            f"Densities must be 1D. Got shapes {density_a.shape} and {density_b.shape}."
         )
     if len(density_a) != len(density_b):
         raise ValueError(
@@ -122,30 +118,30 @@ def distribution_distance(
             f"and {len(density_b)}."
         )
 
-    if metric in ('l1', 'l2', 'lp'):
-        if metric == 'l1':
+    if metric in ("l1", "l2", "lp"):
+        if metric == "l1":
             p_val = 1.0
-        elif metric == 'l2':
+        elif metric == "l2":
             p_val = 2.0
         else:
             if p is None:
-                raise ValueError(
-                    "Parameter p is required when metric='lp'."
-                )
+                raise ValueError("Parameter p is required when metric='lp'.")
             p_val = float(p)
 
         diff = np.abs(density_a - density_b)
-        return float(np.sum(diff ** p_val) ** (1.0 / p_val))
+        return float(np.sum(diff**p_val) ** (1.0 / p_val))
 
-    elif metric == 'wasserstein':
+    elif metric == "wasserstein":
         if x is None:
             raise ValueError(
-                "Parameter x (support points) is required for "
-                "metric='wasserstein'."
+                "Parameter x (support points) is required for metric='wasserstein'."
             )
         from scipy.stats import wasserstein_distance
+
         x = np.asarray(x, dtype=np.float64)
-        return float(wasserstein_distance(x, x, u_weights=density_a, v_weights=density_b))
+        return float(
+            wasserstein_distance(x, x, u_weights=density_a, v_weights=density_b)
+        )
 
     else:
         raise ValueError(

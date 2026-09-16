@@ -4,6 +4,7 @@ Metric tensor class.
 Provides the MetricTensor class representing a metric tensor (inner product
 matrix) on a finite-dimensional real vector space.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -16,13 +17,14 @@ from .validation import validate_metric_tensor, METRIC_POSITIVITY_TOL
 # MetricTensor
 # =============================================================================
 
+
 class MetricTensor:
     """
     Metric tensor (inner product matrix) on a finite-dimensional real vector space.
 
     A lightweight container enforcing the SPD mathematical contract on a sparse
     matrix. Provides linear algebra operations for computing the action of the
-    metric and its inverse. 
+    metric and its inverse.
 
     Parameters
     ----------
@@ -66,7 +68,7 @@ class MetricTensor:
 
         self._matrix = matrix.tocsr()
         self._is_diagonal = is_diagonal
-        
+
         # Cache diagonal array eagerly
         self._diagonal: np.ndarray | None = (
             np.asarray(self._matrix.diagonal()) if is_diagonal else None
@@ -151,7 +153,7 @@ class MetricTensor:
     def to_matrix(self) -> sparse.csr_matrix:
         """Return the metric tensor as an explicit sparse matrix."""
         return self._matrix
-    
+
     def to_matrix_inverse(self) -> sparse.csr_matrix:
         """
         Return the inverse metric tensor G^{-1} as an explicit sparse matrix.
@@ -182,7 +184,7 @@ class MetricTensor:
             If the metric is not diagonal.
         """
         if self._is_diagonal:
-            return sparse.diags(self._diagonal ** p, format='csr')
+            return sparse.diags(self._diagonal**p, format="csr")
         raise NotImplementedError(
             "to_matrix_power is not yet implemented for non-diagonal "
             "metric tensors. Extension path: sparse Cholesky factorization."
@@ -194,4 +196,3 @@ class MetricTensor:
 
     def __repr__(self) -> str:
         return f"MetricTensor(size={self.size}, is_diagonal={self._is_diagonal})"
-

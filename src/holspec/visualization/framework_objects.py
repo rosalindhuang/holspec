@@ -40,16 +40,18 @@ from holspec.visualization import (
 # Labels
 # =============================================================================
 
+
 def make_Lk_label(k, comp):
     """LaTeX label for Hodge Laplacian: L^k or L^{k,comp}."""
-    if comp == 'full':
-        return f'L^{{{k}}}'
-    return f'L^{{{k},\\mathrm{{{comp}}}}}'
+    if comp == "full":
+        return f"L^{{{k}}}"
+    return f"L^{{{k},\\mathrm{{{comp}}}}}"
 
 
 # =============================================================================
 # Point data
 # =============================================================================
+
 
 def plot_point_data(
     positions: np.ndarray,
@@ -60,11 +62,11 @@ def plot_point_data(
     cmap: Optional[str] = None,
     # Figure
     ax: Optional[Axes] = None,
-    **kwargs
+    **kwargs,
 ) -> Tuple[Figure, Axes]:
     """
     Plot point data as circles (2D) or spheres (3D).
-    
+
     Parameters
     ----------
     positions : np.ndarray
@@ -84,22 +86,22 @@ def plot_point_data(
         Existing axes. If None, creates new figure.
     **kwargs
         Passed to plot_circles or plot_spheres.
-    
+
     Returns
     -------
     fig, ax : Figure, Axes
-    
+
     Examples
     --------
     >>> # All same color
     >>> plot_point_data(positions, colors='red')
-    
+
     >>> # Colormap
     >>> plot_point_data(positions, color_values=np.arange(n))
 
     >>> # Per-point radii from particle diameters
     >>> plot_point_data(positions, radius=0.5 * diameters)
-    
+
     >>> # Explicit control with overrides
     >>> colors = [plt.get_cmap('viridis')(i/n) for i in range(n)]
     >>> colors[3] = 'red'
@@ -109,9 +111,9 @@ def plot_point_data(
     dimension = positions.shape[1]
     if dimension not in [2, 3]:
         raise ValueError(f"positions must be 2D or 3D, got {dimension}")
-    
+
     n_points = len(positions)
-    
+
     # Determine colors
     if colors is not None:
         if isinstance(colors, str):
@@ -122,40 +124,44 @@ def plot_point_data(
             colors_list = list(colors)
             if len(colors_list) != n_points:
                 raise ValueError(f"colors length must match positions ({n_points})")
-    
+
     elif color_values is not None and cmap is not None:
         # Map values to colormap
         color_values = np.asarray(color_values)
         if len(color_values) != n_points:
             raise ValueError(f"color_values length must match positions ({n_points})")
-        
+
         vmin, vmax = color_values.min(), color_values.max()
         if vmax > vmin:
             norm = (color_values - vmin) / (vmax - vmin)
         else:
             norm = np.zeros_like(color_values)
-        
+
         cmap_obj = plt.get_cmap(cmap)
         colors_list = [cmap_obj(v) for v in norm]
-    
+
     else:
         # Use defaults from plot_circles/plot_spheres
         colors_list = None
-    
+
     # Plot
     if colors_list is not None:
         if dimension == 2:
-            props = [{'facecolor': c} for c in colors_list]
-            fig, ax = plot_circles(positions, radius, circle_props=props, ax=ax, **kwargs)
+            props = [{"facecolor": c} for c in colors_list]
+            fig, ax = plot_circles(
+                positions, radius, circle_props=props, ax=ax, **kwargs
+            )
         else:
-            props = [{'c': c} for c in colors_list]
-            fig, ax = plot_spheres(positions, radius, sphere_props=props, ax=ax, **kwargs)
+            props = [{"c": c} for c in colors_list]
+            fig, ax = plot_spheres(
+                positions, radius, sphere_props=props, ax=ax, **kwargs
+            )
     else:
         if dimension == 2:
             fig, ax = plot_circles(positions, radius, ax=ax, **kwargs)
         else:
             fig, ax = plot_spheres(positions, radius, ax=ax, **kwargs)
-    
+
     return fig, ax
 
 
@@ -163,10 +169,13 @@ def plot_point_data(
 # Simplicial complex
 # =============================================================================
 
-def _parse_feature_flags(flags: Union[bool, Dict[int, bool]], all_keys: List[int]) -> List[int]:
+
+def _parse_feature_flags(
+    flags: Union[bool, Dict[int, bool]], all_keys: List[int]
+) -> List[int]:
     """
     Helper: Convert bool or dict flags to list of enabled keys.
-        
+
     Parameters
     ----------
     flags : bool or Dict[int, bool]
@@ -176,12 +185,12 @@ def _parse_feature_flags(flags: Union[bool, Dict[int, bool]], all_keys: List[int
         - Dict: enable for keys where value is True
     all_keys : List[int]
         Complete list of valid keys.
-    
+
     Returns
     -------
     List[int]
         List of keys where feature is enabled.
-    
+
     Examples
     --------
     >>> _parse_feature_flags(True, [0, 1, 2])
@@ -211,11 +220,11 @@ def plot_simplicial_complex_2d(
     show_orientation: Optional[Union[bool, Dict[int, bool]]] = None,
     # Figure
     ax: Optional[Axes] = None,
-    **kwargs
+    **kwargs,
 ) -> Tuple[Figure, Axes]:
     """
     Plot a 2D simplicial complex with vertices, edges, and triangles.
-    
+
     Parameters
     ----------
     simplices : Dict[int, List[Tuple]]
@@ -245,14 +254,14 @@ def plot_simplicial_complex_2d(
         Axes to plot on. If None, creates new figure.
     **kwargs
         Additional styling arguments applied to all dimensions.
-    
+
     Returns
     -------
     fig : Figure
         The matplotlib figure object.
     ax : Axes
         The matplotlib axes object.
-    
+
     Examples
     --------
     >>> fig, ax = plot_simplicial_complex_2d(
@@ -276,39 +285,47 @@ def plot_simplicial_complex_2d(
         fig, ax = plt.subplots()
     else:
         fig = ax.figure
-    
+
     # Set up default colors
-    default_colors = {0: 'C0', 1: 'C1', 2: 'C2'}
+    default_colors = {0: "C0", 1: "C1", 2: "C2"}
     color_map = {**default_colors, **(simplex_colors or {})}
-    
+
     # Set up per-dimension kwargs
     dim_kwargs = simplex_kwargs or {}
-    
+
     # Plot simplices (triangles -> edges -> vertices for proper layering)
     if 2 in simplices and simplices[2]:
         kw = {**kwargs, **dim_kwargs.get(2, {})}
-        fig, ax = plot_triangles_2d(simplices[2], positions, color=color_map[2], ax=ax, zorder=10, **kw)
-    
+        fig, ax = plot_triangles_2d(
+            simplices[2], positions, color=color_map[2], ax=ax, zorder=10, **kw
+        )
+
     if 1 in simplices and simplices[1]:
         kw = {**kwargs, **dim_kwargs.get(1, {})}
-        fig, ax = plot_edges_2d(simplices[1], positions, color=color_map[1], ax=ax, zorder=20, **kw)
-    
+        fig, ax = plot_edges_2d(
+            simplices[1], positions, color=color_map[1], ax=ax, zorder=20, **kw
+        )
+
     if 0 in simplices and simplices[0]:
         kw = {**kwargs, **dim_kwargs.get(0, {})}
-        fig, ax = plot_vertices_2d(simplices[0], positions, color=color_map[0], ax=ax, zorder=30, **kw)
-    
+        fig, ax = plot_vertices_2d(
+            simplices[0], positions, color=color_map[0], ax=ax, zorder=30, **kw
+        )
+
     # Add labels if requested
     if show_labels:
         dims_to_label = _parse_feature_flags(show_labels, [0, 1, 2])
         if dims_to_label:
             add_simplex_labels_2d(simplices, positions, dims_to_label, color_map, ax=ax)
-    
+
     # Add orientation if requested
     if show_orientation:
         dims_to_orient = _parse_feature_flags(show_orientation, [1, 2])
         if dims_to_orient:
-            add_simplex_orientation_2d(simplices, positions, dims_to_orient, color_map, ax=ax)
-    
+            add_simplex_orientation_2d(
+                simplices, positions, dims_to_orient, color_map, ax=ax
+            )
+
     return fig, ax
 
 
@@ -325,11 +342,11 @@ def plot_simplicial_complex_3d(
     show_orientation: Optional[Union[bool, Dict[int, bool]]] = None,
     # Figure
     ax: Optional[Axes] = None,
-    **kwargs
+    **kwargs,
 ) -> Tuple[Figure, Axes]:
     """
     Plot a 3D simplicial complex with vertices, edges, triangles, and tetrahedra.
-    
+
     Parameters
     ----------
     simplices : Dict[int, List[Tuple]]
@@ -360,14 +377,14 @@ def plot_simplicial_complex_3d(
         3D axes to plot on. If None, creates new figure.
     **kwargs
         Additional styling arguments applied to all dimensions.
-    
+
     Returns
     -------
     fig : Figure
         The matplotlib figure object.
     ax : Axes
         The matplotlib 3D axes object.
-    
+
     Examples
     --------
     >>> fig, ax = plot_simplicial_complex_3d(
@@ -376,12 +393,12 @@ def plot_simplicial_complex_3d(
     ...     simplex_kwargs={0: {'radius': 0.04}, 1: {'linewidth': 2}, 3: {'alpha': 0.05}},
     ...     show_labels={0: True, 1: False, 2: True, 3: False},
     ...     show_orientation={1: True, 2: False}
-    ... )    
-    
+    ... )
+
     Notes
     -----
     - For fine-grained control over styling, use the basic plotting
-      functions directly: plot_tetrahedra_3d(), plot_triangles_3d(), 
+      functions directly: plot_tetrahedra_3d(), plot_triangles_3d(),
       plot_edges_3d(), plot_vertices_3d()
     - Orientation only applies to dimensions 1 (edge arrows) and 2 (face normals)
     - Tetrahedra rendered as 4 triangular facets with low alpha (0.1)
@@ -393,56 +410,68 @@ def plot_simplicial_complex_3d(
     # Create 3D figure if needed
     if ax is None:
         fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
+        ax = fig.add_subplot(111, projection="3d")
     else:
         fig = ax.figure
-    
+
     # Set up default colors
-    default_colors = {0: 'C0', 1: 'C1', 2: 'C2', 3: 'C3'}
+    default_colors = {0: "C0", 1: "C1", 2: "C2", 3: "C3"}
     color_map = {**default_colors, **(simplex_colors or {})}
-    
+
     # Set up per-dimension kwargs
     dim_kwargs = simplex_kwargs or {}
-    
+
     # Plot simplices (back-to-front: tetrahedra -> triangles -> edges -> vertices)
     if 3 in simplices and simplices[3]:
         kw = {**kwargs, **dim_kwargs.get(3, {})}
-        kw.setdefault('edgecolor', color_map[1])
-        fig, ax = plot_tetrahedra_3d(simplices[3], positions, color=color_map[3], ax=ax, **kw)
-    
+        kw.setdefault("edgecolor", color_map[1])
+        fig, ax = plot_tetrahedra_3d(
+            simplices[3], positions, color=color_map[3], ax=ax, **kw
+        )
+
     if 2 in simplices and simplices[2]:
         kw = {**kwargs, **dim_kwargs.get(2, {})}
-        kw.setdefault('edgecolor', color_map[1])
-        fig, ax = plot_triangles_3d(simplices[2], positions, color=color_map[2], ax=ax, **kw)
-    
+        kw.setdefault("edgecolor", color_map[1])
+        fig, ax = plot_triangles_3d(
+            simplices[2], positions, color=color_map[2], ax=ax, **kw
+        )
+
     if 1 in simplices and simplices[1]:
         kw = {**kwargs, **dim_kwargs.get(1, {})}
-        fig, ax = plot_edges_3d(simplices[1], positions, color=color_map[1], ax=ax, **kw)
-    
+        fig, ax = plot_edges_3d(
+            simplices[1], positions, color=color_map[1], ax=ax, **kw
+        )
+
     if 0 in simplices and simplices[0]:
         kw = {**kwargs, **dim_kwargs.get(0, {})}
-        fig, ax = plot_vertices_3d(simplices[0], positions, color=color_map[0], ax=ax, **kw)
-    
+        fig, ax = plot_vertices_3d(
+            simplices[0], positions, color=color_map[0], ax=ax, **kw
+        )
+
     # Re-plot vertices on top (same trick as old repo: scatter drawn last wins depth sort)
     if 0 in simplices and simplices[0]:
         kw = {**kwargs, **dim_kwargs.get(0, {})}
-        fig, ax = plot_vertices_3d(simplices[0], positions, color=color_map[0], ax=ax, **kw)
-    
+        fig, ax = plot_vertices_3d(
+            simplices[0], positions, color=color_map[0], ax=ax, **kw
+        )
+
     # Set equal aspect ratio
     ax.set_box_aspect(np.ptp(positions, axis=0))
-    
+
     # Add labels if requested
     if show_labels:
         dims_to_label = _parse_feature_flags(show_labels, [0, 1, 2, 3])
         if dims_to_label:
             add_simplex_labels_3d(simplices, positions, dims_to_label, color_map, ax=ax)
-    
+
     # Add orientation if requested (only dims 1 and 2)
     if show_orientation:
         dims_to_orient = _parse_feature_flags(show_orientation, [1, 2])
         if dims_to_orient:
-            add_simplex_orientation_3d(simplices, positions, dims_to_orient, color_map, ax=ax)
-    
+            add_simplex_orientation_3d(
+                simplices, positions, dims_to_orient, color_map, ax=ax
+            )
+
     return fig, ax
 
 
@@ -453,19 +482,21 @@ def plot_simplicial_complex_3d(
 # Dispatch dicts: map simplex dimension to primitive plotting function
 _PLOT_SIMPLEX_2D = {0: plot_vertices_2d, 1: plot_edges_2d, 2: plot_triangles_2d}
 _PLOT_SIMPLEX_3D = {
-    0: plot_vertices_3d, 1: plot_edges_3d,
-    2: plot_triangles_3d, 3: plot_tetrahedra_3d,
+    0: plot_vertices_3d,
+    1: plot_edges_3d,
+    2: plot_triangles_3d,
+    3: plot_tetrahedra_3d,
 }
 
 # Default kwargs for reference geometry (lower-dim simplices drawn in background)
 _DEFAULT_COMPLEX_KWARGS_2D = {
-    0: {'radius_scale': 0.6},
-    1: {'linewidth': 1.0},
+    0: {"radius_scale": 0.6},
+    1: {"linewidth": 1.0},
 }
 _DEFAULT_COMPLEX_KWARGS_3D = {
-    0: {'radius_scale': 0.6},
-    1: {'linewidth': 1.0},
-    2: {'alpha': 0.3, 'edgecolor': 'none'},
+    0: {"radius_scale": 0.6},
+    1: {"linewidth": 1.0},
+    2: {"alpha": 0.3, "edgecolor": "none"},
 }
 
 
@@ -508,15 +539,15 @@ def make_cochain_kwargs(
         raise ValueError(f"positions must be 2D or 3D, got shape {positions.shape}")
 
     complex_kwargs = {
-        0: {'radius': complex_r},
-        1: {'linewidth': lw_ref},
-        2: {'alpha': 0.15, 'edgecolor': 'k', 'linewidth': lw_ref * 0.5},
+        0: {"radius": complex_r},
+        1: {"linewidth": lw_ref},
+        2: {"alpha": 0.15, "edgecolor": "k", "linewidth": lw_ref * 0.5},
     }
     simplex_kwargs_per_k = {
-        0: {'radius': simplex_r},
-        1: {'linewidth': lw_colored},
-        2: {'alpha': 0.9, 'edgecolor': 'k', 'linewidth': lw_ref},
-        3: {'alpha': 0.3, 'edgecolor': 'k', 'linewidth': lw_ref * 0.5},
+        0: {"radius": simplex_r},
+        1: {"linewidth": lw_colored},
+        2: {"alpha": 0.9, "edgecolor": "k", "linewidth": lw_ref},
+        3: {"alpha": 0.3, "edgecolor": "k", "linewidth": lw_ref * 0.5},
     }
     return complex_kwargs, simplex_kwargs_per_k
 
@@ -527,10 +558,10 @@ def plot_cochain(
     k: int,
     values: np.ndarray,
     *,
-    cmap: str = 'coolwarm',
+    cmap: str = "coolwarm",
     clim: Optional[Tuple[float, float]] = None,
     show_complex: bool = True,
-    complex_color: str = 'k',
+    complex_color: str = "k",
     complex_kwargs: Optional[Dict[int, Dict]] = None,
     simplex_kwargs: Optional[Dict] = None,
     cbar: bool = True,
@@ -599,9 +630,7 @@ def plot_cochain(
         plot_simplex = _PLOT_SIMPLEX_3D
         default_complex_kw = _DEFAULT_COMPLEX_KWARGS_3D
     else:
-        raise ValueError(
-            f"positions must be 2D or 3D, got shape {positions.shape}"
-        )
+        raise ValueError(f"positions must be 2D or 3D, got shape {positions.shape}")
 
     # Create figure/axes if needed
     if ax is None:
@@ -609,7 +638,7 @@ def plot_cochain(
             fig, ax = plt.subplots()
         else:
             fig = plt.figure()
-            ax = fig.add_subplot(111, projection='3d')
+            ax = fig.add_subplot(111, projection="3d")
     else:
         fig = ax.figure
 
@@ -638,15 +667,23 @@ def plot_cochain(
             ref_zorder = 50 if d == 0 else 10 + d * 10
             kw = merged_complex_kw[d]
             plot_simplex[d](
-                simplices[d], positions,
-                color=complex_color, ax=ax, zorder=ref_zorder, **kw,
+                simplices[d],
+                positions,
+                color=complex_color,
+                ax=ax,
+                zorder=ref_zorder,
+                **kw,
             )
 
     # Draw colored k-simplices
     kw = dict(simplex_kwargs or {})
     plot_simplex[k](
-        simplices[k], positions,
-        color=colors, ax=ax, zorder=40, **kw,
+        simplices[k],
+        positions,
+        color=colors,
+        ax=ax,
+        zorder=40,
+        **kw,
     )
 
     # Colorbar
@@ -663,9 +700,9 @@ def plot_cochain_grid(
     values_grid: List[List[Optional[np.ndarray]]],
     degrees: Sequence[int],
     *,
-    cmap: str = 'coolwarm',
+    cmap: str = "coolwarm",
     clims: Optional[List[List[Optional[Tuple[float, float]]]]] = None,
-    cbar_share: str = 'row',
+    cbar_share: str = "row",
     show_complex: bool = True,
     complex_kwargs: Optional[Dict[int, Dict]] = None,
     simplex_kwargs_per_k: Optional[Dict[int, Dict]] = None,
@@ -764,14 +801,13 @@ def plot_cochain_grid(
     from matplotlib.colors import Normalize
     import matplotlib.cm as cm
 
-    if cbar_share not in ('none', 'row', 'figure'):
+    if cbar_share not in ("none", "row", "figure"):
         raise ValueError(
-            f"cbar_share must be one of 'none', 'row', 'figure'; "
-            f"got {cbar_share!r}"
+            f"cbar_share must be one of 'none', 'row', 'figure'; got {cbar_share!r}"
         )
 
-    merged_cbar_kwargs = {'shrink': 1, **(cbar_kwargs or {})}
-    shared_cbar_kwargs = {**merged_cbar_kwargs, 'location': 'right'}
+    merged_cbar_kwargs = {"shrink": 1, **(cbar_kwargs or {})}
+    shared_cbar_kwargs = {**merged_cbar_kwargs, "location": "right"}
 
     n_rows = len(values_grid)
     if n_rows == 0:
@@ -785,25 +821,20 @@ def plot_cochain_grid(
             )
     if len(degrees) != n_rows:
         raise ValueError(
-            f"degrees has length {len(degrees)} but values_grid has "
-            f"{n_rows} rows"
+            f"degrees has length {len(degrees)} but values_grid has {n_rows} rows"
         )
     if clims is not None and (
-        len(clims) != n_rows
-        or any(len(row) != n_cols for row in clims)
+        len(clims) != n_rows or any(len(row) != n_cols for row in clims)
     ):
         raise ValueError("clims must have the same shape as values_grid")
     if cell_titles is not None and (
-        len(cell_titles) != n_rows
-        or any(len(row) != n_cols for row in cell_titles)
+        len(cell_titles) != n_rows or any(len(row) != n_cols for row in cell_titles)
     ):
         raise ValueError("cell_titles must have the same shape as values_grid")
 
     ambient_dim = positions.shape[1]
     if ambient_dim not in (2, 3):
-        raise ValueError(
-            f"positions must be 2D or 3D, got shape {positions.shape}"
-        )
+        raise ValueError(f"positions must be 2D or 3D, got shape {positions.shape}")
 
     # First pass: resolve per-cell clims (override or symmetric auto).
     cell_clims: List[List[Optional[Tuple[float, float]]]] = [
@@ -833,7 +864,7 @@ def plot_cochain_grid(
     final_clims: List[List[Optional[Tuple[float, float]]]] = [
         [cell_clims[r][c] for c in range(n_cols)] for r in range(n_rows)
     ]
-    if cbar_share == 'row':
+    if cbar_share == "row":
         for r in range(n_rows):
             row_clim = _widen_symmetric(cell_clims[r])
             if row_clim is None:
@@ -841,7 +872,7 @@ def plot_cochain_grid(
             for c in range(n_cols):
                 if cell_clims[r][c] is not None:
                     final_clims[r][c] = row_clim
-    elif cbar_share == 'figure':
+    elif cbar_share == "figure":
         fig_clim = _widen_symmetric(
             [cell_clims[r][c] for r in range(n_rows) for c in range(n_cols)]
         )
@@ -852,14 +883,15 @@ def plot_cochain_grid(
                         final_clims[r][c] = fig_clim
 
     # Create figure and axes.
-    subplot_kw = {'projection': '3d'} if ambient_dim == 3 else {}
+    subplot_kw = {"projection": "3d"} if ambient_dim == 3 else {}
     figsize = (subplot_size[0] * n_cols, subplot_size[1] * n_rows)
     fig, axes = plt.subplots(
-        n_rows, n_cols,
+        n_rows,
+        n_cols,
         figsize=figsize,
         subplot_kw=subplot_kw,
         squeeze=False,
-        layout='constrained',
+        layout="constrained",
     )
 
     # Plot cells.
@@ -868,18 +900,21 @@ def plot_cochain_grid(
             ax = axes[r, c]
             vals = values_grid[r][c]
             if vals is None:
-                ax.axis('off')
+                ax.axis("off")
                 continue
             k = degrees[r]
             _, _, cell_cbar = plot_cochain(
-                simplices, positions, k, vals,
+                simplices,
+                positions,
+                k,
+                vals,
                 cmap=cmap,
                 clim=final_clims[r][c],
                 show_complex=show_complex,
                 complex_kwargs=complex_kwargs,
                 simplex_kwargs=(simplex_kwargs_per_k or {}).get(k),
-                cbar=(cbar_share == 'none'),
-                cbar_kwargs=merged_cbar_kwargs if cbar_share == 'none' else None,
+                cbar=(cbar_share == "none"),
+                cbar_kwargs=merged_cbar_kwargs if cbar_share == "none" else None,
                 ax=ax,
             )
             if cell_cbar is not None and cbar_config:
@@ -896,10 +931,7 @@ def plot_cochain_grid(
         for c in range(n_cols):
             if col_labels[c] is None:
                 continue
-            if (
-                cell_titles is not None
-                and cell_titles[0][c] is not None
-            ):
+            if cell_titles is not None and cell_titles[0][c] is not None:
                 continue
             if values_grid[0][c] is None:
                 continue
@@ -915,42 +947,54 @@ def plot_cochain_grid(
                 # Leftmost cell is blank — use fig.text placed at the row center.
                 bbox = left_ax.get_position()
                 fig.text(
-                    bbox.x0 - 0.01, bbox.y0 + bbox.height / 2,
+                    bbox.x0 - 0.01,
+                    bbox.y0 + bbox.height / 2,
                     row_labels[r],
-                    rotation=90, ha='right', va='center', fontsize=11,
+                    rotation=90,
+                    ha="right",
+                    va="center",
+                    fontsize=11,
                 )
                 continue
             if ambient_dim == 2:
                 left_ax.set_ylabel(row_labels[r], fontsize=11, labelpad=10)
             else:
                 left_ax.text2D(
-                    -0.15, 0.5, row_labels[r],
+                    -0.15,
+                    0.5,
+                    row_labels[r],
                     transform=left_ax.transAxes,
-                    rotation=90, ha='right', va='center', fontsize=11,
+                    rotation=90,
+                    ha="right",
+                    va="center",
+                    fontsize=11,
                 )
 
     # Shared colorbars. Pass location='right' to ensure placement at the
     # right edge of the row/figure, even with axis-off cells in the span.
-    if cbar_share == 'row':
+    if cbar_share == "row":
         for r in range(n_rows):
             row_cells = [
-                final_clims[r][c] for c in range(n_cols)
+                final_clims[r][c]
+                for c in range(n_cols)
                 if final_clims[r][c] is not None
             ]
             if not row_cells:
                 continue
             vmin, vmax = row_cells[0]
             sm = cm.ScalarMappable(
-                norm=Normalize(vmin=vmin, vmax=vmax), cmap=cmap,
+                norm=Normalize(vmin=vmin, vmax=vmax),
+                cmap=cmap,
             )
             sm.set_array([])
             cbar_obj = fig.colorbar(
-                sm, ax=list(axes[r, :]),
+                sm,
+                ax=list(axes[r, :]),
                 **shared_cbar_kwargs,
             )
             if cbar_config:
                 format_cbar(cbar_obj, **cbar_config)
-    elif cbar_share == 'figure':
+    elif cbar_share == "figure":
         all_cells = [
             final_clims[r][c]
             for r in range(n_rows)
@@ -960,11 +1004,13 @@ def plot_cochain_grid(
         if all_cells:
             vmin, vmax = all_cells[0]
             sm = cm.ScalarMappable(
-                norm=Normalize(vmin=vmin, vmax=vmax), cmap=cmap,
+                norm=Normalize(vmin=vmin, vmax=vmax),
+                cmap=cmap,
             )
             sm.set_array([])
             cbar_obj = fig.colorbar(
-                sm, ax=list(axes.ravel()),
+                sm,
+                ax=list(axes.ravel()),
                 **shared_cbar_kwargs,
             )
             if cbar_config:
@@ -980,6 +1026,7 @@ def plot_cochain_grid(
 # Spectra visualization
 # =============================================================================
 
+
 def plot_eigval_distribution(
     esa,
     analysis_config: dict,
@@ -989,8 +1036,8 @@ def plot_eigval_distribution(
     ylim_ranges: Optional[Dict[Tuple, Tuple[float, float]]] = None,
     title: Optional[str] = None,
     subplot_size: Optional[Tuple[float, float]] = None,
-    layout: str = 'horizontal',
-    float_fmt: str = '.4g',
+    layout: str = "horizontal",
+    float_fmt: str = ".4g",
 ) -> Tuple[Figure, List[Axes]]:
     """
     Plot eigenvalue distribution bar charts for one spectra analysis,
@@ -1035,31 +1082,29 @@ def plot_eigval_distribution(
         axis_config = {}
     if bar_config is None:
         bar_config = {}
-    if layout not in ('horizontal', 'vertical'):
-        raise ValueError(
-            f"layout must be 'horizontal' or 'vertical', got {layout!r}"
-        )
+    if layout not in ("horizontal", "vertical"):
+        raise ValueError(f"layout must be 'horizontal' or 'vertical', got {layout!r}")
     if subplot_size is None:
-        subplot_size = (4.5, 3.6) if layout == 'horizontal' else (4.5, 3)
+        subplot_size = (4.5, 3.6) if layout == "horizontal" else (4.5, 3)
 
-    degrees = analysis_config['degrees']
-    components = analysis_config['components']
+    degrees = analysis_config["degrees"]
+    components = analysis_config["components"]
     if len(components) != 1:
         raise ValueError(
             f"plot_eigval_distribution renders one Laplacian component per figure; "
             f"got components={components}. Call once per component."
         )
     analysis_keys = [(k, comp) for k in degrees for comp in components]
-    nonzero = analysis_config.get('nonzero', False)
-    dstrb_params = analysis_config.get('distribution_params', {})
+    nonzero = analysis_config.get("nonzero", False)
+    dstrb_params = analysis_config.get("distribution_params", {})
     dims = esa.dimensions
 
-    margins = axis_config.get('margins', (0.05, 0.05))
+    margins = axis_config.get("margins", (0.05, 0.05))
     x_margin = margins[0] if isinstance(margins, (tuple, list)) else margins
     y_margin = margins[1] if isinstance(margins, (tuple, list)) else margins
 
     n = len(degrees)
-    if layout == 'horizontal':
+    if layout == "horizontal":
         nrows, ncols = 1, n
         figsize = (subplot_size[0] * n, subplot_size[1])
     else:
@@ -1072,16 +1117,17 @@ def plot_eigval_distribution(
     for col, (k, comp) in enumerate(analysis_keys):
         ax = axes[col]
         dist = esa.eigenvalue_distribution(k, comp, nonzero=nonzero)
-        x = dist['x']
-        density = dist['density_mean']
+        x = dist["x"]
+        density = dist["density_mean"]
         bar_width = (x[1] - x[0]) if len(x) > 1 else 0.5
 
-        plot_bars(xy_list=[(x, density)], ax=ax,
-                  color=f'C{k}', width=bar_width, **bar_config)
+        plot_bars(
+            xy_list=[(x, density)], ax=ax, color=f"C{k}", width=bar_width, **bar_config
+        )
         format_axis(ax, title=f"${make_Lk_label(k, comp)}$", **axis_config)
 
         # Set x-limits from distribution range config
-        xrange = dstrb_params.get(k, {}).get('range')
+        xrange = dstrb_params.get(k, {}).get("range")
         if xrange is not None:
             xspan = xrange[1] - xrange[0]
             xpad = xspan * x_margin
@@ -1096,21 +1142,29 @@ def plot_eigval_distribution(
         # Annotate with dimension, nullity, and eigenvalue range
         summary = esa.observables_summary(k, comp)
         N_k = dims.get(k, 0)
-        null_mean = summary['dim_ker']['mean']
-        null_std = summary['dim_ker']['std']
-        lam_min_mean = summary['eigval_min_nz']['mean']
-        lam_min_std = summary['eigval_min_nz']['std']
-        lam_max_mean = summary['eigval_max']['mean']
-        lam_max_std = summary['eigval_max']['std']
+        null_mean = summary["dim_ker"]["mean"]
+        null_std = summary["dim_ker"]["std"]
+        lam_min_mean = summary["eigval_min_nz"]["mean"]
+        lam_min_std = summary["eigval_min_nz"]["std"]
+        lam_max_mean = summary["eigval_max"]["mean"]
+        lam_max_std = summary["eigval_max"]["std"]
         Lk = make_Lk_label(k, comp)
         ann = (
-            f'$\\operatorname{{dim}} C_{{{k}}} = {N_k}$\n'
-            f'$\\operatorname{{null}} {Lk} = {null_mean:{float_fmt}} \\pm {null_std:{float_fmt}}$\n'
-            f'$\\lambda_{{\\min}} = {lam_min_mean:{float_fmt}} \\pm {lam_min_std:{float_fmt}}$\n'
-            f'$\\lambda_{{\\max}} = {lam_max_mean:{float_fmt}} \\pm {lam_max_std:{float_fmt}}$'
+            f"$\\operatorname{{dim}} C_{{{k}}} = {N_k}$\n"
+            f"$\\operatorname{{null}} {Lk} = {null_mean:{float_fmt}} \\pm {null_std:{float_fmt}}$\n"
+            f"$\\lambda_{{\\min}} = {lam_min_mean:{float_fmt}} \\pm {lam_min_std:{float_fmt}}$\n"
+            f"$\\lambda_{{\\max}} = {lam_max_mean:{float_fmt}} \\pm {lam_max_std:{float_fmt}}$"
         )
-        ax.text(0.025, 0.95, ann, transform=ax.transAxes,
-                fontsize=9, color=f'C{k}', va='top', ha='left')
+        ax.text(
+            0.025,
+            0.95,
+            ann,
+            transform=ax.transAxes,
+            fontsize=9,
+            color=f"C{k}",
+            va="top",
+            ha="left",
+        )
 
     if title is not None:
         fig.suptitle(title, fontsize=11)
@@ -1129,7 +1183,7 @@ def plot_observable_vs_parameter(
     match_ylim_range: bool = False,
     title: Optional[str] = None,
     subplot_size: Optional[Tuple[float, float]] = None,
-    layout: str = 'horizontal',
+    layout: str = "horizontal",
 ) -> Tuple[Figure, List[Axes]]:
     """
     Plot an observable vs experiment parameter, one subplot per degree.
@@ -1180,25 +1234,23 @@ def plot_observable_vs_parameter(
     if line_config is None:
         line_config = {}
 
-    if match_ylim_range and 'ylims' in axis_config:
+    if match_ylim_range and "ylims" in axis_config:
         raise ValueError(
             "match_ylim_range=True is incompatible with an explicit "
             "'ylims' in axis_config; the two contradict."
         )
-    if layout not in ('horizontal', 'vertical'):
-        raise ValueError(
-            f"layout must be 'horizontal' or 'vertical', got {layout!r}"
-        )
+    if layout not in ("horizontal", "vertical"):
+        raise ValueError(f"layout must be 'horizontal' or 'vertical', got {layout!r}")
     if subplot_size is None:
-        subplot_size = (4.5, 4) if layout == 'horizontal' else (4.5, 3)
+        subplot_size = (4.5, 4) if layout == "horizontal" else (4.5, 3)
 
-    exp_param = series['exp_param']
-    exp_values = series['exp_values']
-    analysis_keys = series['analysis_keys']
+    exp_param = series["exp_param"]
+    exp_values = series["exp_values"]
+    analysis_keys = series["analysis_keys"]
     obs_label = OBSERVABLE_LABELS.get(obs_name, obs_name)
     n_deg = len(analysis_keys)
 
-    if layout == 'horizontal':
+    if layout == "horizontal":
         nrows, ncols = 1, n_deg
         figsize = (subplot_size[0] * n_deg, subplot_size[1])
     else:
@@ -1210,28 +1262,36 @@ def plot_observable_vs_parameter(
 
     for col, (k, comp) in enumerate(analysis_keys):
         ax = axes[col]
-        obs = series['observable_series'][(k, comp)][obs_name]
-        mean = obs['mean']
-        std = obs['std']
+        obs = series["observable_series"][(k, comp)][obs_name]
+        mean = obs["mean"]
+        std = obs["std"]
 
-        plot_lines([(exp_values, mean)], ax=ax, color=f'C{k}', **line_config)
-        ax.fill_between(exp_values, mean - std, mean + std,
-                        alpha=fill_alpha, color=f'C{k}')
+        plot_lines([(exp_values, mean)], ax=ax, color=f"C{k}", **line_config)
+        ax.fill_between(
+            exp_values, mean - std, mean + std, alpha=fill_alpha, color=f"C{k}"
+        )
 
-        format_axis(ax, title=f"${make_Lk_label(k, comp)}$",
-                    ylabel=obs_label, xlabel=exp_param, **axis_config)
+        format_axis(
+            ax,
+            title=f"${make_Lk_label(k, comp)}$",
+            ylabel=obs_label,
+            xlabel=exp_param,
+            **axis_config,
+        )
 
         if mark_transition:
             _draw_transition_marker(
-                ax, series['transition_points'].get((k, comp)),
+                ax,
+                series["transition_points"].get((k, comp)),
             )
 
         # Legend on first subplot only
         if col == 0:
-            ax.plot([], [], color=f'C{k}', label='mean', **line_config)
-            ax.fill_between([], [], [], alpha=fill_alpha,
-                            color=f'C{k}', label=r'mean $\pm$ std')
-            ax.legend(fontsize=8, loc='best')
+            ax.plot([], [], color=f"C{k}", label="mean", **line_config)
+            ax.fill_between(
+                [], [], [], alpha=fill_alpha, color=f"C{k}", label=r"mean $\pm$ std"
+            )
+            ax.legend(fontsize=8, loc="best")
 
     if match_ylim_range:
         target = max(y1 - y0 for y0, y1 in (ax.get_ylim() for ax in axes))
@@ -1249,14 +1309,14 @@ def plot_observable_vs_parameter(
 def plot_distribution_heatmap(
     series: dict,
     *,
-    cmap: str = 'magma',
+    cmap: str = "magma",
     log: bool = False,
     mark_transition: bool = False,
     axis_config: Optional[Dict] = None,
     cbar_config: Optional[Dict] = None,
     title: Optional[str] = None,
     subplot_size: Optional[Tuple[float, float]] = None,
-    layout: str = 'horizontal',
+    layout: str = "horizontal",
 ) -> Tuple[Figure, List[Axes]]:
     """
     Plot eigenvalue distribution heatmaps, one subplot per degree.
@@ -1300,19 +1360,17 @@ def plot_distribution_heatmap(
         axis_config = {}
     if cbar_config is None:
         cbar_config = {}
-    if layout not in ('horizontal', 'vertical'):
-        raise ValueError(
-            f"layout must be 'horizontal' or 'vertical', got {layout!r}"
-        )
+    if layout not in ("horizontal", "vertical"):
+        raise ValueError(f"layout must be 'horizontal' or 'vertical', got {layout!r}")
     if subplot_size is None:
-        subplot_size = (5, 4) if layout == 'horizontal' else (5, 3)
+        subplot_size = (5, 4) if layout == "horizontal" else (5, 3)
 
-    exp_param = series['exp_param']
-    exp_values = series['exp_values']
-    analysis_keys = series['analysis_keys']
+    exp_param = series["exp_param"]
+    exp_values = series["exp_values"]
+    analysis_keys = series["analysis_keys"]
     n_deg = len(analysis_keys)
 
-    if layout == 'horizontal':
+    if layout == "horizontal":
         nrows, ncols = 1, n_deg
         figsize = (subplot_size[0] * n_deg, subplot_size[1])
     else:
@@ -1324,9 +1382,9 @@ def plot_distribution_heatmap(
 
     for col, (k, comp) in enumerate(analysis_keys):
         ax = axes[col]
-        ds = series['distribution_series'][(k, comp)]
-        x = ds['x']
-        density_stack = ds['density_stack']
+        ds = series["distribution_series"][(k, comp)]
+        x = ds["x"]
+        density_stack = ds["density_stack"]
 
         # Reconstruct bin edges from centers for pcolormesh
         bin_width = x[1] - x[0] if len(x) > 1 else 1.0
@@ -1339,11 +1397,13 @@ def plot_distribution_heatmap(
         else:
             param_mids = np.array([])
             param_step = 1.0
-        param_edges = np.concatenate([
-            [exp_values[0] - param_step / 2],
-            param_mids,
-            [exp_values[-1] + param_step / 2],
-        ])
+        param_edges = np.concatenate(
+            [
+                [exp_values[0] - param_step / 2],
+                param_mids,
+                [exp_values[-1] + param_step / 2],
+            ]
+        )
 
         # Optional log normalization
         norm = None
@@ -1358,17 +1418,20 @@ def plot_distribution_heatmap(
         else:
             density_plot = density_stack
 
-        im = ax.pcolormesh(x_edges, param_edges, density_plot,
-                           shading='flat', cmap=cmap, norm=norm)
+        im = ax.pcolormesh(
+            x_edges, param_edges, density_plot, shading="flat", cmap=cmap, norm=norm
+        )
         cbar = fig.colorbar(im, ax=ax)
         format_cbar(cbar, **cbar_config)
-        format_axis(ax, title=f"${make_Lk_label(k, comp)}$",
-                    ylabel=exp_param, **axis_config)
+        format_axis(
+            ax, title=f"${make_Lk_label(k, comp)}$", ylabel=exp_param, **axis_config
+        )
 
         if mark_transition:
             _draw_transition_marker(
-                ax, series['transition_points'].get((k, comp)),
-                orientation='horizontal',
+                ax,
+                series["transition_points"].get((k, comp)),
+                orientation="horizontal",
             )
 
     if title is not None:
@@ -1380,13 +1443,13 @@ def plot_distribution_heatmap(
 def plot_distribution_lines(
     series: dict,
     *,
-    cmap: str = 'viridis',
+    cmap: str = "viridis",
     linewidth: float = 1.5,
     mark_transition: bool = False,
     axis_config: Optional[Dict] = None,
     title: Optional[str] = None,
     subplot_size: Optional[Tuple[float, float]] = None,
-    layout: str = 'horizontal',
+    layout: str = "horizontal",
 ) -> Tuple[Figure, List[Axes]]:
     """
     Overlay eigenvalue distributions as colored lines, one subplot per degree.
@@ -1425,21 +1488,19 @@ def plot_distribution_lines(
     """
     if axis_config is None:
         axis_config = {}
-    if layout not in ('horizontal', 'vertical'):
-        raise ValueError(
-            f"layout must be 'horizontal' or 'vertical', got {layout!r}"
-        )
+    if layout not in ("horizontal", "vertical"):
+        raise ValueError(f"layout must be 'horizontal' or 'vertical', got {layout!r}")
     if subplot_size is None:
-        subplot_size = (5, 4) if layout == 'horizontal' else (5, 3)
+        subplot_size = (5, 4) if layout == "horizontal" else (5, 3)
 
-    exp_param = series['exp_param']
-    exp_values = series['exp_values']
-    analysis_keys = series['analysis_keys']
+    exp_param = series["exp_param"]
+    exp_values = series["exp_values"]
+    analysis_keys = series["analysis_keys"]
     n_deg = len(analysis_keys)
     n_levels = len(exp_values)
     colormap = plt.get_cmap(cmap)
 
-    if layout == 'horizontal':
+    if layout == "horizontal":
         nrows, ncols = 1, n_deg
         figsize = (subplot_size[0] * n_deg, subplot_size[1])
     else:
@@ -1451,25 +1512,31 @@ def plot_distribution_lines(
 
     for col, (k, comp) in enumerate(analysis_keys):
         ax = axes[col]
-        ds = series['distribution_series'][(k, comp)]
-        x = ds['x']
-        density_stack = ds['density_stack']
+        ds = series["distribution_series"][(k, comp)]
+        x = ds["x"]
+        density_stack = ds["density_stack"]
 
         for i in range(n_levels):
             c = (i + 1) / (n_levels + 1)
-            ax.plot(x, density_stack[i], color=colormap(c),
-                    linewidth=linewidth, zorder=i)
+            ax.plot(
+                x, density_stack[i], color=colormap(c), linewidth=linewidth, zorder=i
+            )
 
         if mark_transition:
-            transition = series['transition_points'].get((k, comp))
+            transition = series["transition_points"].get((k, comp))
             if transition is not None and not np.isnan(transition):
                 i_nearest = int(np.argmin(np.abs(exp_values - transition)))
                 nearest_value = float(exp_values[i_nearest])
-                ax.plot(x, density_stack[i_nearest],
-                        color='r', linestyle='--', linewidth=1.5,
-                        zorder=n_levels + 1,
-                        label=f'${nearest_value:.3g}$')
-                ax.legend(fontsize=8, loc='best')
+                ax.plot(
+                    x,
+                    density_stack[i_nearest],
+                    color="r",
+                    linestyle="--",
+                    linewidth=1.5,
+                    zorder=n_levels + 1,
+                    label=f"${nearest_value:.3g}$",
+                )
+                ax.legend(fontsize=8, loc="best")
 
         # Colorbar showing parameter values
         sm = plt.cm.ScalarMappable(
@@ -1491,14 +1558,14 @@ def plot_distribution_lines(
 def plot_distribution_distance(
     series: dict,
     *,
-    distance_metric: str = 'distance',
+    distance_metric: str = "distance",
     mark_transition: bool = False,
     axis_config: Optional[Dict] = None,
     line_config: Optional[Dict] = None,
     match_ylims: bool = False,
     title: Optional[str] = None,
     subplot_size: Optional[Tuple[float, float]] = None,
-    layout: str = 'horizontal',
+    layout: str = "horizontal",
 ) -> Tuple[Figure, List[Axes]]:
     """
     Plot successive distribution distance vs experiment parameter,
@@ -1548,25 +1615,23 @@ def plot_distribution_distance(
     if line_config is None:
         line_config = {}
 
-    if match_ylims and 'ylims' in axis_config:
+    if match_ylims and "ylims" in axis_config:
         raise ValueError(
             "match_ylims=True is incompatible with an explicit "
             "'ylims' in axis_config; the two contradict."
         )
-    if layout not in ('horizontal', 'vertical'):
-        raise ValueError(
-            f"layout must be 'horizontal' or 'vertical', got {layout!r}"
-        )
+    if layout not in ("horizontal", "vertical"):
+        raise ValueError(f"layout must be 'horizontal' or 'vertical', got {layout!r}")
     if subplot_size is None:
-        subplot_size = (4.5, 4) if layout == 'horizontal' else (4.5, 3)
+        subplot_size = (4.5, 4) if layout == "horizontal" else (4.5, 3)
 
-    exp_param = series['exp_param']
-    exp_values = series['exp_values']
-    analysis_keys = series['analysis_keys']
+    exp_param = series["exp_param"]
+    exp_values = series["exp_values"]
+    analysis_keys = series["analysis_keys"]
     n_deg = len(analysis_keys)
     midpoints = 0.5 * (exp_values[:-1] + exp_values[1:])
 
-    if layout == 'horizontal':
+    if layout == "horizontal":
         nrows, ncols = 1, n_deg
         figsize = (subplot_size[0] * n_deg, subplot_size[1])
     else:
@@ -1578,17 +1643,22 @@ def plot_distribution_distance(
 
     for col, (k, comp) in enumerate(analysis_keys):
         ax = axes[col]
-        dists = series['distance_series'][(k, comp)]
+        dists = series["distance_series"][(k, comp)]
 
-        plot_lines([(midpoints, dists)], ax=ax, color=f'C{k}', **line_config)
+        plot_lines([(midpoints, dists)], ax=ax, color=f"C{k}", **line_config)
 
-        format_axis(ax, title=f"${make_Lk_label(k, comp)}$",
-                    xlabel=exp_param, ylabel=f'{distance_metric} distance',
-                    **axis_config)
+        format_axis(
+            ax,
+            title=f"${make_Lk_label(k, comp)}$",
+            xlabel=exp_param,
+            ylabel=f"{distance_metric} distance",
+            **axis_config,
+        )
 
         if mark_transition:
             _draw_transition_marker(
-                ax, series['transition_points'].get((k, comp)),
+                ax,
+                series["transition_points"].get((k, comp)),
             )
 
     if match_ylims:
@@ -1605,7 +1675,7 @@ def plot_distribution_distance(
 def _draw_transition_marker(
     ax: Axes,
     transition: Optional[float],
-    orientation: str = 'vertical',
+    orientation: str = "vertical",
 ) -> None:
     """
     Draw a red-dashed marker at the phase-transition point, labelled
@@ -1625,23 +1695,36 @@ def _draw_transition_marker(
     """
     if transition is None or np.isnan(transition):
         return
-    label = f'${transition:.3g}$'
-    if orientation == 'vertical':
-        ax.axvline(x=transition, color='r', linestyle='--',
-                   linewidth=1.2, label=label)
-        ax.annotate(label, xy=(transition, 0.05),
-                    xycoords=ax.get_xaxis_transform(which='grid'),
-                    xytext=(4, 0), textcoords='offset points',
-                    color='red', fontsize=8, ha='left', va='bottom')
-    elif orientation == 'horizontal':
-        ax.axhline(y=transition, color='r', linestyle='--',
-                   linewidth=1.2, label=label)
-        ax.annotate(label, xy=(0.98, transition),
-                    xycoords=ax.get_yaxis_transform(which='grid'),
-                    xytext=(0, 4), textcoords='offset points',
-                    color='red', fontsize=8, ha='right', va='bottom',
-                    bbox=dict(facecolor='white', alpha=0.75, edgecolor='r',
-                              boxstyle='round,pad=0.2'))
+    label = f"${transition:.3g}$"
+    if orientation == "vertical":
+        ax.axvline(x=transition, color="r", linestyle="--", linewidth=1.2, label=label)
+        ax.annotate(
+            label,
+            xy=(transition, 0.05),
+            xycoords=ax.get_xaxis_transform(which="grid"),
+            xytext=(4, 0),
+            textcoords="offset points",
+            color="red",
+            fontsize=8,
+            ha="left",
+            va="bottom",
+        )
+    elif orientation == "horizontal":
+        ax.axhline(y=transition, color="r", linestyle="--", linewidth=1.2, label=label)
+        ax.annotate(
+            label,
+            xy=(0.98, transition),
+            xycoords=ax.get_yaxis_transform(which="grid"),
+            xytext=(0, 4),
+            textcoords="offset points",
+            color="red",
+            fontsize=8,
+            ha="right",
+            va="bottom",
+            bbox=dict(
+                facecolor="white", alpha=0.75, edgecolor="r", boxstyle="round,pad=0.2"
+            ),
+        )
     else:
         raise ValueError(
             f"orientation must be 'vertical' or 'horizontal', got {orientation!r}."

@@ -17,6 +17,7 @@ from itertools import combinations
 # Line plots
 # =============================================================================
 
+
 def plot_lines(
     xy_list: List[Tuple[np.ndarray, np.ndarray]],
     # Figure properties
@@ -27,11 +28,11 @@ def plot_lines(
     colors_list: Optional[List[str]] = None,
     # Legend
     legend_labels: Optional[List[str]] = None,
-    **kwargs
+    **kwargs,
 ) -> Tuple[Figure, Axes]:
     """
     Plot multiple lines on a single axis.
-    
+
     Parameters
     ----------
     xy_list : list of (x, y) tuples
@@ -48,12 +49,12 @@ def plot_lines(
         List of legend labels for each line. If provided, legend will be displayed.
     **kwargs
         Additional keyword arguments passed to ax.plot().
-    
+
     Returns
     -------
     tuple
         (fig, ax) - The figure and axes objects.
-    
+
     Raises
     ------
     ValueError
@@ -80,30 +81,31 @@ def plot_lines(
     if color is not None:
         colors = [color] * len(xy_list)
     elif colors_list is not None:
-        colors = _extend_list(colors_list, len(xy_list), 'k')
+        colors = _extend_list(colors_list, len(xy_list), "k")
     else:
-        colors = ['k'] * len(xy_list)
-    
+        colors = ["k"] * len(xy_list)
+
     # Resolve legend labels
     labels = None
     if legend_labels is not None:
         labels = _extend_list(legend_labels, len(xy_list), None)
-    
+
     # Plot lines
     for i, (x, y) in enumerate(xy_list):
         label = labels[i] if labels is not None else None
         ax.plot(x, y, color=colors[i], label=label, **kwargs)
-    
+
     # Add legend if labels were provided
     if legend_labels is not None:
         ax.legend()
-    
+
     return fig, ax
 
 
 # =============================================================================
 # Scatter plots
 # =============================================================================
+
 
 def plot_scatters(
     xy_list: List[Tuple[np.ndarray, np.ndarray]],
@@ -119,7 +121,7 @@ def plot_scatters(
     # Legend and colorbar
     legend_labels: Optional[List[str]] = None,
     colorbar: bool = False,
-    **kwargs
+    **kwargs,
 ) -> Union[Tuple[Figure, Axes], Tuple[Figure, Axes, Colorbar]]:
     """
     Plot multiple scatter plots on a single axis.
@@ -182,7 +184,7 @@ def plot_scatters(
         plot_c_values = [None] * n_plots
     elif colors_list is not None:
         # Different colors for each scatter
-        plot_colors = _extend_list(colors_list, n_plots, 'k')
+        plot_colors = _extend_list(colors_list, n_plots, "k")
         plot_c_values = [None] * n_plots
     elif c is not None:
         # Use colormap with single c values for all
@@ -196,7 +198,7 @@ def plot_scatters(
         use_colormap = True
     else:
         # Default colors
-        plot_colors = ['k'] * n_plots
+        plot_colors = ["k"] * n_plots
         plot_c_values = [None] * n_plots
 
     # Resolve legend labels
@@ -234,6 +236,7 @@ def plot_scatters(
 # Bar plots
 # =============================================================================
 
+
 def plot_bars(
     xy_list: Optional[List[Tuple[np.ndarray, np.ndarray]]] = None,
     y_list: Optional[List[np.ndarray]] = None,
@@ -245,7 +248,7 @@ def plot_bars(
     colors_list: Optional[List[str]] = None,
     # Legend
     legend_labels: Optional[List[str]] = None,
-    **kwargs
+    **kwargs,
 ) -> Tuple[Figure, Axes]:
     """
     Plot multiple bar charts on a single axis.
@@ -311,9 +314,9 @@ def plot_bars(
     if color is not None:
         colors = [color] * len(xy_list)
     elif colors_list is not None:
-        colors = _extend_list(colors_list, len(xy_list), 'k')
+        colors = _extend_list(colors_list, len(xy_list), "k")
     else:
-        colors = ['k'] * len(xy_list)
+        colors = ["k"] * len(xy_list)
 
     # Resolve legend labels
     labels = None
@@ -336,6 +339,7 @@ def plot_bars(
 # Stem plots
 # =============================================================================
 
+
 def plot_stems(
     xy_list: Optional[List[Tuple[np.ndarray, np.ndarray]]] = None,
     y_list: Optional[List[np.ndarray]] = None,
@@ -347,7 +351,7 @@ def plot_stems(
     colors_list: Optional[List[str]] = None,
     # Legend
     legend_labels: Optional[List[str]] = None,
-    **kwargs
+    **kwargs,
 ) -> Tuple[Figure, Axes]:
     """
     Plot multiple stem (lollipop) plots on a single axis.
@@ -410,12 +414,12 @@ def plot_stems(
         raise ValueError("Data list must contain at least one entry.")
 
     # Pop stem-specific kwargs that need special routing
-    linefmt = kwargs.pop('linefmt', None)
-    markerfmt = kwargs.pop('markerfmt', None)
-    basefmt = kwargs.pop('basefmt', 'k-')
-    bottom = kwargs.pop('bottom', 0)
-    markersize = kwargs.pop('markersize', None)
-    linewidth = kwargs.pop('linewidth', None)
+    linefmt = kwargs.pop("linefmt", None)
+    markerfmt = kwargs.pop("markerfmt", None)
+    basefmt = kwargs.pop("basefmt", "k-")
+    bottom = kwargs.pop("bottom", 0)
+    markersize = kwargs.pop("markersize", None)
+    linewidth = kwargs.pop("linewidth", None)
 
     # Create figure if needed
     if ax is None:
@@ -427,9 +431,9 @@ def plot_stems(
     if color is not None:
         colors = [color] * len(xy_list)
     elif colors_list is not None:
-        colors = _extend_list(colors_list, len(xy_list), 'k')
+        colors = _extend_list(colors_list, len(xy_list), "k")
     else:
-        colors = ['k'] * len(xy_list)
+        colors = ["k"] * len(xy_list)
 
     # Resolve legend labels
     labels = None
@@ -439,9 +443,17 @@ def plot_stems(
     # Plot stems
     for i, (x, y) in enumerate(xy_list):
         label = labels[i] if labels is not None else None
-        bfmt = basefmt if i == 0 else ''
-        container = ax.stem(x, y, linefmt=linefmt or '', markerfmt=markerfmt or 'o',
-                            basefmt=bfmt, bottom=bottom, label=label, **kwargs)
+        bfmt = basefmt if i == 0 else ""
+        container = ax.stem(
+            x,
+            y,
+            linefmt=linefmt or "",
+            markerfmt=markerfmt or "o",
+            basefmt=bfmt,
+            bottom=bottom,
+            label=label,
+            **kwargs,
+        )
 
         # Apply color via container when format strings don't encode color
         if linefmt is None:
@@ -450,7 +462,7 @@ def plot_stems(
             container.markerline.set_color(colors[i])
         # Force baseline black when using default basefmt, since linefmt=''
         # causes matplotlib to auto-cycle colors which can bleed into the baseline
-        container.baseline.set_color('k')
+        container.baseline.set_color("k")
 
         # Apply optional sizing
         if markersize is not None:
@@ -469,6 +481,7 @@ def plot_stems(
 # Basic shapes plots
 # =============================================================================
 
+
 def plot_circles(
     positions: np.ndarray,
     radius: Union[float, np.ndarray],
@@ -476,17 +489,17 @@ def plot_circles(
     circle_props: Optional[Union[Dict[str, Any], List[Dict[str, Any]]]] = None,
     # Figure properties
     ax: Optional[Axes] = None,
-    **kwargs
+    **kwargs,
 ) -> Tuple[Figure, Axes]:
     """
     Plot circles in 2D at specified positions with given radius/radii.
-    
+
     Parameters
     ----------
     positions : np.ndarray
         Array of shape (N, 2) with (x, y) coordinates of circle centers.
     radius : float or np.ndarray
-        Circle radius. Can be a single value for all circles or an array of 
+        Circle radius. Can be a single value for all circles or an array of
         length N for individual radii.
     circle_props : dict or list of dicts, optional
         Circle properties.
@@ -498,12 +511,12 @@ def plot_circles(
     **kwargs
         Additional keyword arguments passed to matplotlib Circle patches.
         These serve as additional defaults that can be overridden by circle_props.
-    
+
     Returns
     -------
     tuple
         (fig, ax) - The figure and axes objects.
-    
+
     Raises
     ------
     ValueError
@@ -515,10 +528,10 @@ def plot_circles(
         fig, ax = plt.subplots()
     else:
         fig = ax.figure
-    
+
     # Convert positions to numpy array
     positions = np.asarray(positions)
-    
+
     # Handle single radius vs array of radii
     if np.isscalar(radius):
         radii = np.full(len(positions), radius)
@@ -526,16 +539,16 @@ def plot_circles(
         radii = np.asarray(radius)
         if len(radii) != len(positions):
             raise ValueError("Length of radius array must match number of positions")
-    
+
     # Set up default properties
     default_props = {
-        'facecolor': 'lightgrey',
-        'edgecolor': 'black',
-        'alpha': 0.8,
-        'zorder': 0
+        "facecolor": "lightgrey",
+        "edgecolor": "black",
+        "alpha": 0.8,
+        "zorder": 0,
     }
     default_props.update(kwargs)
-    
+
     # Handle circle_props
     if circle_props is None:
         # Use defaults for all circles
@@ -548,7 +561,9 @@ def plot_circles(
     elif isinstance(circle_props, (list, tuple)):
         # List of dicts, one per circle
         if len(circle_props) != len(positions):
-            raise ValueError("Length of circle_props list must match number of positions")
+            raise ValueError(
+                "Length of circle_props list must match number of positions"
+            )
         props_list = []
         for props in circle_props:
             circle_prop = default_props.copy()
@@ -557,12 +572,12 @@ def plot_circles(
             props_list.append(circle_prop)
     else:
         raise ValueError("circle_props must be None, dict, or list of dicts")
-    
+
     # Add circles to the plot
     for pos, r, props in zip(positions, radii, props_list):
         circle = plt.Circle(pos, r, **props)
         ax.add_patch(circle)
-    
+
     return fig, ax
 
 
@@ -575,17 +590,17 @@ def plot_spheres(
     ax: Optional[Axes] = None,
     # Sphere rendering
     size_scale: float = 100.0,
-    **kwargs
+    **kwargs,
 ) -> Tuple[Figure, Axes]:
     """
     Plot spheres in 3D at specified positions with given radius/radii.
-    
+
     Parameters
     ----------
     positions : np.ndarray
         Array of shape (N, 3) with (x, y, z) coordinates of sphere centers.
     radius : float or np.ndarray
-        Sphere radius. Can be a single value for all spheres or an array of 
+        Sphere radius. Can be a single value for all spheres or an array of
         length N for individual radii.
     sphere_props : dict or list of dicts, optional
         Sphere properties.
@@ -600,33 +615,33 @@ def plot_spheres(
     **kwargs
         Additional keyword arguments passed to ax.scatter().
         These serve as additional defaults that can be overridden by sphere_props.
-    
+
     Returns
     -------
     tuple
         (fig, ax) - The figure and 3D axes objects.
-    
+
     Raises
     ------
     ValueError
         If length of radius array doesn't match number of positions, or if
         sphere_props format is invalid.
-    
+
     Notes
     -----
     Spheres are rendered using scatter plot with sizes proportional to radius squared.
     """
-    
+
     # Create figure and axes if not provided
     if ax is None:
         fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
+        ax = fig.add_subplot(111, projection="3d")
     else:
         fig = ax.figure
-    
+
     # Convert positions to numpy array
     positions = np.asarray(positions)
-    
+
     # Handle single radius vs array of radii
     if np.isscalar(radius):
         radii = np.full(len(positions), radius)
@@ -634,15 +649,11 @@ def plot_spheres(
         radii = np.asarray(radius)
         if len(radii) != len(positions):
             raise ValueError("Length of radius array must match number of positions")
-    
+
     # Set up default properties
-    default_props = {
-        'c': 'lightgrey',
-        'edgecolors': 'black',
-        'alpha': 0.8
-    }
+    default_props = {"c": "lightgrey", "edgecolors": "black", "alpha": 0.8}
     default_props.update(kwargs)
-    
+
     # Handle sphere_props
     if sphere_props is None:
         # Use defaults for all spheres
@@ -655,7 +666,9 @@ def plot_spheres(
     elif isinstance(sphere_props, (list, tuple)):
         # List of dicts, one per sphere
         if len(sphere_props) != len(positions):
-            raise ValueError("Length of sphere_props list must match number of positions")
+            raise ValueError(
+                "Length of sphere_props list must match number of positions"
+            )
         props_list = []
         for props in sphere_props:
             sphere_prop = default_props.copy()
@@ -664,17 +677,21 @@ def plot_spheres(
             props_list.append(sphere_prop)
     else:
         raise ValueError("sphere_props must be None, dict, or list of dicts")
-    
+
     # Plot spheres using scatter with size proportional to radius squared
     for pos, r, props in zip(positions, radii, props_list):
         size = (r * size_scale) ** 2
-        
+
         # Fix matplotlib warning: convert 'c' to 'color' if it's an RGBA tuple
-        if 'c' in props and isinstance(props['c'], (tuple, list)) and len(props['c']) in [3, 4]:
-            props['color'] = props.pop('c')
-        
+        if (
+            "c" in props
+            and isinstance(props["c"], (tuple, list))
+            and len(props["c"]) in [3, 4]
+        ):
+            props["color"] = props.pop("c")
+
         ax.scatter(pos[0], pos[1], pos[2], s=size, **props)
-    
+
     return fig, ax
 
 
@@ -682,14 +699,15 @@ def plot_spheres(
 # Simplicial complex primitives (2D)
 # =============================================================================
 
+
 def plot_vertices_2d(
     vertices: List[Tuple],
     positions: np.ndarray,
-    color: Union[str, Sequence] = 'C0',
+    color: Union[str, Sequence] = "C0",
     radius: Optional[float] = None,
     radius_scale: float = 1.0,
     ax: Optional[Axes] = None,
-    **kwargs
+    **kwargs,
 ) -> Tuple[Figure, Axes]:
     """
     Plot 0-simplices (vertices) as circles in 2D.
@@ -751,47 +769,45 @@ def plot_vertices_2d(
     if isinstance(color, str):
         # Single color: build one props dict for all vertices
         default_circle_props = {
-            'facecolor': color,
-            'edgecolor': 'black',
-            'linewidth': 1,
-            'alpha': 1
+            "facecolor": color,
+            "edgecolor": "black",
+            "linewidth": 1,
+            "alpha": 1,
         }
 
         # Merge with user-provided circle_props if present
-        if 'circle_props' in kwargs:
-            user_props = kwargs.pop('circle_props')
+        if "circle_props" in kwargs:
+            user_props = kwargs.pop("circle_props")
             if isinstance(user_props, dict):
                 default_circle_props.update(user_props)
             else:
                 # If user provided list, use it directly
-                kwargs['circle_props'] = user_props
+                kwargs["circle_props"] = user_props
                 return plot_circles(vertex_positions, radius, ax=ax, **kwargs)
 
         fig, ax = plot_circles(
-            vertex_positions, radius,
-            circle_props=default_circle_props, ax=ax, **kwargs
+            vertex_positions, radius, circle_props=default_circle_props, ax=ax, **kwargs
         )
     else:
         # Per-vertex colors: build list of props dicts
         props_list = [
-            {'facecolor': c, 'edgecolor': 'black', 'linewidth': 1, 'alpha': 1}
+            {"facecolor": c, "edgecolor": "black", "linewidth": 1, "alpha": 1}
             for c in colors
         ]
 
         # Merge with user-provided circle_props dict if present
-        if 'circle_props' in kwargs:
-            user_props = kwargs.pop('circle_props')
+        if "circle_props" in kwargs:
+            user_props = kwargs.pop("circle_props")
             if isinstance(user_props, dict):
                 for p in props_list:
                     p.update(user_props)
             else:
                 # If user provided list, use it directly (overrides per-vertex colors)
-                kwargs['circle_props'] = user_props
+                kwargs["circle_props"] = user_props
                 return plot_circles(vertex_positions, radius, ax=ax, **kwargs)
 
         fig, ax = plot_circles(
-            vertex_positions, radius,
-            circle_props=props_list, ax=ax, **kwargs
+            vertex_positions, radius, circle_props=props_list, ax=ax, **kwargs
         )
 
     return fig, ax
@@ -800,10 +816,10 @@ def plot_vertices_2d(
 def plot_edges_2d(
     edges: List[Tuple],
     positions: np.ndarray,
-    color: Union[str, Sequence] = 'C1',
+    color: Union[str, Sequence] = "C1",
     linewidth: float = 1.5,
     ax: Optional[Axes] = None,
-    **kwargs
+    **kwargs,
 ) -> Tuple[Figure, Axes]:
     """
     Plot 1-simplices (edges) as line segments in 2D.
@@ -861,11 +877,11 @@ def plot_edges_2d(
 def plot_triangles_2d(
     triangles: List[Tuple],
     positions: np.ndarray,
-    color: Union[str, Sequence] = 'C2',
+    color: Union[str, Sequence] = "C2",
     alpha: float = 0.4,
-    edgecolor: str = 'none',
+    edgecolor: str = "none",
     ax: Optional[Axes] = None,
-    **kwargs
+    **kwargs,
 ) -> Tuple[Figure, Axes]:
     """
     Plot 2-simplices (triangles) as filled polygons in 2D.
@@ -925,7 +941,7 @@ def plot_triangles_2d(
             facecolor=c,
             edgecolor=edgecolor,
             alpha=alpha,
-            **kwargs
+            **kwargs,
         )
         ax.add_patch(polygon)
 
@@ -936,14 +952,15 @@ def plot_triangles_2d(
 # Simplicial complex primitives (3D)
 # =============================================================================
 
+
 def plot_vertices_3d(
     vertices: List[Tuple],
     positions: np.ndarray,
-    color: Union[str, Sequence] = 'C0',
+    color: Union[str, Sequence] = "C0",
     radius: Optional[float] = None,
     radius_scale: float = 1.0,
     ax: Optional[Axes] = None,
-    **kwargs
+    **kwargs,
 ) -> Tuple[Figure, Axes]:
     """
     Plot 0-simplices (vertices) as spheres in 3D.
@@ -977,7 +994,7 @@ def plot_vertices_3d(
     # Create 3D figure if needed
     if ax is None:
         fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
+        ax = fig.add_subplot(111, projection="3d")
     else:
         fig = ax.figure
 
@@ -996,47 +1013,44 @@ def plot_vertices_3d(
     if isinstance(color, str):
         # Single color: build one props dict for all vertices
         default_sphere_props = {
-            'c': color,
-            'edgecolors': 'black',
-            'linewidths': 1,
-            'alpha': 1
+            "c": color,
+            "edgecolors": "black",
+            "linewidths": 1,
+            "alpha": 1,
         }
 
         # Merge with user-provided sphere_props if present
-        if 'sphere_props' in kwargs:
-            user_props = kwargs.pop('sphere_props')
+        if "sphere_props" in kwargs:
+            user_props = kwargs.pop("sphere_props")
             if isinstance(user_props, dict):
                 default_sphere_props.update(user_props)
             else:
                 # If user provided list, use it directly
-                kwargs['sphere_props'] = user_props
+                kwargs["sphere_props"] = user_props
                 return plot_spheres(vertex_positions, radius, ax=ax, **kwargs)
 
         fig, ax = plot_spheres(
-            vertex_positions, radius,
-            sphere_props=default_sphere_props, ax=ax, **kwargs
+            vertex_positions, radius, sphere_props=default_sphere_props, ax=ax, **kwargs
         )
     else:
         # Per-vertex colors: build list of props dicts
         props_list = [
-            {'c': c, 'edgecolors': 'black', 'linewidths': 1, 'alpha': 1}
-            for c in colors
+            {"c": c, "edgecolors": "black", "linewidths": 1, "alpha": 1} for c in colors
         ]
 
         # Merge with user-provided sphere_props dict if present
-        if 'sphere_props' in kwargs:
-            user_props = kwargs.pop('sphere_props')
+        if "sphere_props" in kwargs:
+            user_props = kwargs.pop("sphere_props")
             if isinstance(user_props, dict):
                 for p in props_list:
                     p.update(user_props)
             else:
                 # If user provided list, use it directly (overrides per-vertex colors)
-                kwargs['sphere_props'] = user_props
+                kwargs["sphere_props"] = user_props
                 return plot_spheres(vertex_positions, radius, ax=ax, **kwargs)
 
         fig, ax = plot_spheres(
-            vertex_positions, radius,
-            sphere_props=props_list, ax=ax, **kwargs
+            vertex_positions, radius, sphere_props=props_list, ax=ax, **kwargs
         )
 
     return fig, ax
@@ -1045,10 +1059,10 @@ def plot_vertices_3d(
 def plot_edges_3d(
     edges: List[Tuple],
     positions: np.ndarray,
-    color: Union[str, Sequence] = 'C1',
+    color: Union[str, Sequence] = "C1",
     linewidth: float = 2.0,
     ax: Optional[Axes] = None,
-    **kwargs
+    **kwargs,
 ) -> Tuple[Figure, Axes]:
     """
     Plot 1-simplices (edges) as line segments in 3D.
@@ -1076,7 +1090,7 @@ def plot_edges_3d(
     # Create 3D figure if needed
     if ax is None:
         fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
+        ax = fig.add_subplot(111, projection="3d")
     else:
         fig = ax.figure
 
@@ -1099,7 +1113,7 @@ def plot_edges_3d(
             color=c,
             linewidth=linewidth,
             alpha=1,
-            **kwargs
+            **kwargs,
         )
 
     return fig, ax
@@ -1108,11 +1122,11 @@ def plot_edges_3d(
 def plot_triangles_3d(
     triangles: List[Tuple],
     positions: np.ndarray,
-    color: Union[str, Sequence] = 'C2',
+    color: Union[str, Sequence] = "C2",
     alpha: float = 0.4,
-    edgecolor: str = 'none',
+    edgecolor: str = "none",
     ax: Optional[Axes] = None,
-    **kwargs
+    **kwargs,
 ) -> Tuple[Figure, Axes]:
     """
     Plot 2-simplices (triangles) as filled polygons in 3D.
@@ -1145,7 +1159,7 @@ def plot_triangles_3d(
     # Create 3D figure if needed
     if ax is None:
         fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
+        ax = fig.add_subplot(111, projection="3d")
     else:
         fig = ax.figure
 
@@ -1161,11 +1175,7 @@ def plot_triangles_3d(
     for triangle, c in zip(triangles, colors):
         tri_positions = positions[list(triangle)]
         poly = Poly3DCollection(
-            [tri_positions],
-            facecolor=c,
-            edgecolor=edgecolor,
-            alpha=alpha,
-            **kwargs
+            [tri_positions], facecolor=c, edgecolor=edgecolor, alpha=alpha, **kwargs
         )
         ax.add_collection3d(poly)
 
@@ -1175,11 +1185,11 @@ def plot_triangles_3d(
 def plot_tetrahedra_3d(
     tetrahedra: List[Tuple],
     positions: np.ndarray,
-    color: Union[str, Sequence] = 'C3',
+    color: Union[str, Sequence] = "C3",
     alpha: float = 0.2,
-    edgecolor: str = 'none',
+    edgecolor: str = "none",
     ax: Optional[Axes] = None,
-    **kwargs
+    **kwargs,
 ) -> Tuple[Figure, Axes]:
     """
     Plot 3-simplices (tetrahedra) as collections of triangular facets in 3D.
@@ -1214,7 +1224,7 @@ def plot_tetrahedra_3d(
     # Create 3D figure if needed
     if ax is None:
         fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
+        ax = fig.add_subplot(111, projection="3d")
     else:
         fig = ax.figure
 
@@ -1237,7 +1247,7 @@ def plot_tetrahedra_3d(
                 facecolor=c,
                 edgecolor=edgecolor,
                 alpha=alpha,
-                **kwargs
+                **kwargs,
             )
             ax.add_collection3d(poly)
 
@@ -1251,14 +1261,14 @@ def add_simplex_orientation_2d(
     colors: Optional[Dict[int, str]] = None,
     arrow_scale: float = 0.02,
     fontsize: int = 10,
-    ax: Optional[Axes] = None
+    ax: Optional[Axes] = None,
 ) -> None:
     """
     Add orientation markers to simplices in 2D.
-    
+
     For edges (dim 1): draws arrows at midpoints.
     For triangles (dim 2): draws +/− signs based on winding order.
-    
+
     Parameters
     ----------
     simplices : Dict[int, List[Tuple]]
@@ -1275,7 +1285,7 @@ def add_simplex_orientation_2d(
         Font size for triangle orientation signs.
     ax : Axes
         Axes to draw on. Required.
-    
+
     Examples
     --------
     >>> simplices = {1: [(0, 1), (1, 2)], 2: [(0, 1, 2)]}
@@ -1285,29 +1295,29 @@ def add_simplex_orientation_2d(
     """
     if ax is None:
         raise ValueError("ax parameter is required for add_simplex_orientation_2d")
-    
+
     # Default colors
     if colors is None:
-        colors = {1: 'C1', 2: 'C2'}
-    
+        colors = {1: "C1", 2: "C2"}
+
     # Get axis range for scaling
     xlim, ylim = ax.get_xlim(), ax.get_ylim()
     axis_scale = max(np.ptp(xlim), np.ptp(ylim))
-    
+
     # Add orientation for each requested dimension
     for dim in dims:
         if dim not in simplices or not simplices[dim]:
             continue
-        
-        color = colors.get(dim, 'black')
-        
+
+        color = colors.get(dim, "black")
+
         if dim == 1:
             # Add arrows to edges
             arrow_size = arrow_scale * axis_scale
             for edge in simplices[1]:
                 p0 = positions[edge[0]]
                 p1 = positions[edge[1]]
-                
+
                 # Compute direction
                 vec = p1 - p0
                 vec_norm = np.linalg.norm(vec)
@@ -1315,59 +1325,64 @@ def add_simplex_orientation_2d(
                     direction = vec / vec_norm
                 else:
                     continue
-                
+
                 # Position arrow at midpoint
                 midpoint = 0.5 * (p0 + p1)
                 arrow_start = midpoint - arrow_size * direction
                 arrow_dxdy = 2 * arrow_size * direction
-                
+
                 # Draw arrow
                 ax.arrow(
-                    arrow_start[0], arrow_start[1],
-                    arrow_dxdy[0], arrow_dxdy[1],
+                    arrow_start[0],
+                    arrow_start[1],
+                    arrow_dxdy[0],
+                    arrow_dxdy[1],
                     head_width=arrow_size,
                     head_length=arrow_size * 1.3,
                     fc=color,
                     ec=color,
                     length_includes_head=True,
                     zorder=12,
-                    alpha=1
+                    alpha=1,
                 )
-        
+
         elif dim == 2:
             # Add +/− signs to triangles
             circle_radius = 0.02 * axis_scale
             for triangle in simplices[2]:
                 # Get triangle vertices
                 v0, v1, v2 = positions[list(triangle)]
-                
+
                 # Compute signed area (determinant)
-                det = (v1[0] - v0[0]) * (v2[1] - v0[1]) - (v2[0] - v0[0]) * (v1[1] - v0[1])
+                det = (v1[0] - v0[0]) * (v2[1] - v0[1]) - (v2[0] - v0[0]) * (
+                    v1[1] - v0[1]
+                )
                 sign = np.sign(det).astype(int)
-                
+
                 if sign != 0:
                     centroid = np.mean(positions[list(triangle)], axis=0)
-                    symbol = '+' if sign > 0 else '−'
-                    
+                    symbol = "+" if sign > 0 else "−"
+
                     # Add text symbol
                     ax.text(
-                        *centroid, symbol,
+                        *centroid,
+                        symbol,
                         fontsize=fontsize,
-                        weight='bold',
-                        ha='center',
-                        va='center',
+                        weight="bold",
+                        ha="center",
+                        va="center",
                         color=color,
-                        zorder=15
+                        zorder=15,
                     )
-                    
+
                     # Add circle around symbol
                     circle = plt.Circle(
                         centroid,
                         radius=circle_radius,
-                        color='none',
+                        color="none",
                         ec=color,
                         lw=1.2,
-                        zorder=14
+                        zorder=14,
                     )
                     ax.add_patch(circle)
 
@@ -1378,15 +1393,15 @@ def add_simplex_labels_2d(
     dims: List[int],
     colors: Optional[Dict[int, str]] = None,
     fontsize: int = 9,
-    ax: Optional[Axes] = None
+    ax: Optional[Axes] = None,
 ) -> None:
     """
     Add index labels to simplices in 2D.
-    
+
     Labels are placed at the centroid of each simplex (vertex position for
     0-simplices, edge midpoint for 1-simplices, triangle centroid for
     2-simplices).
-    
+
     Parameters
     ----------
     simplices : Dict[int, List[Tuple]]
@@ -1401,7 +1416,7 @@ def add_simplex_labels_2d(
         Font size for labels.
     ax : Axes
         Axes to draw labels on. Must be provided.
-    
+
     Examples
     --------
     >>> simplices = {0: [(0,), (1,)], 1: [(0, 1)]}
@@ -1411,45 +1426,47 @@ def add_simplex_labels_2d(
     """
     if ax is None:
         raise ValueError("ax parameter is required for add_simplex_labels_2d")
-    
+
     # Default colors
     if colors is None:
-        colors = {0: 'C0', 1: 'C1', 2: 'C2'}
-    
+        colors = {0: "C0", 1: "C1", 2: "C2"}
+
     # Get axis range for offset scaling
     xlim, ylim = ax.get_xlim(), ax.get_ylim()
     axis_scale = max(np.ptp(xlim), np.ptp(ylim))
     offset = 0.03 * axis_scale
-    
+
     # Add labels for each requested dimension
     for dim in dims:
         if dim not in simplices or not simplices[dim]:
             continue
-        
-        color = colors.get(dim, 'black')
-        
+
+        color = colors.get(dim, "black")
+
         for i, simplex in enumerate(simplices[dim]):
             # Compute centroid/position
             simplex_positions = positions[list(simplex)]
             centroid = np.mean(simplex_positions, axis=0)
-            
+
             # Add vertical offset for all dimensions
             label_pos = centroid + np.array([0, offset])
-            
+
             # Add text label
             ax.text(
-                *label_pos, str(i),
+                *label_pos,
+                str(i),
                 fontsize=fontsize,
-                ha='center',
-                va='center',
+                ha="center",
+                va="center",
                 color=color,
-                zorder=20
+                zorder=20,
             )
 
 
 # =============================================================================
 # Simplicial complex annotation (3D)
 # =============================================================================
+
 
 def add_simplex_orientation_3d(
     simplices: Dict[int, List[Tuple]],
@@ -1458,15 +1475,15 @@ def add_simplex_orientation_3d(
     colors: Optional[Dict[int, str]] = None,
     arrow_scale: float = 0.02,
     fontsize: int = 10,
-    ax: Optional[Axes] = None
+    ax: Optional[Axes] = None,
 ) -> None:
     """
     Add orientation markers to simplices in 3D.
-    
+
     For edges (dim 1): draws arrows along edge direction.
     For triangles (dim 2): draws arrows along surface normal.
     Dimensions 0 and 3 have no orientation visualization.
-    
+
     Parameters
     ----------
     simplices : Dict[int, List[Tuple]]
@@ -1483,7 +1500,7 @@ def add_simplex_orientation_3d(
         Font size (unused in 3D, kept for API consistency).
     ax : Axes
         3D axes to draw on. Required.
-    
+
     Examples
     --------
     >>> simplices = {1: [(0, 1), (1, 2)], 2: [(0, 1, 2)]}
@@ -1494,29 +1511,29 @@ def add_simplex_orientation_3d(
     """
     if ax is None:
         raise ValueError("ax parameter is required for add_simplex_orientation_3d")
-    
+
     # Default colors
     if colors is None:
-        colors = {1: 'C1', 2: 'C2'}
-    
+        colors = {1: "C1", 2: "C2"}
+
     # Get axis range for scaling
     data_range = np.ptp(positions, axis=0)
     axis_scale = data_range.max()
-    
+
     # Add orientation for each requested dimension
     for dim in dims:
         if dim not in simplices or not simplices[dim]:
             continue
-        
-        color = colors.get(dim, 'black')
-        
+
+        color = colors.get(dim, "black")
+
         if dim == 1:
             # Add arrows to edges
             arrow_size = arrow_scale * axis_scale
             for edge in simplices[1]:
                 p0 = positions[edge[0]]
                 p1 = positions[edge[1]]
-                
+
                 # Compute direction
                 vec = p1 - p0
                 vec_norm = np.linalg.norm(vec)
@@ -1524,54 +1541,62 @@ def add_simplex_orientation_3d(
                     direction = vec / vec_norm
                 else:
                     continue
-                
+
                 # Position arrow at midpoint
                 midpoint = 0.5 * (p0 + p1)
                 arrow_length = arrow_size
-                
+
                 # Draw arrow using quiver
                 ax.quiver(
-                    midpoint[0], midpoint[1], midpoint[2],
-                    direction[0], direction[1], direction[2],
+                    midpoint[0],
+                    midpoint[1],
+                    midpoint[2],
+                    direction[0],
+                    direction[1],
+                    direction[2],
                     length=arrow_length,
                     normalize=True,
                     arrow_length_ratio=0.3,
                     color=color,
                     linewidth=1.5,
-                    alpha=1
+                    alpha=1,
                 )
-        
+
         elif dim == 2:
             # Add normal arrows to triangles
             arrow_size = 0.15 * axis_scale
             for triangle in simplices[2]:
                 # Get triangle vertices
                 v0, v1, v2 = positions[list(triangle)]
-                
+
                 # Compute surface normal via cross product
                 edge1 = v1 - v0
                 edge2 = v2 - v0
                 normal = np.cross(edge1, edge2)
                 normal_norm = np.linalg.norm(normal)
-                
+
                 if normal_norm > 0:
                     normal = normal / normal_norm
                 else:
                     continue
-                
+
                 # Position arrow at centroid
                 centroid = np.mean(positions[list(triangle)], axis=0)
-                
+
                 # Draw normal arrow
                 ax.quiver(
-                    centroid[0], centroid[1], centroid[2],
-                    normal[0], normal[1], normal[2],
+                    centroid[0],
+                    centroid[1],
+                    centroid[2],
+                    normal[0],
+                    normal[1],
+                    normal[2],
                     length=arrow_size,
                     normalize=True,
                     arrow_length_ratio=0.3,
                     color=color,
                     linewidth=1.5,
-                    alpha=1
+                    alpha=1,
                 )
 
 
@@ -1581,13 +1606,13 @@ def add_simplex_labels_3d(
     dims: List[int],
     colors: Optional[Dict[int, str]] = None,
     fontsize: int = 8,
-    ax: Optional[Axes] = None
+    ax: Optional[Axes] = None,
 ) -> None:
     """
     Add index labels to simplices in 3D.
-    
+
     Labels placed at simplex centroids with small offset for visibility.
-    
+
     Parameters
     ----------
     simplices : Dict[int, List[Tuple]]
@@ -1602,7 +1627,7 @@ def add_simplex_labels_3d(
         Font size.
     ax : Axes
         3D axes to draw on. Required.
-    
+
     Examples
     --------
     >>> simplices = {0: [(0,), (1,)], 1: [(0, 1)]}
@@ -1613,39 +1638,42 @@ def add_simplex_labels_3d(
     """
     if ax is None:
         raise ValueError("ax parameter is required for add_simplex_labels_3d")
-    
+
     # Default colors
     if colors is None:
-        colors = {0: 'C0', 1: 'C1', 2: 'C2', 3: 'C3'}
-    
+        colors = {0: "C0", 1: "C1", 2: "C2", 3: "C3"}
+
     # Get axis range for offset scaling
     data_range = np.ptp(positions, axis=0)
     axis_scale = data_range.max()
     offset = 0.03 * axis_scale
-    
+
     # Add labels for each requested dimension
     for dim in dims:
         if dim not in simplices or not simplices[dim]:
             continue
-        
-        color = colors.get(dim, 'black')
-        
+
+        color = colors.get(dim, "black")
+
         for i, simplex in enumerate(simplices[dim]):
             # Compute centroid
             simplex_positions = positions[list(simplex)]
             centroid = np.mean(simplex_positions, axis=0)
-            
+
             # Add offset for visibility
             label_pos = centroid + np.array([offset, offset, offset])
-            
+
             # Add text label using text3D
             ax.text(
-                label_pos[0], label_pos[1], label_pos[2], str(i),
+                label_pos[0],
+                label_pos[1],
+                label_pos[2],
+                str(i),
                 fontsize=fontsize,
-                ha='center',
-                va='center',
+                ha="center",
+                va="center",
                 color=color,
-                zorder=20
+                zorder=20,
             )
 
 
@@ -1653,13 +1681,14 @@ def add_simplex_labels_3d(
 # Matrix plots
 # =============================================================================
 
+
 def plot_matrix(
     matrix: np.ndarray,
     # Figure properties
     ax: Optional[Axes] = None,
     figsize: Optional[Tuple[float, float]] = None,
     # Colormap
-    cmap: str = 'RdBu_r',
+    cmap: str = "RdBu_r",
     vmin: Optional[float] = None,
     vmax: Optional[float] = None,
     symmetric: bool = False,
@@ -1668,7 +1697,7 @@ def plot_matrix(
     zero_thresh: float = 1e-8,
     # Colorbar
     colorbar: bool = False,
-    **kwargs
+    **kwargs,
 ) -> Union[Tuple[Figure, Axes], Tuple[Figure, Axes, Colorbar]]:
     """
     Visualize a matrix as a color-mapped grid using pcolormesh.
@@ -1772,7 +1801,7 @@ def plot_matrix(
     ax.invert_yaxis()
 
     # Equal aspect so each cell is square
-    ax.set_aspect('equal')
+    ax.set_aspect("equal")
 
     # Ticks at cell centres, labelled with integer indices
     ax.set_xticks(np.arange(ncols) + 0.5)
@@ -1792,9 +1821,10 @@ def plot_matrix(
 # Color utilities
 # =============================================================================
 
+
 def values_to_colors(
     values: np.ndarray,
-    cmap: str = 'viridis',
+    cmap: str = "viridis",
     vmin: Optional[float] = None,
     vmax: Optional[float] = None,
 ) -> Tuple[List, ScalarMappable]:
@@ -1850,10 +1880,11 @@ def values_to_colors(
 # Helper functions
 # =============================================================================
 
+
 def _extend_list(lst: List, target_length: int, default_value) -> List:
     """
     Extend list to target length with default value.
-    
+
     Parameters
     ----------
     lst : list
@@ -1862,7 +1893,7 @@ def _extend_list(lst: List, target_length: int, default_value) -> List:
         Target length for the list.
     default_value : any
         Value to use for extending the list.
-    
+
     Returns
     -------
     list
@@ -1899,7 +1930,6 @@ def _resolve_colors(color: Union[str, Sequence], n: int) -> List:
     colors = list(color)
     if len(colors) != n:
         raise ValueError(
-            f"color sequence length ({len(colors)}) must match "
-            f"expected count ({n})"
+            f"color sequence length ({len(colors)}) must match expected count ({n})"
         )
     return colors

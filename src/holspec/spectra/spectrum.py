@@ -5,6 +5,7 @@ Provides the Spectrum class, a lightweight container enforcing the sorted
 non-negative eigenvalue contract and providing per-spectrum observable
 methods.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -15,6 +16,7 @@ from .validation import ZERO_EIGENVALUE_TOL, validate_spectrum
 # =============================================================================
 # Spectrum
 # =============================================================================
+
 
 class Spectrum:
     """
@@ -40,7 +42,7 @@ class Spectrum:
         None, eigenvector-dependent methods are unavailable.
     tol : float, default=ZERO_EIGENVALUE_TOL
         Tolerance for eigenvalue validation and clamping. Eigenvalues
-        below -tol are rejected; values with abs(value) < tol are clamped 
+        below -tol are rejected; values with abs(value) < tol are clamped
         to zero.
 
     Notes
@@ -78,7 +80,8 @@ class Spectrum:
 
         self._eigenvectors: np.ndarray | None = (
             np.array(eigenvectors, dtype=np.float64)
-            if eigenvectors is not None else None
+            if eigenvectors is not None
+            else None
         )
 
     # =========================================================================
@@ -129,7 +132,7 @@ class Spectrum:
         """
         # Eigenvalues are sorted ascending, so searchsorted gives the
         # count of values <= tol in O(log n).
-        return int(np.searchsorted(self._eigenvalues, tol, side='right'))
+        return int(np.searchsorted(self._eigenvalues, tol, side="right"))
 
     def nonzero_eigenvalues(self, tol: float = ZERO_EIGENVALUE_TOL) -> np.ndarray:
         """
@@ -171,9 +174,7 @@ class Spectrum:
             If eigenvectors were not provided at construction.
         """
         if self._eigenvectors is None:
-            raise ValueError(
-                "Eigenvectors were not provided at construction."
-            )
+            raise ValueError("Eigenvectors were not provided at construction.")
         mask = self._eigenvalues > tol
         return self._eigenvectors[:, mask]
 
@@ -220,7 +221,7 @@ class Spectrum:
         if n == 0:
             return 0.0
 
-        total = float(np.sum(selected ** p))
+        total = float(np.sum(selected**p))
         return total / n if normalized else total
 
     def heat_trace(self, t: float | np.ndarray) -> float | np.ndarray:

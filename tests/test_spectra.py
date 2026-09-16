@@ -16,6 +16,7 @@ from tests.helpers import assert_eigenvalues_allclose
 
 # Dense spectra contract
 
+
 def test_dense_full_spectra_have_expected_contract(
     filled_triangle_spectra: HodgeLaplacianSpectra,
 ):
@@ -57,6 +58,7 @@ def test_sparse_spectrum_computes_partial_eigenvalues(
 
 
 # Known tiny-example spectra
+
 
 def test_edge_full_spectrum_eigenvalues(edge_spectra: HodgeLaplacianSpectra):
     # Expected spectra are for full combinatorial Hodge Laplacians on the
@@ -106,6 +108,7 @@ def test_filled_triangle_full_spectrum_eigenvalues(
 
 # Kernel dimensions
 
+
 def test_full_laplacian_kernel_dimensions_match_tiny_topology(
     edge_spectra: HodgeLaplacianSpectra,
     triangle_boundary_spectra: HodgeLaplacianSpectra,
@@ -126,6 +129,7 @@ def test_full_laplacian_kernel_dimensions_match_tiny_topology(
 
 # Spectrum observables
 
+
 def test_spectrum_observables_on_known_values():
     spectrum = Spectrum(np.array([0.0, 2.0, 4.0]), dimension=3)
 
@@ -142,6 +146,7 @@ def test_spectrum_observables_on_known_values():
 
 
 # Spectrum contracts
+
 
 @pytest.mark.parametrize(
     ("eigenvalues", "dimension", "eigenvectors", "exception", "match"),
@@ -180,6 +185,7 @@ def test_spectrum_rejects_nonzero_eigenvectors_when_missing():
 
 
 # Hodge Laplacian spectra contracts
+
 
 def test_hodge_laplacian_spectra_rejects_unknown_solver(
     filled_triangle_hodge_laplacian,

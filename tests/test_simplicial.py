@@ -19,12 +19,14 @@ from holspec.simplicial import (
 
 # Local helpers
 
+
 def assert_sparse_array_equal(matrix, expected: np.ndarray) -> None:
     """Compare a sparse matrix to expected dense values exactly."""
     np.testing.assert_array_equal(matrix.toarray(), expected)
 
 
 # Basic complex invariants
+
 
 def test_edge_complex_basic_invariants(edge_complex: SimplicialComplex):
     assert edge_complex.max_dim == 1
@@ -55,6 +57,7 @@ def test_filled_triangle_complex_basic_invariants(
 
 
 # Incidence and boundary conventions
+
 
 def test_boundary_degree_incidence_shapes(
     edge_complex: SimplicialComplex,
@@ -127,6 +130,7 @@ def test_boundary_matrix_alias_matches_incidence_matrix(
 
 # Chain-complex identities
 
+
 def test_boundary_property_passes_for_tiny_complexes(
     edge_complex: SimplicialComplex,
     triangle_boundary_complex: SimplicialComplex,
@@ -150,6 +154,7 @@ def test_filled_triangle_boundary_of_boundary_is_zero(
 
 
 # Simplicial complex contracts
+
 
 @pytest.mark.parametrize(
     ("simplices", "match"),
@@ -190,6 +195,7 @@ def test_simplicial_complex_rejects_invalid_incidence_degrees(
 
 
 # Simplex utility conventions
+
 
 def test_simplicial_closure_of_triangle(
     filled_triangle_simplices: dict[int, list[tuple[int, ...]]],

@@ -40,7 +40,6 @@ dependencies:
   # Development tools
   - pytest
   - ruff
-  - pre-commit
 
   # Pip packages, if needed
   - pip: []

@@ -4,6 +4,7 @@ Cochain metric tensors on a simplicial complex.
 Provides CochainMetric, the primary Stage 2 output object. Bundles per-degree
 MetricTensor instances {G^k}_{k=0}^n with provenance metadata and HDF5 I/O.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -27,6 +28,7 @@ if TYPE_CHECKING:
 # =============================================================================
 # CochainMetric
 # =============================================================================
+
 
 class CochainMetric:
     """
@@ -65,7 +67,9 @@ class CochainMetric:
         metadata: dict | None = None,
     ):
         # Store sorted by degree
-        self._metric_tensors: dict[int, MetricTensor] = dict(sorted(metric_tensors.items()))
+        self._metric_tensors: dict[int, MetricTensor] = dict(
+            sorted(metric_tensors.items())
+        )
 
         # Extract dimensions for validation and quick access
         self._dimensions: dict[int, int] = {
@@ -75,8 +79,8 @@ class CochainMetric:
 
         # Metadata
         self.metadata: dict = metadata if metadata is not None else {}
-        if 'creation_time' not in self.metadata:
-            self.metadata['creation_time'] = datetime.now().isoformat()
+        if "creation_time" not in self.metadata:
+            self.metadata["creation_time"] = datetime.now().isoformat()
 
         self._hash_cache: str | None = None
 
@@ -137,7 +141,9 @@ class CochainMetric:
             When omitted, validates self-consistency only (degrees consecutive,
             sizes internally consistent).
         """
-        dimensions = cochain_dimensions if cochain_dimensions is not None else self._dimensions
+        dimensions = (
+            cochain_dimensions if cochain_dimensions is not None else self._dimensions
+        )
         validate_cochain_metric(self._metric_tensors, dimensions)
 
     # =========================================================================
@@ -147,7 +153,7 @@ class CochainMetric:
     def save(
         self,
         filepath: str | Path,
-        mode: str = 'replace',
+        mode: str = "replace",
         group: str | None = None,
         hdf5_options: dict | None = None,
     ) -> str:
@@ -185,14 +191,14 @@ class CochainMetric:
         """
         filepath = Path(filepath)
         if hdf5_options is None:
-            hdf5_options = {'compression': 'gzip', 'compression_opts': 4}
+            hdf5_options = {"compression": "gzip", "compression_opts": 4}
 
         # Root-level attributes
         root_attributes = {
-            'max_dim': self.max_dim,
-            'all_diagonal': self.all_diagonal,
-            'content_hash': self.content_hash,
-            'metadata': self.metadata,
+            "max_dim": self.max_dim,
+            "all_diagonal": self.all_diagonal,
+            "content_hash": self.content_hash,
+            "metadata": self.metadata,
         }
         save_h5(
             filepath,
@@ -210,14 +216,14 @@ class CochainMetric:
                     f"save is not yet implemented for non-diagonal metric tensors "
                     f"(degree {k})."
                 )
-            G_k_attributes = {'size': G_k.size, 'is_diagonal': G_k.is_diagonal}
-            G_k_datasets = {'diagonal_elements': G_k.matrix.diagonal()}
+            G_k_attributes = {"size": G_k.size, "is_diagonal": G_k.is_diagonal}
+            G_k_datasets = {"diagonal_elements": G_k.matrix.diagonal()}
             save_h5(
                 filepath,
                 datasets=G_k_datasets,
                 attributes=G_k_attributes,
                 mode=mode,
-                group=join_h5_group(group, f'degree_{k}'),
+                group=join_h5_group(group, f"degree_{k}"),
                 hdf5_options=hdf5_options,
             )
 
@@ -257,50 +263,51 @@ class CochainMetric:
 
         # Read root-level attributes
         _, root_attributes = read_h5(filepath, group=group)
-        if 'max_dim' not in root_attributes:
+        if "max_dim" not in root_attributes:
             raise ValueError(f"Missing 'max_dim' in {filepath}")
 
-        max_dim = root_attributes['max_dim']
-        metadata = root_attributes.get('metadata', {})
+        max_dim = root_attributes["max_dim"]
+        metadata = root_attributes.get("metadata", {})
 
         # Reconstruct per-degree metric tensors
         from .metric_models import construct_diagonal_metric
+
         metric_tensors: dict[int, MetricTensor] = {}
         for k in range(max_dim + 1):
             metric_tensor_datasets, metric_tensor_attributes = read_h5(
-                filepath, group=join_h5_group(group, f'degree_{k}')
+                filepath, group=join_h5_group(group, f"degree_{k}")
             )
-            if 'size' not in metric_tensor_attributes:
+            if "size" not in metric_tensor_attributes:
                 raise ValueError(
                     f"Missing 'size' attribute in degree_{k} group of {filepath}"
                 )
-            if 'is_diagonal' not in metric_tensor_attributes:
+            if "is_diagonal" not in metric_tensor_attributes:
                 raise ValueError(
                     f"Missing 'is_diagonal' attribute in degree_{k} group of {filepath}"
                 )
-            if not metric_tensor_attributes['is_diagonal']:
+            if not metric_tensor_attributes["is_diagonal"]:
                 raise NotImplementedError(
                     f"load is not yet implemented for non-diagonal metric tensors "
                     f"(degree {k})."
                 )
-            if 'diagonal_elements' not in metric_tensor_datasets:
+            if "diagonal_elements" not in metric_tensor_datasets:
                 raise ValueError(
                     f"Missing 'diagonal_elements' dataset in degree_{k} "
                     f"group of {filepath}"
                 )
 
             metric_tensors[k] = construct_diagonal_metric(
-                metric_tensor_datasets['diagonal_elements']
+                metric_tensor_datasets["diagonal_elements"]
             )
 
         cm = cls(metric_tensors, metadata=metadata)
 
         if validate_hash:
-            if 'content_hash' not in root_attributes:
+            if "content_hash" not in root_attributes:
                 raise ValueError(
                     f"Missing 'content_hash' in {filepath}, cannot validate"
                 )
-            stored_hash = str(root_attributes['content_hash'])
+            stored_hash = str(root_attributes["content_hash"])
             if cm.content_hash != stored_hash:
                 raise ValueError(
                     f"Content hash mismatch in {filepath}: "
@@ -336,7 +343,7 @@ class CochainMetric:
             Example: {'model': 'combinatorial', 'params': {}}
         metadata : dict, optional
             Additional provenance metadata. Caller-supplied values take
-            precedence over auto-populated keys. 
+            precedence over auto-populated keys.
 
         Returns
         -------
@@ -349,17 +356,19 @@ class CochainMetric:
         - 'metric_model': config['model']
         - 'metric_model_config': config
         - 'input_hash': sc.content_hash, identifying the source complex
-        
+
         To record the file path of the source complex for downstream
         provenance, pass ``metadata={'input_file': str(sc_filepath)}``.
         """
-        metric_tensors, diagnostics = construct_cochain_metric_from_config(config, sc, ptd)
+        metric_tensors, diagnostics = construct_cochain_metric_from_config(
+            config, sc, ptd
+        )
 
         cm_metadata = {
-            'metric_model': config['model'],
-            'metric_model_config': config,
-            'metric_model_diagnostics': diagnostics,
-            'input_hash': sc.content_hash,
+            "metric_model": config["model"],
+            "metric_model_config": config,
+            "metric_model_diagnostics": diagnostics,
+            "input_hash": sc.content_hash,
         }
         if metadata is not None:
             cm_metadata.update(metadata)
@@ -421,7 +430,7 @@ class CochainMetric:
             f"hash={self.content_hash[:8]})"
         )
 
-    def summary(self, indent: str = '') -> str:
+    def summary(self, indent: str = "") -> str:
         """
         Generate human-readable summary of the metric collection.
 
@@ -442,7 +451,7 @@ class CochainMetric:
         """
         lines = []
 
-        lines.append('Metric Tensors:')
+        lines.append("Metric Tensors:")
         lines.append("-" * 48)
         lines.append(f"{'k':<4} {'N_k':<6} {'is_diagonal':<14} {'diagonal elements'}")
         lines.append("-" * 48)
@@ -451,18 +460,18 @@ class CochainMetric:
             G_k = self._metric_tensors[k]
             diag = G_k.matrix.diagonal()
             if G_k.size > 3:
-                vals = ', '.join(f'{v:g}' for v in diag[:3])
-                diag_str = f'[{vals}, ...]'
+                vals = ", ".join(f"{v:g}" for v in diag[:3])
+                diag_str = f"[{vals}, ...]"
             else:
-                vals = ', '.join(f'{v:g}' for v in diag)
-                diag_str = f'[{vals}]'
+                vals = ", ".join(f"{v:g}" for v in diag)
+                diag_str = f"[{vals}]"
             lines.append(f"{k:<4} {G_k.size:<6} {str(G_k.is_diagonal):<14} {diag_str}")
 
         lines.append("-" * 48)
         lines.append(f"content_hash: {self.content_hash[:16]}")
         lines.append("")
 
-        return '\n'.join(indent + line for line in lines)
+        return "\n".join(indent + line for line in lines)
 
     # =========================================================================
     # Private Methods
@@ -483,6 +492,6 @@ class CochainMetric:
         """
         hasher = hashlib.sha256()
         for k in sorted(self._metric_tensors.keys()):
-            hasher.update(k.to_bytes(4, byteorder='little'))
+            hasher.update(k.to_bytes(4, byteorder="little"))
             hasher.update(self._metric_tensors[k].matrix.diagonal().tobytes())
         return hasher.hexdigest()

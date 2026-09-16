@@ -34,6 +34,7 @@ def _analysis() -> EnsembleSpectraAnalysis:
 
 # Construction and access
 
+
 def test_ensemble_spectra_analysis_accepts_member_spectra():
     member_spectra = _member_spectra()
     analysis = EnsembleSpectraAnalysis(member_spectra)
@@ -119,6 +120,7 @@ def test_ensemble_spectra_analysis_rejects_duplicate_observable_cache_name():
 
 
 # Eigenvector spectra
+
 
 def test_ensemble_spectra_analysis_accepts_eigenvector_spectra():
     analysis = _analysis()

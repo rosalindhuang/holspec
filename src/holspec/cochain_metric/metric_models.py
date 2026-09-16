@@ -4,6 +4,7 @@ Cochain metric model construction.
 Factory functions for constructing MetricTensor instances and collections
 from geometric data, with config-driven dispatch via the metric model registry.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -29,6 +30,7 @@ if TYPE_CHECKING:
 # Per-Degree Construction Functions
 # =============================================================================
 
+
 def construct_diagonal_metric(
     diagonal_elements: np.ndarray,
     tol: float = METRIC_POSITIVITY_TOL,
@@ -53,17 +55,17 @@ def construct_diagonal_metric(
     diagonal_elements = np.asarray(diagonal_elements, dtype=float)
     if diagonal_elements.ndim != 1:
         raise ValueError(
-            f"diagonal_elements must be a 1D array, "
-            f"got shape {diagonal_elements.shape}"
+            f"diagonal_elements must be a 1D array, got shape {diagonal_elements.shape}"
         )
     return MetricTensor(
-        sparse.diags(diagonal_elements, format='csr'), is_diagonal=True, tol=tol
+        sparse.diags(diagonal_elements, format="csr"), is_diagonal=True, tol=tol
     )
 
 
 # =============================================================================
 # Collection-Level Construction Functions
 # =============================================================================
+
 
 def construct_combinatorial_cochain_metric(
     sc: SimplicialComplex,
@@ -105,7 +107,7 @@ def construct_combinatorial_cochain_metric(
 def construct_hodge_star_cochain_metric(
     sc: SimplicialComplex,
     ptd: PointData,
-    positivity: str = 'strict',
+    positivity: str = "strict",
     degeneracy_tol: float = VOLUME_DEGENERACY_TOL,
     positivity_tol: float = METRIC_POSITIVITY_TOL,
 ) -> tuple[dict[int, MetricTensor], dict]:
@@ -147,7 +149,7 @@ def construct_hodge_star_cochain_metric(
         full-dimensional, the ambient dimension is outside the current
         supported scope, positivity is invalid, or raw Hodge star entries are
         negative under positivity='strict'.
-    
+
     References
     ----------
     .. [1] A. N. Hirani, K. Kalyanaraman, and E. B. VanderZee, "Delaunay
@@ -158,8 +160,7 @@ def construct_hodge_star_cochain_metric(
 
     if not ptd.has_positions:
         raise ValueError(
-            "Hodge star metric requires position data: "
-            "ptd.has_positions is False"
+            "Hodge star metric requires position data: ptd.has_positions is False"
         )
 
     if sc.max_dim != ptd.dimension:
@@ -174,11 +175,8 @@ def construct_hodge_star_cochain_metric(
             f"complexes: ptd.dimension={ptd.dimension}"
         )
 
-    if positivity not in ('strict', 'abs'):
-        raise ValueError(
-            f"positivity must be 'strict' or 'abs', got '{positivity}'"
-        )
-    
+    if positivity not in ("strict", "abs"):
+        raise ValueError(f"positivity must be 'strict' or 'abs', got '{positivity}'")
 
     # --- Compute Hodge star from primal and dual volumes ---
 
@@ -213,8 +211,7 @@ def construct_hodge_star_cochain_metric(
 
     # Assemble raw Hodge star diagonals
     raw_diagonals = {
-        k: dual_volumes[k] / primal_volumes[k]
-        for k in sorted(primal_volumes)
+        k: dual_volumes[k] / primal_volumes[k] for k in sorted(primal_volumes)
     }
 
     # --- Compute diagnostics from raw values ---
@@ -231,36 +228,36 @@ def construct_hodge_star_cochain_metric(
         total_negative += num_negative
 
         per_degree[k] = {
-            'num_simplices': len(simplices[k]),
-            'num_negative': num_negative,
-            'primal_volume_range': [
+            "num_simplices": len(simplices[k]),
+            "num_negative": num_negative,
+            "primal_volume_range": [
                 float(primal_vols_k.min()),
                 float(primal_vols_k.max()),
             ],
-            'dual_volume_range': [
+            "dual_volume_range": [
                 float(dual_vols_k.min()),
                 float(dual_vols_k.max()),
             ],
-            'hodge_star_range': [
+            "hodge_star_range": [
                 float(raw_diags_k.min()),
                 float(raw_diags_k.max()),
             ],
         }
 
     diagnostics = {
-        'positivity': positivity,
-        'total_negative': total_negative,
-        'per_degree': per_degree,
+        "positivity": positivity,
+        "total_negative": total_negative,
+        "per_degree": per_degree,
     }
 
     # --- Apply positivity handling ---
 
-    if positivity == 'strict':
+    if positivity == "strict":
         if total_negative > 0:
             breakdown = ", ".join(
                 f"k={k}: {per_degree[k]['num_negative']}/{per_degree[k]['num_simplices']}"
                 for k in sorted(per_degree)
-                if per_degree[k]['num_negative'] > 0
+                if per_degree[k]["num_negative"] > 0
             )
             raise ValueError(
                 f"Hodge star has {total_negative} negative "
@@ -269,11 +266,8 @@ def construct_hodge_star_cochain_metric(
             )
         diagonals = raw_diagonals
 
-    elif positivity == 'abs':
-        diagonals = {
-            k: np.abs(raw_diagonals[k])
-            for k in sorted(raw_diagonals)
-        }
+    elif positivity == "abs":
+        diagonals = {k: np.abs(raw_diagonals[k]) for k in sorted(raw_diagonals)}
 
     # --- Construct diagonal metric tensors ---
 
@@ -290,8 +284,8 @@ def construct_hodge_star_cochain_metric(
 # =============================================================================
 
 COCHAIN_METRIC_MODEL_REGISTRY: dict[str, callable] = {
-    'combinatorial': construct_combinatorial_cochain_metric,
-    'hodge_star': construct_hodge_star_cochain_metric,
+    "combinatorial": construct_combinatorial_cochain_metric,
+    "hodge_star": construct_hodge_star_cochain_metric,
 }
 
 
@@ -327,24 +321,24 @@ def construct_cochain_metric_from_config(
     ValueError
         If 'model' key is missing or the model name is not in the registry.
     """
-    if 'model' not in config:
+    if "model" not in config:
         raise ValueError("config must contain a 'model' key")
 
-    model = config['model']
+    model = config["model"]
     if model not in COCHAIN_METRIC_MODEL_REGISTRY:
         raise ValueError(
             f"Unknown metric model '{model}'. "
             f"Available models: {list(COCHAIN_METRIC_MODEL_REGISTRY)}"
         )
 
-    params = config.get('params', {})
+    params = config.get("params", {})
     construct_fn = COCHAIN_METRIC_MODEL_REGISTRY[model]
     return construct_fn(sc, ptd, **params)
 
 
 def create_metric_model_label(
     config: dict,
-    float_fmt: str | None = 'g',
+    float_fmt: str | None = "g",
     strip_zeros: bool = True,
 ) -> str:
     """
@@ -377,17 +371,17 @@ def create_metric_model_label(
     >>> create_metric_model_label({'model': 'combinatorial', 'params': {}})
     'combinatorial'
     """
-    if 'model' not in config:
+    if "model" not in config:
         raise ValueError("config must contain a 'model' key")
 
-    model = config['model']
+    model = config["model"]
     if model not in COCHAIN_METRIC_MODEL_REGISTRY:
         raise ValueError(
             f"Unknown metric model '{model}'. "
             f"Available models: {list(COCHAIN_METRIC_MODEL_REGISTRY)}"
         )
 
-    params = config.get('params', {})
+    params = config.get("params", {})
     parts = [model]
 
     for key, value in params.items():
@@ -395,17 +389,17 @@ def create_metric_model_label(
         if value is None:
             continue
 
-        param_abbr = key.replace('_', '')[:3]
+        param_abbr = key.replace("_", "")[:3]
 
         if isinstance(value, bool):
-            value_str = '1' if value else '0'
+            value_str = "1" if value else "0"
         elif isinstance(value, float):
             value_str = format_float_str(value, float_fmt, strip_zeros=strip_zeros)
         elif isinstance(value, str):
-            value_str = value[:3].lower().replace('_', '')
+            value_str = value[:3].lower().replace("_", "")
         else:
-            value_str = str(value).replace('.', 'p')
+            value_str = str(value).replace(".", "p")
 
         parts.append(f"{param_abbr}{value_str}")
 
-    return '_'.join(parts)
+    return "_".join(parts)

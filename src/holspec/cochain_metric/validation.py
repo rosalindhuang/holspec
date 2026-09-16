@@ -4,6 +4,7 @@ Cochain metric validation.
 Standalone functions for validating metric tensors and cochain metric
 collections against their mathematical contracts (SPD, size consistency).
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -27,6 +28,7 @@ METRIC_POSITIVITY_TOL = 1e-10
 # =============================================================================
 # Validation Functions
 # =============================================================================
+
 
 def validate_metric_tensor(
     matrix: sparse.spmatrix,
@@ -100,9 +102,7 @@ def validate_metric_tensor(
     # --- Finite values ---
     # Only stored (non-zero) entries are checked; implicit zeros are always finite.
     if matrix.nnz > 0 and not np.all(np.isfinite(matrix.data)):
-        raise ValueError(
-            "Metric tensor contains non-finite values (NaN or Inf)"
-        )
+        raise ValueError("Metric tensor contains non-finite values (NaN or Inf)")
 
     # --- SPD contract ---
     if is_diagonal:

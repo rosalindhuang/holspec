@@ -5,6 +5,7 @@ Standalone functions for validating Hodge Laplacian inputs (cross-compatibility
 of SimplicialComplex and CochainMetric) and mathematical properties of computed
 Laplacian matrices.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -29,6 +30,7 @@ LAPLACIAN_PROPERTY_TOL = 1e-10
 # =============================================================================
 # Validation Functions
 # =============================================================================
+
 
 def validate_hodge_laplacian_inputs(
     sc: SimplicialComplex,
@@ -144,8 +146,7 @@ def validate_laplacian_properties(
     # --- Square ---
     if laplacian_matrix.shape[0] != laplacian_matrix.shape[1]:
         raise ValueError(
-            f"Laplacian property violation: "
-            f"is_square: shape={laplacian_matrix.shape}"
+            f"Laplacian property violation: is_square: shape={laplacian_matrix.shape}"
         )
 
     if N != metric.size:
@@ -162,14 +163,12 @@ def validate_laplacian_properties(
     if not np.allclose(GL_dense, GL_dense.T, atol=tol, rtol=0):
         max_deviation = np.max(np.abs(GL_dense - GL_dense.T))
         failures.append(
-            f"is_self_adjoint: max |G L - (G L)^T| = {max_deviation:.2e} "
-            f"(tol={tol})"
+            f"is_self_adjoint: max |G L - (G L)^T| = {max_deviation:.2e} (tol={tol})"
         )
 
     # --- Positive semidefinite via symmetrized form ---
     L_sym = (
-        metric.to_matrix_power(0.5) @ laplacian_matrix
-        @ metric.to_matrix_power(-0.5)
+        metric.to_matrix_power(0.5) @ laplacian_matrix @ metric.to_matrix_power(-0.5)
     )
     eigenvalues = np.linalg.eigvalsh(L_sym.toarray())
     if not np.all(eigenvalues >= -tol):
@@ -183,6 +182,4 @@ def validate_laplacian_properties(
         if len(failures) == 1:
             raise ValueError(f"Laplacian property violation: {failures[0]}")
         detail = "\n  ".join(failures)
-        raise ValueError(
-            f"Laplacian property violations:\n  {detail}"
-        )
+        raise ValueError(f"Laplacian property violations:\n  {detail}")

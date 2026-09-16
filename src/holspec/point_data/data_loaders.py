@@ -188,6 +188,7 @@ def load_distances_array(
 # Helpers
 # =============================================================================
 
+
 def _load_array(
     filepath: str | Path,
     file_format: str | None,

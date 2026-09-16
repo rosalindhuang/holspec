@@ -7,6 +7,7 @@ distribution estimation. The primary factory ``from_file`` reads directly
 from pipeline HDF5 files; results can be persisted via ``save`` and
 restored via ``load_cache``.
 """
+
 from __future__ import annotations
 
 import warnings
@@ -33,34 +34,35 @@ if TYPE_CHECKING:
 
 # Default set of scalar observables computed eagerly by EnsembleSpectraAnalysis
 STANDARD_OBSERVABLES = (
-    'dim_ker',
-    'eigval_min_nz',
-    'eigval_max',
-    'eigval_mean',
-    'eigval_mean_nz',
-    'eigval_var',
-    'eigval_var_nz',
-    'eigval_sum',
-    'num_nonzero',
+    "dim_ker",
+    "eigval_min_nz",
+    "eigval_max",
+    "eigval_mean",
+    "eigval_mean_nz",
+    "eigval_var",
+    "eigval_var_nz",
+    "eigval_sum",
+    "num_nonzero",
 )
 
 # LaTeX labels for observables (keyed by observable name)
 OBSERVABLE_LABELS = {
-    'dim_ker': r'$\dim\ker$',
-    'eigval_min_nz': r'$\lambda_{\min,\,\mathrm{nonzero}}$',
-    'eigval_max': r'$\lambda_{\max}$',
-    'eigval_mean': r'$\langle\lambda\rangle$',
-    'eigval_mean_nz': r'$\langle\lambda\rangle_\mathrm{nonzero}$',
-    'eigval_var': r'$\mathrm{Var}(\lambda)$',
-    'eigval_var_nz': r'$\mathrm{Var}(\lambda)_\mathrm{nonzero}$',
-    'eigval_sum': r'$\sum\lambda$',
-    'num_nonzero': r'$N_\mathrm{nonzero}$',
+    "dim_ker": r"$\dim\ker$",
+    "eigval_min_nz": r"$\lambda_{\min,\,\mathrm{nonzero}}$",
+    "eigval_max": r"$\lambda_{\max}$",
+    "eigval_mean": r"$\langle\lambda\rangle$",
+    "eigval_mean_nz": r"$\langle\lambda\rangle_\mathrm{nonzero}$",
+    "eigval_var": r"$\mathrm{Var}(\lambda)$",
+    "eigval_var_nz": r"$\mathrm{Var}(\lambda)_\mathrm{nonzero}$",
+    "eigval_sum": r"$\sum\lambda$",
+    "num_nonzero": r"$N_\mathrm{nonzero}$",
 }
 
 
 # =============================================================================
 # EnsembleSpectraAnalysis
 # =============================================================================
+
 
 class EnsembleSpectraAnalysis:
     """
@@ -118,16 +120,13 @@ class EnsembleSpectraAnalysis:
         unique_lengths = set(lengths.values())
         if len(unique_lengths) != 1:
             raise ValueError(
-                f"All spectrum lists must have the same length. "
-                f"Got lengths: {lengths}."
+                f"All spectrum lists must have the same length. Got lengths: {lengths}."
             )
 
         # Validate keys
         for k, component in member_spectra:
             if not isinstance(k, int) or k < 0:
-                raise ValueError(
-                    f"Degree must be a non-negative integer, got k={k!r}."
-                )
+                raise ValueError(f"Degree must be a non-negative integer, got k={k!r}.")
             if component not in LAPLACIAN_COMPONENT_NAMES:
                 raise ValueError(
                     f"Unknown component '{component}'. "
@@ -154,8 +153,8 @@ class EnsembleSpectraAnalysis:
 
         # Initialize metadata
         self.metadata: dict = metadata if metadata is not None else {}
-        if 'creation_time' not in self.metadata:
-            self.metadata['creation_time'] = datetime.now().isoformat()
+        if "creation_time" not in self.metadata:
+            self.metadata["creation_time"] = datetime.now().isoformat()
 
         # Eagerly compute observables
         self._observables_cache: dict[tuple[int, str], dict[str, np.ndarray]] = {}
@@ -182,7 +181,7 @@ class EnsembleSpectraAnalysis:
         filepath: str | Path,
         project_root: str | Path | None = None,
         degrees: list[int] | None = None,
-        components: tuple[str, ...] = ('full',),
+        components: tuple[str, ...] = ("full",),
         load_eigenvectors: bool = False,
         metadata: dict | None = None,
     ) -> EnsembleSpectraAnalysis:
@@ -218,20 +217,18 @@ class EnsembleSpectraAnalysis:
 
         # Discover member groups
         all_keys = get_keys_h5(filepath)
-        member_keys = [key for key in all_keys if key.startswith('member_')]
+        member_keys = [key for key in all_keys if key.startswith("member_")]
         if not member_keys:
-            raise ValueError(
-                f"No member groups found in {filepath}."
-            )
+            raise ValueError(f"No member groups found in {filepath}.")
 
         # Read first member attributes to discover available (k, component) pairs
         _, first_attrs = read_h5(filepath, group=member_keys[0], dataset_names=[])
-        cached_keys_raw = first_attrs.get('cached_keys', [])
+        cached_keys_raw = first_attrs.get("cached_keys", [])
 
         # Parse "k_component" strings and filter
         available_keys: list[tuple[int, str]] = []
         for key_str in cached_keys_raw:
-            k_str, comp = key_str.split('_', 1)
+            k_str, comp = key_str.split("_", 1)
             k = int(k_str)
             if degrees is not None and k not in degrees:
                 continue
@@ -253,15 +250,15 @@ class EnsembleSpectraAnalysis:
 
         for member_key in member_keys:
             for k, comp in available_keys:
-                subgroup = join_h5_group(member_key, f'degree_{k}/component_{comp}')
+                subgroup = join_h5_group(member_key, f"degree_{k}/component_{comp}")
                 spc_datasets, spc_attributes = read_h5(filepath, group=subgroup)
 
-                eigenvalues = spc_datasets['eigenvalues']
-                dimension = int(spc_attributes['dimension'])
+                eigenvalues = spc_datasets["eigenvalues"]
+                dimension = int(spc_attributes["dimension"])
 
                 eigenvectors = None
                 if load_eigenvectors:
-                    eigenvectors = spc_datasets.get('eigenvectors', None)
+                    eigenvectors = spc_datasets.get("eigenvectors", None)
 
                 member_spectra[(k, comp)].append(
                     Spectrum(eigenvalues, dimension, eigenvectors=eigenvectors)
@@ -270,10 +267,10 @@ class EnsembleSpectraAnalysis:
         # Build metadata
         if metadata is None:
             metadata = {
-                'source_file': str(filepath),
+                "source_file": str(filepath),
             }
             if project_root is not None:
-                metadata['project_root'] = str(project_root)
+                metadata["project_root"] = str(project_root)
 
         esa = cls(member_spectra, metadata=metadata)
 
@@ -288,7 +285,7 @@ class EnsembleSpectraAnalysis:
         cls,
         hlsp_list: list[HodgeLaplacianSpectra],
         degrees: list[int] | None = None,
-        components: tuple[str, ...] = ('full',),
+        components: tuple[str, ...] = ("full",),
         metadata: dict | None = None,
     ) -> EnsembleSpectraAnalysis:
         """
@@ -329,9 +326,7 @@ class EnsembleSpectraAnalysis:
         for k in degrees:
             for comp in components:
                 key = (k, comp)
-                member_spectra[key] = [
-                    hlsp.spectrum(k, comp) for hlsp in hlsp_list
-                ]
+                member_spectra[key] = [hlsp.spectrum(k, comp) for hlsp in hlsp_list]
 
         return cls(member_spectra, metadata=metadata)
 
@@ -385,7 +380,7 @@ class EnsembleSpectraAnalysis:
     # Spectrum Access
     # =========================================================================
 
-    def member_spectra(self, k: int, component: str = 'full') -> list[Spectrum]:
+    def member_spectra(self, k: int, component: str = "full") -> list[Spectrum]:
         """
         Per-member Spectrum objects at (k, component).
 
@@ -403,7 +398,7 @@ class EnsembleSpectraAnalysis:
         self._validate_key(k, component)
         return self._member_spectra[(k, component)]
 
-    def member_eigenvalues(self, k: int, component: str = 'full') -> list[np.ndarray]:
+    def member_eigenvalues(self, k: int, component: str = "full") -> list[np.ndarray]:
         """
         Per-member eigenvalue arrays at (k, component).
 
@@ -421,7 +416,9 @@ class EnsembleSpectraAnalysis:
         return [spc.eigenvalues for spc in self.member_spectra(k, component)]
 
     def member_eigenvectors(
-        self, k: int, component: str = 'full',
+        self,
+        k: int,
+        component: str = "full",
     ) -> list[np.ndarray | None]:
         """
         Per-member eigenvector matrices at (k, component).
@@ -440,7 +437,9 @@ class EnsembleSpectraAnalysis:
         return [spc.eigenvectors for spc in self.member_spectra(k, component)]
 
     def eigenvector_spectra(
-        self, k: int, component: str = 'full',
+        self,
+        k: int,
+        component: str = "full",
     ) -> list[Spectrum] | None:
         """
         Per-member eigenvector Spectrum objects at (k, component).
@@ -492,9 +491,7 @@ class EnsembleSpectraAnalysis:
         """
         for (k, component), spc_list in eigenvector_spectra.items():
             if not isinstance(k, int) or k < 0:
-                raise ValueError(
-                    f"Degree must be a non-negative integer, got k={k!r}."
-                )
+                raise ValueError(f"Degree must be a non-negative integer, got k={k!r}.")
             if component not in LAPLACIAN_COMPONENT_NAMES:
                 raise ValueError(
                     f"Unknown component '{component}'. "
@@ -512,7 +509,9 @@ class EnsembleSpectraAnalysis:
     # =========================================================================
 
     def member_observables(
-        self, k: int, component: str = 'full',
+        self,
+        k: int,
+        component: str = "full",
     ) -> dict[str, np.ndarray]:
         """
         Per-member scalar observables at (k, component).
@@ -531,7 +530,7 @@ class EnsembleSpectraAnalysis:
     def observables_summary(
         self,
         k: int,
-        component: str = 'full',
+        component: str = "full",
         ci: float | None = None,
     ) -> dict[str, dict[str, float]]:
         """
@@ -555,24 +554,22 @@ class EnsembleSpectraAnalysis:
             observable.
         """
         if ci is not None and not (0.0 < ci < 1.0):
-            raise ValueError(
-                f"ci must be in (0, 1), got {ci}."
-            )
+            raise ValueError(f"ci must be in (0, 1), got {ci}.")
 
         obs = self.member_observables(k, component)
         summary: dict[str, dict[str, float]] = {}
 
         for name, arr in obs.items():
             with warnings.catch_warnings():
-                warnings.simplefilter('ignore', RuntimeWarning)
+                warnings.simplefilter("ignore", RuntimeWarning)
                 entry: dict[str, float] = {
-                    'mean': float(np.nanmean(arr)),
-                    'std': float(np.nanstd(arr)),
+                    "mean": float(np.nanmean(arr)),
+                    "std": float(np.nanstd(arr)),
                 }
             if ci is not None:
                 alpha = (1.0 - ci) / 2.0
-                entry['ci_low'] = float(np.nanpercentile(arr, 100.0 * alpha))
-                entry['ci_high'] = float(np.nanpercentile(arr, 100.0 * (1.0 - alpha)))
+                entry["ci_low"] = float(np.nanpercentile(arr, 100.0 * alpha))
+                entry["ci_high"] = float(np.nanpercentile(arr, 100.0 * (1.0 - alpha)))
             summary[name] = entry
 
         return summary
@@ -580,7 +577,7 @@ class EnsembleSpectraAnalysis:
     def compute_member_observable(
         self,
         k: int,
-        component: str = 'full',
+        component: str = "full",
         *,
         func: Callable[[Spectrum], float],
         cache_name: str | None = None,
@@ -608,7 +605,8 @@ class EnsembleSpectraAnalysis:
 
         spectra_list = self._member_spectra[(k, component)]
         result = np.array(
-            [func(spc) for spc in spectra_list], dtype=np.float64,
+            [func(spc) for spc in spectra_list],
+            dtype=np.float64,
         )
 
         if cache_name is not None:
@@ -629,9 +627,9 @@ class EnsembleSpectraAnalysis:
     def eigenvalue_distribution(
         self,
         k: int,
-        component: str = 'full',
+        component: str = "full",
         nonzero: bool = True,
-        method: str = 'histogram',
+        method: str = "histogram",
         method_params: dict | None = None,
     ) -> dict:
         """
@@ -675,7 +673,7 @@ class EnsembleSpectraAnalysis:
         cache_key = (k, component, nonzero)
         if method_params is None and cache_key in self._distribution_cache:
             cached = self._distribution_cache[cache_key]
-            if cached['method'] == method:
+            if cached["method"] == method:
                 return cached
 
         # Extract eigenvalue arrays
@@ -686,20 +684,25 @@ class EnsembleSpectraAnalysis:
             eig_arrays = [spc.eigenvalues for spc in spectra_list]
 
         # Resolve method params
-        if method == 'histogram':
+        if method == "histogram":
             params = {**_HISTOGRAM_DEFAULTS, **(method_params or {})}
 
             # Compute shared bin edges from pooled data
             pooled = np.concatenate(eig_arrays) if eig_arrays else np.array([])
             if pooled.size > 0:
-                n_bins = params['bins']
+                n_bins = params["bins"]
                 # When bins is an int and no explicit range is set,
                 # clamp to available unique values to avoid errors
-                if isinstance(n_bins, (int, np.integer)) and params.get('range') is None:
+                if (
+                    isinstance(n_bins, (int, np.integer))
+                    and params.get("range") is None
+                ):
                     n_bins = min(int(n_bins), max(len(np.unique(pooled)), 1))
                 try:
                     shared_edges = np.histogram_bin_edges(
-                        pooled, bins=n_bins, range=params['range'],
+                        pooled,
+                        bins=n_bins,
+                        range=params["range"],
                     )
                 except ValueError:
                     # Data span too narrow for n_bins finite-sized bins (e.g.
@@ -708,18 +711,18 @@ class EnsembleSpectraAnalysis:
                     pmin, pmax = float(pooled.min()), float(pooled.max())
                     pad = max(abs(pmin), abs(pmax), 1.0) * 1e-9
                     shared_edges = np.array([pmin - pad, pmax + pad])
-                params['bins'] = shared_edges
+                params["bins"] = shared_edges
             else:
-                params['bins'] = np.array([0.0, 1.0])
+                params["bins"] = np.array([0.0, 1.0])
 
-            params['density'] = True
+            params["density"] = True
         else:
             params = method_params or {}
 
         # Compute per-member distributions
         # Determine number of bins for zero-density fallback
-        if method == 'histogram' and isinstance(params.get('bins'), np.ndarray):
-            n_output = len(params['bins']) - 1
+        if method == "histogram" and isinstance(params.get("bins"), np.ndarray):
+            n_output = len(params["bins"]) - 1
         else:
             n_output = None
 
@@ -752,13 +755,13 @@ class EnsembleSpectraAnalysis:
             density_std = np.std(density_stack, axis=0)
 
         result = {
-            'x': x,
-            'density_mean': density_mean,
-            'density_std': density_std,
-            'nonzero': nonzero,
-            'method': method,
-            'method_params': params,
-            'num_members': self._num_members,
+            "x": x,
+            "density_mean": density_mean,
+            "density_std": density_std,
+            "nonzero": nonzero,
+            "method": method,
+            "method_params": params,
+            "num_members": self._num_members,
         }
 
         # Cache result keyed by (k, component, nonzero)
@@ -772,7 +775,7 @@ class EnsembleSpectraAnalysis:
     def save(
         self,
         filepath: str | Path,
-        mode: str = 'replace',
+        mode: str = "replace",
         group: str | None = None,
         hdf5_options: dict | None = None,
     ) -> None:
@@ -796,20 +799,22 @@ class EnsembleSpectraAnalysis:
         """
         filepath = Path(filepath)
         if hdf5_options is None:
-            hdf5_options = {'compression': 'gzip', 'compression_opts': 4}
+            hdf5_options = {"compression": "gzip", "compression_opts": 4}
 
         # Root attributes
         root_attributes = {
-            'num_members': self._num_members,
-            'degrees': self._degrees,
-            'components': list(self._components),
-            'max_dim': self._max_dim,
-            'observable_names': sorted({
-                name
-                for obs_dict in self._observables_cache.values()
-                for name in obs_dict
-            }),
-            'metadata': self.metadata,
+            "num_members": self._num_members,
+            "degrees": self._degrees,
+            "components": list(self._components),
+            "max_dim": self._max_dim,
+            "observable_names": sorted(
+                {
+                    name
+                    for obs_dict in self._observables_cache.values()
+                    for name in obs_dict
+                }
+            ),
+            "metadata": self.metadata,
         }
         save_h5(
             filepath,
@@ -823,59 +828,59 @@ class EnsembleSpectraAnalysis:
         # Save observables
         for (k, comp), obs_dict in self._observables_cache.items():
             subgroup = join_h5_group(
-                group, f'observables/degree_{k}/component_{comp}',
+                group,
+                f"observables/degree_{k}/component_{comp}",
             )
             save_h5(
                 filepath,
                 datasets=obs_dict,
                 attributes=None,
-                mode='update',
+                mode="update",
                 group=subgroup,
                 hdf5_options=hdf5_options,
             )
 
         # Save cached distributions
         for (k, comp, nz), dist in self._distribution_cache.items():
-            nz_label = 'nonzero_true' if nz else 'nonzero_false'
+            nz_label = "nonzero_true" if nz else "nonzero_false"
             subgroup = join_h5_group(
                 group,
-                f'distributions/degree_{k}/component_{comp}/{nz_label}',
+                f"distributions/degree_{k}/component_{comp}/{nz_label}",
             )
             dist_datasets = {
-                'x': dist['x'],
-                'density_mean': dist['density_mean'],
-                'density_std': dist['density_std'],
+                "x": dist["x"],
+                "density_mean": dist["density_mean"],
+                "density_std": dist["density_std"],
             }
             dist_attributes = {
-                'method': dist['method'],
-                'method_params': dist['method_params'],
-                'num_members': dist['num_members'],
-                'nonzero': nz,
+                "method": dist["method"],
+                "method_params": dist["method_params"],
+                "num_members": dist["num_members"],
+                "nonzero": nz,
             }
             save_h5(
                 filepath,
                 datasets=dist_datasets,
                 attributes=dist_attributes,
-                mode='update',
+                mode="update",
                 group=subgroup,
                 hdf5_options=hdf5_options,
             )
 
         # Save eigenvector spectra
         if self._eigenvector_spectra is not None:
-            eigvec_root = join_h5_group(group, 'eigenvectors')
+            eigvec_root = join_h5_group(group, "eigenvectors")
             eigvec_keys_list = [
-                f'{k}_{comp}'
-                for k, comp in sorted(self._eigenvector_spectra.keys())
+                f"{k}_{comp}" for k, comp in sorted(self._eigenvector_spectra.keys())
             ]
             save_h5(
                 filepath,
                 datasets=None,
                 attributes={
-                    'num_members': self._num_members,
-                    'eigenvector_keys': eigvec_keys_list,
+                    "num_members": self._num_members,
+                    "eigenvector_keys": eigvec_keys_list,
                 },
-                mode='update',
+                mode="update",
                 group=eigvec_root,
                 hdf5_options=hdf5_options,
             )
@@ -885,20 +890,20 @@ class EnsembleSpectraAnalysis:
                         continue
                     member_group = join_h5_group(
                         eigvec_root,
-                        f'member_{i:04d}/degree_{k}/component_{comp}',
+                        f"member_{i:04d}/degree_{k}/component_{comp}",
                     )
-                    spc_datasets = {'eigenvalues': spc.eigenvalues}
+                    spc_datasets = {"eigenvalues": spc.eigenvalues}
                     spc_attributes = {
-                        'dimension': spc.dimension,
-                        'num_eigenvalues': spc.num_eigenvalues,
+                        "dimension": spc.dimension,
+                        "num_eigenvalues": spc.num_eigenvalues,
                     }
                     if spc.eigenvectors is not None:
-                        spc_datasets['eigenvectors'] = spc.eigenvectors
+                        spc_datasets["eigenvectors"] = spc.eigenvectors
                     save_h5(
                         filepath,
                         datasets=spc_datasets,
                         attributes=spc_attributes,
-                        mode='update',
+                        mode="update",
                         group=member_group,
                         hdf5_options=hdf5_options,
                     )
@@ -923,19 +928,18 @@ class EnsembleSpectraAnalysis:
         # Read root attributes for validation
         _, root_attrs = read_h5(filepath, group=group, dataset_names=[])
 
-        stored_num_members = int(root_attrs.get('num_members', -1))
+        stored_num_members = int(root_attrs.get("num_members", -1))
         if stored_num_members != self._num_members:
             raise ValueError(
                 f"num_members mismatch: stored {stored_num_members}, "
                 f"live {self._num_members}."
             )
-        stored_degrees = list(root_attrs.get('degrees', []))
+        stored_degrees = list(root_attrs.get("degrees", []))
         if sorted(stored_degrees) != sorted(self._degrees):
             raise ValueError(
-                f"degrees mismatch: stored {stored_degrees}, "
-                f"live {self._degrees}."
+                f"degrees mismatch: stored {stored_degrees}, live {self._degrees}."
             )
-        stored_components = list(root_attrs.get('components', []))
+        stored_components = list(root_attrs.get("components", []))
         if sorted(stored_components) != sorted(self._components):
             raise ValueError(
                 f"components mismatch: stored {stored_components}, "
@@ -943,7 +947,7 @@ class EnsembleSpectraAnalysis:
             )
 
         # Restore metadata
-        stored_metadata = root_attrs.get('metadata')
+        stored_metadata = root_attrs.get("metadata")
         if isinstance(stored_metadata, dict):
             self.metadata.update(stored_metadata)
 
@@ -953,7 +957,8 @@ class EnsembleSpectraAnalysis:
                 if (k, comp) not in self._member_spectra:
                     continue
                 obs_group = join_h5_group(
-                    group, f'observables/degree_{k}/component_{comp}',
+                    group,
+                    f"observables/degree_{k}/component_{comp}",
                 )
                 try:
                     obs_datasets, _ = read_h5(filepath, group=obs_group)
@@ -966,25 +971,29 @@ class EnsembleSpectraAnalysis:
             for comp in self._components:
                 if (k, comp) not in self._member_spectra:
                     continue
-                for nz, nz_label in ((True, 'nonzero_true'), (False, 'nonzero_false')):
+                for nz, nz_label in ((True, "nonzero_true"), (False, "nonzero_false")):
                     dist_group = join_h5_group(
                         group,
-                        f'distributions/degree_{k}/component_{comp}/{nz_label}',
+                        f"distributions/degree_{k}/component_{comp}/{nz_label}",
                     )
                     try:
                         dist_datasets, dist_attrs = read_h5(
-                            filepath, group=dist_group,
+                            filepath,
+                            group=dist_group,
                         )
                         self._distribution_cache[(k, comp, nz)] = {
-                            'x': dist_datasets['x'],
-                            'density_mean': dist_datasets['density_mean'],
-                            'density_std': dist_datasets['density_std'],
-                            'nonzero': nz,
-                            'method': str(dist_attrs.get('method', 'histogram')),
-                            'method_params': dist_attrs.get('method_params', {}),
-                            'num_members': int(dist_attrs.get(
-                                'num_members', self._num_members,
-                            )),
+                            "x": dist_datasets["x"],
+                            "density_mean": dist_datasets["density_mean"],
+                            "density_std": dist_datasets["density_std"],
+                            "nonzero": nz,
+                            "method": str(dist_attrs.get("method", "histogram")),
+                            "method_params": dist_attrs.get("method_params", {}),
+                            "num_members": int(
+                                dist_attrs.get(
+                                    "num_members",
+                                    self._num_members,
+                                )
+                            ),
                         }
                     except KeyError:
                         pass
@@ -998,28 +1007,31 @@ class EnsembleSpectraAnalysis:
         group: str | None = None,
     ) -> None:
         """Load eigenvector spectra from the eigenvectors/ group if present."""
-        eigvec_root = join_h5_group(group, 'eigenvectors')
+        eigvec_root = join_h5_group(group, "eigenvectors")
         try:
             _, eigvec_attrs = read_h5(
-                filepath, group=eigvec_root, dataset_names=[],
+                filepath,
+                group=eigvec_root,
+                dataset_names=[],
             )
         except KeyError:
             return
 
-        eigvec_keys_raw = eigvec_attrs.get('eigenvector_keys', [])
+        eigvec_keys_raw = eigvec_attrs.get("eigenvector_keys", [])
         if len(eigvec_keys_raw) == 0:
             return
 
         # Parse available keys
         available_keys = []
         for key_str in eigvec_keys_raw:
-            k_str, comp = key_str.split('_', 1)
+            k_str, comp = key_str.split("_", 1)
             available_keys.append((int(k_str), comp))
 
         # Discover member groups (may be sparse: not every position present)
         member_keys = sorted(
-            k for k in get_keys_h5(filepath, group=eigvec_root)
-            if k.startswith('member_')
+            k
+            for k in get_keys_h5(filepath, group=eigvec_root)
+            if k.startswith("member_")
         )
         if not member_keys:
             return
@@ -1029,32 +1041,33 @@ class EnsembleSpectraAnalysis:
             key: [None] * self._num_members for key in available_keys
         }
         for member_key in member_keys:
-            i = int(member_key.split('_')[1])
+            i = int(member_key.split("_")[1])
             for k, comp in available_keys:
                 subgroup = join_h5_group(
                     eigvec_root,
-                    f'{member_key}/degree_{k}/component_{comp}',
+                    f"{member_key}/degree_{k}/component_{comp}",
                 )
                 try:
                     spc_datasets, spc_attrs = read_h5(filepath, group=subgroup)
                     eigvec_spectra[(k, comp)][i] = Spectrum(
-                        spc_datasets['eigenvalues'],
-                        int(spc_attrs['dimension']),
-                        eigenvectors=spc_datasets.get('eigenvectors'),
+                        spc_datasets["eigenvalues"],
+                        int(spc_attrs["dimension"]),
+                        eigenvectors=spc_datasets.get("eigenvectors"),
                     )
                 except KeyError:
                     pass
 
         # Only set if we actually loaded data
-        if any(any(s is not None for s in spc_list)
-               for spc_list in eigvec_spectra.values()):
+        if any(
+            any(s is not None for s in spc_list) for spc_list in eigvec_spectra.values()
+        ):
             self._eigenvector_spectra = eigvec_spectra
 
     # =========================================================================
     # Utilities
     # =========================================================================
 
-    def summary(self, indent: str = '') -> str:
+    def summary(self, indent: str = "") -> str:
         """
         Generate human-readable summary of ensemble-averaged observables.
 
@@ -1068,33 +1081,35 @@ class EnsembleSpectraAnalysis:
         str
         """
         lines = []
-        lines.append('Ensemble Spectra Analysis:')
-        lines.append('-' * 80)
+        lines.append("Ensemble Spectra Analysis:")
+        lines.append("-" * 80)
         lines.append(
             f"num_members: {self._num_members}, "
             f"degrees: {self._degrees}, "
             f"components: {self._components}"
         )
-        lines.append('-' * 80)
+        lines.append("-" * 80)
 
         # Header row — show a compact subset of observables
-        display_obs = ('dim_ker', 'eigval_min_nz', 'eigval_max', 'eigval_mean_nz')
+        display_obs = ("dim_ker", "eigval_min_nz", "eigval_max", "eigval_mean_nz")
         multi_comp = len(self._components) > 1
         if multi_comp:
             header = f"{'k':<4} {'comp':<8} {'N_k':<6} "
         else:
             header = f"{'k':<4} {'N_k':<6} "
-        header += '  '.join(f'{name:<16}' for name in display_obs)
+        header += "  ".join(f"{name:<16}" for name in display_obs)
         lines.append(header)
         if multi_comp:
-            lines.append(f"{'':4} {'':8} {'':6} " + '  '.join(
-                f'{"(mean +/- std)":<16}' for _ in display_obs
-            ))
+            lines.append(
+                f"{'':4} {'':8} {'':6} "
+                + "  ".join(f"{'(mean +/- std)':<16}" for _ in display_obs)
+            )
         else:
-            lines.append(f"{'':4} {'':6} " + '  '.join(
-                f'{"(mean +/- std)":<16}' for _ in display_obs
-            ))
-        lines.append('-' * 80)
+            lines.append(
+                f"{'':4} {'':6} "
+                + "  ".join(f"{'(mean +/- std)':<16}" for _ in display_obs)
+            )
+        lines.append("-" * 80)
 
         for k in self._degrees:
             N_k = self._dimensions.get(k, 0)
@@ -1108,31 +1123,30 @@ class EnsembleSpectraAnalysis:
                     if obs_name in obs:
                         arr = obs[obs_name]
                         with warnings.catch_warnings():
-                            warnings.simplefilter('ignore', RuntimeWarning)
+                            warnings.simplefilter("ignore", RuntimeWarning)
                             mean = float(np.nanmean(arr))
                             std = float(np.nanstd(arr))
                         if np.isnan(mean):
-                            parts.append('--')
+                            parts.append("--")
                         else:
-                            parts.append(f'{mean:.2f} +/- {std:.2f}')
+                            parts.append(f"{mean:.2f} +/- {std:.2f}")
                     else:
-                        parts.append('--')
+                        parts.append("--")
 
                 if multi_comp:
                     lines.append(
                         f"{k:<4} {comp:<8} {N_k:<6} "
-                        + '  '.join(f'{p:<16}' for p in parts)
+                        + "  ".join(f"{p:<16}" for p in parts)
                     )
                 else:
                     lines.append(
-                        f"{k:<4} {N_k:<6} "
-                        + '  '.join(f'{p:<16}' for p in parts)
+                        f"{k:<4} {N_k:<6} " + "  ".join(f"{p:<16}" for p in parts)
                     )
 
-        lines.append('-' * 80)
-        lines.append('')
+        lines.append("-" * 80)
+        lines.append("")
 
-        return '\n'.join(indent + line for line in lines)
+        return "\n".join(indent + line for line in lines)
 
     def __repr__(self) -> str:
         return (
@@ -1160,11 +1174,14 @@ class EnsembleSpectraAnalysis:
         for key in self._member_spectra:
             k, component = key
             self._observables_cache[key] = self._compute_member_observables(
-                k, component,
+                k,
+                component,
             )
 
     def _compute_member_observables(
-        self, k: int, component: str,
+        self,
+        k: int,
+        component: str,
     ) -> dict[str, np.ndarray]:
         """
         Compute standard scalar observables for one (k, component) pair.
@@ -1195,21 +1212,27 @@ class EnsembleSpectraAnalysis:
             dim_ker[i] = spc.dim_ker()
             eigval_min_nz[i] = nz[0] if len(nz) > 0 else np.nan
             eigval_max[i] = evals[-1] if len(evals) > 0 else np.nan
-            eigval_mean[i] = spc.moment(1, normalized=True, nonzero=False) if len(evals) > 0 else np.nan
-            eigval_mean_nz[i] = spc.moment(1, normalized=True, nonzero=True) if len(nz) > 0 else np.nan
+            eigval_mean[i] = (
+                spc.moment(1, normalized=True, nonzero=False)
+                if len(evals) > 0
+                else np.nan
+            )
+            eigval_mean_nz[i] = (
+                spc.moment(1, normalized=True, nonzero=True) if len(nz) > 0 else np.nan
+            )
             eigval_var[i] = float(np.var(evals)) if len(evals) > 0 else np.nan
             eigval_var_nz[i] = float(np.var(nz)) if len(nz) > 0 else np.nan
             eigval_sum[i] = spc.moment(1, normalized=False, nonzero=False)
             num_nonzero[i] = len(nz)
 
         return {
-            'dim_ker': dim_ker,
-            'eigval_min_nz': eigval_min_nz,
-            'eigval_max': eigval_max,
-            'eigval_mean': eigval_mean,
-            'eigval_mean_nz': eigval_mean_nz,
-            'eigval_var': eigval_var,
-            'eigval_var_nz': eigval_var_nz,
-            'eigval_sum': eigval_sum,
-            'num_nonzero': num_nonzero,
+            "dim_ker": dim_ker,
+            "eigval_min_nz": eigval_min_nz,
+            "eigval_max": eigval_max,
+            "eigval_mean": eigval_mean,
+            "eigval_mean_nz": eigval_mean_nz,
+            "eigval_var": eigval_var,
+            "eigval_var_nz": eigval_var_nz,
+            "eigval_sum": eigval_sum,
+            "num_nonzero": num_nonzero,
         }

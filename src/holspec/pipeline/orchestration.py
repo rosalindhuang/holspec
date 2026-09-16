@@ -6,6 +6,7 @@ Provides ``run_pipeline`` (files-first) and ``run_pipeline_stages``
 assembling per-stage configs from a unified pipeline config and saving
 those configs to YAML.
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -14,7 +15,8 @@ from pathlib import Path
 import yaml
 
 from holspec.utilities import (
-    convert_relative_to_paths, convert_paths_to_relative,
+    convert_relative_to_paths,
+    convert_paths_to_relative,
 )
 
 from .stages import (
@@ -75,41 +77,42 @@ def _assemble_stage_config(
     """
     stage_name = PIPELINE_STAGE_NAMES[stage_num]
     prev_stage_name = PIPELINE_STAGE_NAMES[stage_num - 1]
-    base_data_dir = pipeline_config['outputs']['data_dir']
+    base_data_dir = pipeline_config["outputs"]["data_dir"]
 
     # Input data directory: raw data for Stage 1, previous output dir
     # for Stages 2--4
     if stage_num == 1:
-        input_data_dir = pipeline_config['inputs']['data_dir']
+        input_data_dir = pipeline_config["inputs"]["data_dir"]
     else:
         input_data_dir = f"{base_data_dir}/{prev_stage_name}"
 
     # Build runtime: stage-level takes precedence, pipeline-level fills gaps
-    runtime = dict(pipeline_config['stages'][stage_name]['runtime'])
-    pipeline_runtime = pipeline_config.get('runtime', {})
-    for key in ('error_handling', 'output_retention', 'save_error_report'):
+    runtime = dict(pipeline_config["stages"][stage_name]["runtime"])
+    pipeline_runtime = pipeline_config.get("runtime", {})
+    for key in ("error_handling", "output_retention", "save_error_report"):
         if key not in runtime:
             value = pipeline_runtime.get(key)
             if value is not None:
                 runtime[key] = value
 
     return {
-        'summary': {
-            'created_by': pipeline_config['summary']['created_by'],
-            'creation_time': datetime.now().isoformat(),
+        "summary": {
+            "created_by": pipeline_config["summary"]["created_by"],
+            "creation_time": datetime.now().isoformat(),
         },
-        'inputs': {
-            'stage_name': prev_stage_name,
-            'data_dir': input_data_dir,
-            'filepaths': convert_paths_to_relative(
-                input_filepaths, project_root,
+        "inputs": {
+            "stage_name": prev_stage_name,
+            "data_dir": input_data_dir,
+            "filepaths": convert_paths_to_relative(
+                input_filepaths,
+                project_root,
             ),
         },
-        'configs': pipeline_config['stages'][stage_name]['configs'],
-        'runtime': runtime,
-        'outputs': {
-            'stage_name': stage_name,
-            'data_dir': f"{base_data_dir}/{stage_name}",
+        "configs": pipeline_config["stages"][stage_name]["configs"],
+        "runtime": runtime,
+        "outputs": {
+            "stage_name": stage_name,
+            "data_dir": f"{base_data_dir}/{stage_name}",
         },
     }
 
@@ -138,7 +141,7 @@ def _save_stage_configs(
     project_root : Path
         Project root for path resolution.
     """
-    configs_dir = project_root / pipeline_config['outputs']['configs_dir']
+    configs_dir = project_root / pipeline_config["outputs"]["configs_dir"]
     configs_dir.mkdir(parents=True, exist_ok=True)
 
     for stage_num in (1, 2, 3, 4):
@@ -147,7 +150,8 @@ def _save_stage_configs(
         # Collect full input filepaths for this stage
         if stage_num == 1:
             input_filepaths = convert_relative_to_paths(
-                pipeline_config['inputs']['filepaths'], project_root,
+                pipeline_config["inputs"]["filepaths"],
+                project_root,
             )
         else:
             prev_stage_name = PIPELINE_STAGE_NAMES[stage_num - 1]
@@ -155,14 +159,19 @@ def _save_stage_configs(
 
         # Assemble complete per-stage config and save
         stage_config = _assemble_stage_config(
-            pipeline_config, stage_num, input_filepaths, project_root,
+            pipeline_config,
+            stage_num,
+            input_filepaths,
+            project_root,
         )
 
         config_path = configs_dir / f"{stage_name}.yml"
-        with open(config_path, 'w') as f:
+        with open(config_path, "w") as f:
             yaml.safe_dump(
-                stage_config, f,
-                default_flow_style=False, sort_keys=False,
+                stage_config,
+                f,
+                default_flow_style=False,
+                sort_keys=False,
             )
 
 
@@ -209,33 +218,32 @@ def run_pipeline(
     # --- Extract settings ---
 
     input_filepaths = convert_relative_to_paths(
-        config['inputs']['filepaths'], project_root,
+        config["inputs"]["filepaths"],
+        project_root,
     )
-    verbose = config['runtime']['verbose']
-    save_stage_configs = config['runtime'].get('save_stage_configs', False)
+    verbose = config["runtime"]["verbose"]
+    save_stage_configs = config["runtime"].get("save_stage_configs", False)
 
     # --- Validate inputs ---
 
     # All four stages must be present in config
     expected_stages = {PIPELINE_STAGE_NAMES[n] for n in (1, 2, 3, 4)}
-    provided_stages = set(config.get('stages', {}).keys())
+    provided_stages = set(config.get("stages", {}).keys())
     missing_stages = expected_stages - provided_stages
     if missing_stages:
         raise ValueError(
-            f"Pipeline config 'stages' is missing entries: "
-            f"{sorted(missing_stages)}"
+            f"Pipeline config 'stages' is missing entries: {sorted(missing_stages)}"
         )
 
     # All input files must exist
     for ptd_label, ptd_filepath in input_filepaths.items():
         if not ptd_filepath.exists():
             raise FileNotFoundError(
-                f"Input file for '{ptd_label}' does not exist: "
-                f"{ptd_filepath}"
+                f"Input file for '{ptd_label}' does not exist: {ptd_filepath}"
             )
 
     # configs_dir required when save_stage_configs is enabled
-    if save_stage_configs and 'configs_dir' not in config.get('outputs', {}):
+    if save_stage_configs and "configs_dir" not in config.get("outputs", {}):
         raise ValueError(
             "'outputs.configs_dir' must be specified when "
             "'runtime.save_stage_configs' is true."
@@ -246,7 +254,6 @@ def run_pipeline(
     results: dict[str, dict[str, dict[str, Path]]] = {}
 
     for ptd_label, ptd_filepath in input_filepaths.items():
-
         if verbose:
             print(f"{'=' * 60}")
             print(f"{ptd_label}")
@@ -267,19 +274,23 @@ def run_pipeline(
 
             # Assemble per-stage config for this single input
             stage_config = _assemble_stage_config(
-                config, stage_num, prev_output, project_root,
+                config,
+                stage_num,
+                prev_output,
+                project_root,
             )
 
             # Run the stage
             stage_output = PIPELINE_STAGE_FUNCTIONS[stage_num](
-                stage_config, project_root,
+                stage_config,
+                project_root,
             )
 
             # Accumulate results and wire output to next stage
             results.setdefault(stage_name, {}).update(stage_output)
             prev_output = stage_output
 
-        if not stage_config['runtime'].get('verbose', False):
+        if not stage_config["runtime"].get("verbose", False):
             print()
 
     # --- Save assembled per-stage configs ---
@@ -377,8 +388,8 @@ def run_pipeline_stages(
 
     # --- Extract settings ---
 
-    verbose = config['runtime']['verbose']
-    save_stage_configs = config['runtime'].get('save_stage_configs', False)
+    verbose = config["runtime"]["verbose"]
+    save_stage_configs = config["runtime"].get("save_stage_configs", False)
 
     # --- Validate stage_nums ---
 
@@ -393,12 +404,11 @@ def run_pipeline_stages(
     # --- Validate stage configs ---
 
     expected_stages = {PIPELINE_STAGE_NAMES[n] for n in stage_nums}
-    provided_stages = set(config.get('stages', {}).keys())
+    provided_stages = set(config.get("stages", {}).keys())
     missing_stages = expected_stages - provided_stages
     if missing_stages:
         raise ValueError(
-            f"Pipeline config 'stages' is missing entries: "
-            f"{sorted(missing_stages)}"
+            f"Pipeline config 'stages' is missing entries: {sorted(missing_stages)}"
         )
 
     # --- Resolve initial input filepaths ---
@@ -407,15 +417,15 @@ def run_pipeline_stages(
 
     if first_stage == 1:
         prev_output = convert_relative_to_paths(
-            config['inputs']['filepaths'], project_root,
+            config["inputs"]["filepaths"],
+            project_root,
         )
 
         # All input files must exist
         for ptd_label, ptd_filepath in prev_output.items():
             if not ptd_filepath.exists():
                 raise FileNotFoundError(
-                    f"Input file for '{ptd_label}' does not exist: "
-                    f"{ptd_filepath}"
+                    f"Input file for '{ptd_label}' does not exist: {ptd_filepath}"
                 )
     else:
         if input_filepaths is None:
@@ -427,7 +437,7 @@ def run_pipeline_stages(
 
     # --- Validate save_stage_configs ---
 
-    if save_stage_configs and 'configs_dir' not in config.get('outputs', {}):
+    if save_stage_configs and "configs_dir" not in config.get("outputs", {}):
         raise ValueError(
             "'outputs.configs_dir' must be specified when "
             "'runtime.save_stage_configs' is true."
@@ -449,12 +459,16 @@ def run_pipeline_stages(
 
         # Assemble per-stage config for all inputs
         stage_config = _assemble_stage_config(
-            config, stage_num, prev_output, project_root,
+            config,
+            stage_num,
+            prev_output,
+            project_root,
         )
 
         # Run the stage on all inputs at once
         stage_output = PIPELINE_STAGE_FUNCTIONS[stage_num](
-            stage_config, project_root,
+            stage_config,
+            project_root,
         )
 
         # Store results and wire output to next stage

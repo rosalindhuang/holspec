@@ -26,11 +26,12 @@ SUPPORTED_IMPORT_MODES = {"files", "file_with_noise"}
 # Utilities
 # =============================================================================
 
+
 def make_ensemble_config(
     generator: str,
     params: dict,
     scale: float = 0,
-    distribution: str = 'normal',
+    distribution: str = "normal",
     num_realizations: int = 1,
     base_seed: int = 42,
 ) -> dict:
@@ -59,10 +60,10 @@ def make_ensemble_config(
         num_realizations, base_seed.
     """
     return {
-        'base_config': {'generator': generator, 'params': params},
-        'noise_config': {'scale': scale, 'distribution': distribution},
-        'num_realizations': num_realizations,
-        'base_seed': base_seed,
+        "base_config": {"generator": generator, "params": params},
+        "noise_config": {"scale": scale, "distribution": distribution},
+        "num_realizations": num_realizations,
+        "base_seed": base_seed,
     }
 
 
@@ -96,13 +97,16 @@ def create_ensemble_label(
         Label string for the ensemble.
     """
     label = create_point_generator_label(
-        ensemble_config['base_config'], dimension=dimension,
-        float_fmt=float_fmt, strip_zeros=strip_zeros,
+        ensemble_config["base_config"],
+        dimension=dimension,
+        float_fmt=float_fmt,
+        strip_zeros=strip_zeros,
     )
-    if ensemble_config['noise_config']['scale'] > 0:
+    if ensemble_config["noise_config"]["scale"] > 0:
         noise_label = create_noise_label(
-            ensemble_config['noise_config'],
-            float_fmt=float_fmt, strip_zeros=strip_zeros,
+            ensemble_config["noise_config"],
+            float_fmt=float_fmt,
+            strip_zeros=strip_zeros,
         )
         label += f"__{noise_label}__E{ensemble_config['num_realizations']}"
     else:
@@ -113,6 +117,7 @@ def create_ensemble_label(
 # =============================================================================
 # Orchestration
 # =============================================================================
+
 
 def run_data_generation(
     config: dict,
@@ -150,12 +155,12 @@ def run_data_generation(
 
     # --- Extract settings ---
 
-    output_data_dir = project_root / config['outputs']['data_dir']
-    dataset_subdirs = _get_dataset_subdirs(config['outputs'])
-    stage_name = config['outputs']['stage_name']
-    created_by = config['summary']['created_by']
-    verbose = config['runtime']['verbose']
-    dataset_configs = config['configs']
+    output_data_dir = project_root / config["outputs"]["data_dir"]
+    dataset_subdirs = _get_dataset_subdirs(config["outputs"])
+    stage_name = config["outputs"]["stage_name"]
+    created_by = config["summary"]["created_by"]
+    verbose = config["runtime"]["verbose"]
+    dataset_configs = config["configs"]
 
     # --- Generate ensembles ---
 
@@ -176,20 +181,17 @@ def run_data_generation(
         output_filepaths[dataset] = {}
 
         for ensemble_label, ensemble_config in configs_dict.items():
-
             # Generate PointDataEnsemble
             ptd_ensemble = PointDataEnsemble.from_base_config(
-                base_config=ensemble_config['base_config'],
-                noise_config=ensemble_config['noise_config'],
-                num_realizations=ensemble_config['num_realizations'],
-                base_seed=ensemble_config['base_seed'],
+                base_config=ensemble_config["base_config"],
+                noise_config=ensemble_config["noise_config"],
+                num_realizations=ensemble_config["num_realizations"],
+                base_seed=ensemble_config["base_seed"],
             )
 
             # Save to HDF5
             if dataset_subdirs:
-                output_filepath = (
-                    output_data_dir / dataset / f"{ensemble_label}.h5"
-                )
+                output_filepath = output_data_dir / dataset / f"{ensemble_label}.h5"
             else:
                 output_filepath = output_data_dir / f"{ensemble_label}.h5"
             output_filepath.parent.mkdir(parents=True, exist_ok=True)
@@ -199,13 +201,13 @@ def run_data_generation(
             save_h5(
                 output_filepath,
                 attributes={
-                    'created_by': created_by,
-                    'creation_time': datetime.now().isoformat(),
-                    'stage_name': stage_name,
-                    'stage_config': ensemble_config,
+                    "created_by": created_by,
+                    "creation_time": datetime.now().isoformat(),
+                    "stage_name": stage_name,
+                    "stage_config": ensemble_config,
                 },
                 group=None,
-                mode='update',
+                mode="update",
             )
 
             output_filepaths[dataset][ensemble_label] = output_filepath
@@ -217,15 +219,14 @@ def run_data_generation(
             )
             if verbose:
                 print(f"  {ptd_ensemble}")
-                print(f"  data type: "
-                      f"{ptd_ensemble.members[0].data_type}")
-                print(f"  noise config: "
-                      f"scale={ensemble_config['noise_config']['scale']}, "
-                      f"distribution={ensemble_config['noise_config'].get('distribution', 'normal')}")
-                print(f"  file path: "
-                      f"{output_filepath.relative_to(project_root)}")
-                print(f"  file size: "
-                      f"{output_filepath.stat().st_size / 1024:.2f} KB")
+                print(f"  data type: {ptd_ensemble.members[0].data_type}")
+                print(
+                    f"  noise config: "
+                    f"scale={ensemble_config['noise_config']['scale']}, "
+                    f"distribution={ensemble_config['noise_config'].get('distribution', 'normal')}"
+                )
+                print(f"  file path: {output_filepath.relative_to(project_root)}")
+                print(f"  file size: {output_filepath.stat().st_size / 1024:.2f} KB")
                 print()
 
     return output_filepaths
@@ -291,7 +292,6 @@ def run_data_import(
         output_filepaths[dataset] = {}
 
         for ensemble_label, import_config in configs_dict.items():
-
             # Construct PointDataEnsemble
             ptd_ensemble = _import_ensemble_from_config(
                 import_config,
@@ -300,9 +300,7 @@ def run_data_import(
 
             # Save to HDF5
             if dataset_subdirs:
-                output_filepath = (
-                    output_data_dir / dataset / f"{ensemble_label}.h5"
-                )
+                output_filepath = output_data_dir / dataset / f"{ensemble_label}.h5"
             else:
                 output_filepath = output_data_dir / f"{ensemble_label}.h5"
             output_filepath.parent.mkdir(parents=True, exist_ok=True)
@@ -325,19 +323,14 @@ def run_data_import(
 
             # Completion
             print(
-                f"Imported {ptd_ensemble.size} members "
-                f"for {dataset} / {ensemble_label}"
+                f"Imported {ptd_ensemble.size} members for {dataset} / {ensemble_label}"
             )
             if verbose:
                 print(f"  {ptd_ensemble}")
-                print(f"  import mode: "
-                      f"{import_config['import_mode']}")
-                print(f"  data type: "
-                      f"{ptd_ensemble.members[0].data_type}")
-                print(f"  file path: "
-                      f"{output_filepath.relative_to(project_root)}")
-                print(f"  file size: "
-                      f"{output_filepath.stat().st_size / 1024:.2f} KB")
+                print(f"  import mode: {import_config['import_mode']}")
+                print(f"  data type: {ptd_ensemble.members[0].data_type}")
+                print(f"  file path: {output_filepath.relative_to(project_root)}")
+                print(f"  file size: {output_filepath.stat().st_size / 1024:.2f} KB")
                 print()
 
     return output_filepaths
@@ -346,6 +339,7 @@ def run_data_import(
 # =============================================================================
 # Helpers
 # =============================================================================
+
 
 def _get_dataset_subdirs(outputs_config: dict) -> bool:
     """Return whether point data outputs should be grouped by dataset."""

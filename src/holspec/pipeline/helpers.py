@@ -5,6 +5,7 @@ Convenience functions for selecting pipeline input/output filepaths via
 glob filters, and for splitting a unified pipeline config into per-stage
 config dicts.
 """
+
 from __future__ import annotations
 
 from fnmatch import fnmatch
@@ -67,7 +68,7 @@ def select_pipeline_inputs(
         ):
             continue
 
-        for filepath in sorted(dataset_dir.glob('*.h5')):
+        for filepath in sorted(dataset_dir.glob("*.h5")):
             ptd_label = filepath.stem
 
             # Filter by point data label
@@ -136,16 +137,14 @@ def select_stage_outputs(
         ``output_label`` is the HDF5 file stem.
     """
     if stage_num not in PIPELINE_STAGE_NAMES or stage_num == 0:
-        raise ValueError(
-            f"stage_num must be 1--4, got {stage_num}"
-        )
+        raise ValueError(f"stage_num must be 1--4, got {stage_num}")
 
     project_root = Path(project_root)
     stage_name = PIPELINE_STAGE_NAMES[stage_num]
     if base_dir is not None:
         output_data_dir = project_root / base_dir / stage_name
     else:
-        output_data_dir = project_root / 'data' / 'interim' / stage_name
+        output_data_dir = project_root / "data" / "interim" / stage_name
     raw_data_dir = _resolve_raw_data_dir(project_root, raw_data_dir)
 
     if not output_data_dir.is_dir():
@@ -158,7 +157,7 @@ def select_stage_outputs(
         for dataset_dir in sorted(raw_data_dir.iterdir()):
             if not dataset_dir.is_dir():
                 continue
-            for raw_file in dataset_dir.glob('*.h5'):
+            for raw_file in dataset_dir.glob("*.h5"):
                 ptd_datasets.setdefault(raw_file.stem, set()).add(dataset_dir.name)
 
     # Whether filenames have the {sc}__{cm} format (stage 2+)
@@ -189,13 +188,13 @@ def select_stage_outputs(
 
         # Collect matching output files
         ptd_filepaths: dict[str, Path] = {}
-        for filepath in sorted(ptd_subdir.glob('*.h5')):
+        for filepath in sorted(ptd_subdir.glob("*.h5")):
             stem = filepath.stem
 
             if has_metric_suffix:
-                parts = stem.split('__', 1)
+                parts = stem.split("__", 1)
                 sc_label = parts[0]
-                cm_label = parts[1] if len(parts) == 2 else ''
+                cm_label = parts[1] if len(parts) == 2 else ""
             else:
                 sc_label = stem
                 cm_label = None
@@ -210,9 +209,7 @@ def select_stage_outputs(
             if (
                 has_metric_suffix
                 and select_cochain_metric
-                and not any(
-                    fnmatch(cm_label, g) for g in select_cochain_metric
-                )
+                and not any(fnmatch(cm_label, g) for g in select_cochain_metric)
             ):
                 continue
 
@@ -255,12 +252,15 @@ def split_pipeline_config(
 
     for stage_num in (1, 2, 3, 4):
         if stage_num == 1:
-            input_filepaths = pipeline_config['inputs']['filepaths']
+            input_filepaths = pipeline_config["inputs"]["filepaths"]
         else:
             input_filepaths = {}
 
         stage_configs[stage_num] = _assemble_stage_config(
-            pipeline_config, stage_num, input_filepaths, project_root,
+            pipeline_config,
+            stage_num,
+            input_filepaths,
+            project_root,
         )
 
     return stage_configs
@@ -275,7 +275,7 @@ def _resolve_raw_data_dir(
 ) -> Path:
     """Resolve a raw point data directory relative to the project root."""
     if raw_data_dir is None:
-        return project_root / 'data' / 'raw'
+        return project_root / "data" / "raw"
     raw_data_dir = Path(raw_data_dir)
     if raw_data_dir.is_absolute():
         return raw_data_dir

@@ -6,6 +6,7 @@ Defines the four stage runners ``run_topology_simplicial``,
 plus shared helpers for output-file initialization and per-stage failure
 reporting. Stage names are exposed via ``PIPELINE_STAGE_NAMES``.
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -15,7 +16,9 @@ import warnings
 import yaml
 
 from holspec.utilities import (
-    save_h5, convert_relative_to_paths, get_keys_h5,
+    save_h5,
+    convert_relative_to_paths,
+    get_keys_h5,
 )
 from holspec.point_data import PointDataEnsemble
 from holspec.simplicial import SimplicialComplex
@@ -31,17 +34,18 @@ from .provenance import trace_provenance, load_hodge_laplacian
 # =============================================================================
 
 PIPELINE_STAGE_NAMES: dict[int, str] = {
-    0: 'point_data',
-    1: 'topology_simplicial',
-    2: 'geometry_metric',
-    3: 'hodge_laplacian',
-    4: 'spectra',
+    0: "point_data",
+    1: "topology_simplicial",
+    2: "geometry_metric",
+    3: "hodge_laplacian",
+    4: "spectra",
 }
 
 
 # =============================================================================
 # Pipeline Stage Functions
 # =============================================================================
+
 
 def _initialize_pipeline_file(
     output_filepath: Path,
@@ -78,14 +82,14 @@ def _initialize_pipeline_file(
     save_h5(
         output_filepath,
         attributes={
-            'created_by': created_by,
-            'creation_time': datetime.now().isoformat(),
-            'input_file': str(input_filepath.relative_to(project_root)),
-            'stage_name': stage_name,
-            'stage_config': stage_config,
+            "created_by": created_by,
+            "creation_time": datetime.now().isoformat(),
+            "input_file": str(input_filepath.relative_to(project_root)),
+            "stage_name": stage_name,
+            "stage_config": stage_config,
         },
         group=None,
-        mode='replace',
+        mode="replace",
     )
 
 
@@ -124,12 +128,12 @@ def _build_failure_record(
         ``timestamp``.
     """
     return {
-        'member_key': member_key,
-        'input_file': str(input_filepath.relative_to(project_root)),
-        'output_file': str(output_filepath.relative_to(project_root)),
-        'exception_type': type(exc).__name__,
-        'exception_message': str(exc),
-        'timestamp': datetime.now().isoformat(),
+        "member_key": member_key,
+        "input_file": str(input_filepath.relative_to(project_root)),
+        "output_file": str(output_filepath.relative_to(project_root)),
+        "exception_type": type(exc).__name__,
+        "exception_message": str(exc),
+        "timestamp": datetime.now().isoformat(),
     }
 
 
@@ -184,43 +188,42 @@ def _save_error_report(
     Path
         Absolute path to the written report file.
     """
-    reports_dir = output_data_dir.parent.parent / 'reports'
+    reports_dir = output_data_dir.parent.parent / "reports"
     reports_dir.mkdir(parents=True, exist_ok=True)
 
-    timestamp = datetime.now().isoformat().replace(':', '-')
+    timestamp = datetime.now().isoformat().replace(":", "-")
     report_filename = f"{timestamp}__{stage_name}__report.yml"
     report_path = reports_dir / report_filename
 
     report = {
-        'summary': {
-            'created_by': created_by,
-            'creation_time': datetime.now().isoformat(),
-            'stage_name': stage_name,
+        "summary": {
+            "created_by": created_by,
+            "creation_time": datetime.now().isoformat(),
+            "stage_name": stage_name,
         },
-        'runtime': {
-            'error_handling': error_handling,
-            'output_retention': output_retention,
-            'save_error_report': save_error_report,
+        "runtime": {
+            "error_handling": error_handling,
+            "output_retention": output_retention,
+            "save_error_report": save_error_report,
         },
-        'results': {
-            'num_failed': len(failures),
-            'num_succeeded': num_succeeded,
-            'num_output_files_deleted': num_output_files_deleted,
-            'num_output_files_retained': num_output_files_retained,
+        "results": {
+            "num_failed": len(failures),
+            "num_succeeded": num_succeeded,
+            "num_output_files_deleted": num_output_files_deleted,
+            "num_output_files_retained": num_output_files_retained,
         },
-        'exceptions': failures,
+        "exceptions": failures,
     }
 
-    with open(report_path, 'w') as f:
+    with open(report_path, "w") as f:
         yaml.safe_dump(
-            report, f,
-            default_flow_style=False, sort_keys=False,
+            report,
+            f,
+            default_flow_style=False,
+            sort_keys=False,
         )
 
-    print(
-        f"Error report saved: "
-        f"{report_path.relative_to(project_root)}"
-    )
+    print(f"Error report saved: {report_path.relative_to(project_root)}")
 
     return report_path
 
@@ -266,19 +269,20 @@ def run_topology_simplicial(
     project_root = Path(project_root)
 
     input_filepaths = convert_relative_to_paths(
-        config['inputs']['filepaths'], project_root,
+        config["inputs"]["filepaths"],
+        project_root,
     )
-    output_data_dir = project_root / config['outputs']['data_dir']
-    created_by = config['summary']['created_by']
-    verbose = config['runtime']['verbose']
-    stage_name = config['outputs']['stage_name']
+    output_data_dir = project_root / config["outputs"]["data_dir"]
+    created_by = config["summary"]["created_by"]
+    verbose = config["runtime"]["verbose"]
+    stage_name = config["outputs"]["stage_name"]
 
-    simplicial_constructions = config['configs']['simplicial_constructions']
-    cache_incidence = config['runtime']['cache_incidence']
-    validate_boundary_property = config['runtime']['validate_boundary_property']
-    error_handling = config['runtime'].get('error_handling', 'skip')
-    output_retention = config['runtime'].get('output_retention', 'partial')
-    save_error_report = config['runtime'].get('save_error_report', True)
+    simplicial_constructions = config["configs"]["simplicial_constructions"]
+    cache_incidence = config["runtime"]["cache_incidence"]
+    validate_boundary_property = config["runtime"]["validate_boundary_property"]
+    error_handling = config["runtime"].get("error_handling", "skip")
+    output_retention = config["runtime"].get("output_retention", "partial")
+    save_error_report = config["runtime"].get("save_error_report", True)
 
     failures: list[dict] = []
     total_succeeded = 0
@@ -289,25 +293,26 @@ def run_topology_simplicial(
     output_filepaths: dict[str, dict[str, Path]] = {}
 
     for ptd_label, ptd_filepath in input_filepaths.items():
-
         # Load ensemble once per point data label
         point_data_ensemble = PointDataEnsemble.load(ptd_filepath)
 
         # Discover ensemble members from input file
         member_keys = [
-            key for key in get_keys_h5(ptd_filepath)
-            if key.startswith('member_')
+            key for key in get_keys_h5(ptd_filepath) if key.startswith("member_")
         ]
 
         for sc_label, sc_config in simplicial_constructions.items():
-
             # Output file path
             output_filepath = output_data_dir / ptd_label / f"{sc_label}.h5"
 
             # Initialize file with pipeline metadata
             _initialize_pipeline_file(
-                output_filepath, created_by, ptd_filepath,
-                project_root, stage_name, sc_config,
+                output_filepath,
+                created_by,
+                ptd_filepath,
+                project_root,
+                stage_name,
+                sc_config,
             )
 
             num_succeeded = 0
@@ -315,15 +320,15 @@ def run_topology_simplicial(
 
             # Iterate computation over ensemble members
             for member_key in member_keys:
-
                 try:
-                    member_index = int(member_key.split('_')[1])
+                    member_index = int(member_key.split("_")[1])
                     ptd = point_data_ensemble[member_index]
 
                     # Construct simplicial complex
                     sc = SimplicialComplex.from_point_data(
-                        ptd, sc_config,
-                        metadata={'member_index': member_index},
+                        ptd,
+                        sc_config,
+                        metadata={"member_index": member_index},
                     )
 
                     # Cache incidence matrices for requested degrees
@@ -343,7 +348,7 @@ def run_topology_simplicial(
                     sc.save(
                         output_filepath,
                         save_incidence=True,
-                        mode='replace',
+                        mode="replace",
                         group=member_key,
                     )
 
@@ -352,8 +357,11 @@ def run_topology_simplicial(
                 except Exception as exc:
                     num_failed += 1
                     failure_record = _build_failure_record(
-                        member_key, ptd_filepath, output_filepath,
-                        exc, project_root,
+                        member_key,
+                        ptd_filepath,
+                        output_filepath,
+                        exc,
+                        project_root,
                     )
                     failures.append(failure_record)
 
@@ -364,16 +372,14 @@ def run_topology_simplicial(
                     print(f"    output_file: {failure_record['output_file']}")
                     print(f"    timestamp:   {failure_record['timestamp']}")
 
-                    if error_handling == 'raise':
+                    if error_handling == "raise":
                         raise
 
             # Accumulate stage-level counts
             total_succeeded += num_succeeded
 
             # Completion
-            skip_suffix = (
-                f" ({num_failed} skipped)" if num_failed > 0 else ""
-            )
+            skip_suffix = f" ({num_failed} skipped)" if num_failed > 0 else ""
             print(
                 f"Constructed {num_succeeded} simplicial "
                 f"complexes for {ptd_label} / {sc_label}{skip_suffix}"
@@ -388,10 +394,8 @@ def run_topology_simplicial(
                         print(f"    D_{k}: shape={D_k.shape}, nnz={D_k.nnz}")
                     else:
                         print(f"    D_{k}: (not cached)")
-                print(f"  file path: "
-                      f"{output_filepath.relative_to(project_root)}")
-                print(f"  file size: "
-                      f"{output_filepath.stat().st_size / 1024:.2f} KB")
+                print(f"  file path: {output_filepath.relative_to(project_root)}")
+                print(f"  file size: {output_filepath.stat().st_size / 1024:.2f} KB")
                 print()
             if num_succeeded == 0:
                 print()
@@ -401,10 +405,11 @@ def run_topology_simplicial(
             if num_failed > 0:
                 delete_file = False
                 if num_succeeded == 0 and output_retention in (
-                    'partial', 'complete',
+                    "partial",
+                    "complete",
                 ):
                     delete_file = True
-                elif num_succeeded > 0 and output_retention == 'complete':
+                elif num_succeeded > 0 and output_retention == "complete":
                     delete_file = True
 
                 if delete_file:
@@ -413,9 +418,7 @@ def run_topology_simplicial(
                     total_output_files_deleted += 1
 
             if not file_deleted:
-                output_filepaths.setdefault(ptd_label, {})[sc_label] = (
-                    output_filepath
-                )
+                output_filepaths.setdefault(ptd_label, {})[sc_label] = output_filepath
                 total_output_files_retained += 1
 
     if save_error_report and failures:
@@ -474,18 +477,19 @@ def run_geometry_metric(
     project_root = Path(project_root)
 
     input_filepaths = convert_relative_to_paths(
-        config['inputs']['filepaths'], project_root,
+        config["inputs"]["filepaths"],
+        project_root,
     )
-    output_data_dir = project_root / config['outputs']['data_dir']
-    created_by = config['summary']['created_by']
-    verbose = config['runtime']['verbose']
-    stage_name = config['outputs']['stage_name']
+    output_data_dir = project_root / config["outputs"]["data_dir"]
+    created_by = config["summary"]["created_by"]
+    verbose = config["runtime"]["verbose"]
+    stage_name = config["outputs"]["stage_name"]
 
-    metric_models = config['configs']['metric_models']
-    validate_metric = config['runtime']['validate_metric']
-    error_handling = config['runtime'].get('error_handling', 'skip')
-    output_retention = config['runtime'].get('output_retention', 'partial')
-    save_error_report = config['runtime'].get('save_error_report', True)
+    metric_models = config["configs"]["metric_models"]
+    validate_metric = config["runtime"]["validate_metric"]
+    error_handling = config["runtime"].get("error_handling", "skip")
+    output_retention = config["runtime"].get("output_retention", "partial")
+    save_error_report = config["runtime"].get("save_error_report", True)
 
     failures: list[dict] = []
     total_succeeded = 0
@@ -496,35 +500,33 @@ def run_geometry_metric(
     output_filepaths: dict[str, dict[str, Path]] = {}
 
     for ptd_label, sc_files in input_filepaths.items():
-
         for sc_label, sc_filepath in sc_files.items():
-
             # Trace provenance chain for file paths
             provenance_chain = trace_provenance(sc_filepath, project_root)
-            ptd_filepath = provenance_chain['point_data']
+            ptd_filepath = provenance_chain["point_data"]
 
             # Load point data from file
             point_data_ensemble = PointDataEnsemble.load(ptd_filepath)
 
             # Discover ensemble members from input file
             member_keys = [
-                key for key in get_keys_h5(sc_filepath)
-                if key.startswith('member_')
+                key for key in get_keys_h5(sc_filepath) if key.startswith("member_")
             ]
 
             for cm_label, cm_config in metric_models.items():
-
                 # Output file path
                 output_label = f"{sc_label}__{cm_label}"
-                output_filepath = (
-                    output_data_dir / ptd_label / f"{output_label}.h5"
-                )
+                output_filepath = output_data_dir / ptd_label / f"{output_label}.h5"
 
                 # Initialize file with pipeline metadata
                 # (input_file points to SC file, the immediate predecessor)
                 _initialize_pipeline_file(
-                    output_filepath, created_by, sc_filepath,
-                    project_root, stage_name, cm_config,
+                    output_filepath,
+                    created_by,
+                    sc_filepath,
+                    project_root,
+                    stage_name,
+                    cm_config,
                 )
 
                 num_succeeded = 0
@@ -532,21 +534,23 @@ def run_geometry_metric(
 
                 # Iterate computation over ensemble members
                 for member_key in member_keys:
-
                     try:
-                        member_index = int(member_key.split('_')[1])
+                        member_index = int(member_key.split("_")[1])
                         ptd = point_data_ensemble[member_index]
 
                         # Load simplicial complex for this member
                         sc = SimplicialComplex.load(
-                            sc_filepath, group=member_key,
+                            sc_filepath,
+                            group=member_key,
                             load_incidence=True,
                         )
 
                         # Construct cochain metric
                         cm = CochainMetric.from_simplicial_complex_and_point_data(
-                            sc, ptd, cm_config,
-                            metadata={'member_index': member_index},
+                            sc,
+                            ptd,
+                            cm_config,
+                            metadata={"member_index": member_index},
                         )
 
                         # Validate metric dimensions against simplicial complex
@@ -556,7 +560,7 @@ def run_geometry_metric(
                         # Save cochain metric to file
                         cm.save(
                             output_filepath,
-                            mode='replace',
+                            mode="replace",
                             group=member_key,
                         )
 
@@ -565,8 +569,11 @@ def run_geometry_metric(
                     except Exception as exc:
                         num_failed += 1
                         failure_record = _build_failure_record(
-                            member_key, sc_filepath, output_filepath,
-                            exc, project_root,
+                            member_key,
+                            sc_filepath,
+                            output_filepath,
+                            exc,
+                            project_root,
                         )
                         failures.append(failure_record)
 
@@ -577,16 +584,14 @@ def run_geometry_metric(
                         print(f"    output_file: {failure_record['output_file']}")
                         print(f"    timestamp:   {failure_record['timestamp']}")
 
-                        if error_handling == 'raise':
+                        if error_handling == "raise":
                             raise
 
                 # Accumulate stage-level counts
                 total_succeeded += num_succeeded
 
                 # Completion
-                skip_suffix = (
-                    f" ({num_failed} skipped)" if num_failed > 0 else ""
-                )
+                skip_suffix = f" ({num_failed} skipped)" if num_failed > 0 else ""
                 print(
                     f"Defined {num_succeeded} cochain "
                     f"metrics for {ptd_label} / {output_label}{skip_suffix}"
@@ -598,13 +603,12 @@ def run_geometry_metric(
                     for k in range(cm.max_dim + 1):
                         G_k = cm[k]
                         print(
-                            f"    G_{k}: size={G_k.size}, "
-                            f"is_diagonal={G_k.is_diagonal}"
+                            f"    G_{k}: size={G_k.size}, is_diagonal={G_k.is_diagonal}"
                         )
-                    print(f"  file path: "
-                          f"{output_filepath.relative_to(project_root)}")
-                    print(f"  file size: "
-                          f"{output_filepath.stat().st_size / 1024:.2f} KB")
+                    print(f"  file path: {output_filepath.relative_to(project_root)}")
+                    print(
+                        f"  file size: {output_filepath.stat().st_size / 1024:.2f} KB"
+                    )
                     print()
                 if num_succeeded == 0:
                     print()
@@ -614,13 +618,11 @@ def run_geometry_metric(
                 if num_failed > 0:
                     delete_file = False
                     if num_succeeded == 0 and output_retention in (
-                        'partial', 'complete',
+                        "partial",
+                        "complete",
                     ):
                         delete_file = True
-                    elif (
-                        num_succeeded > 0
-                        and output_retention == 'complete'
-                    ):
+                    elif num_succeeded > 0 and output_retention == "complete":
                         delete_file = True
 
                     if delete_file:
@@ -630,7 +632,8 @@ def run_geometry_metric(
 
                 if not file_deleted:
                     output_filepaths.setdefault(
-                        ptd_label, {},
+                        ptd_label,
+                        {},
                     )[output_label] = output_filepath
                     total_output_files_retained += 1
 
@@ -700,18 +703,19 @@ def run_hodge_laplacian(
     project_root = Path(project_root)
 
     input_filepaths = convert_relative_to_paths(
-        config['inputs']['filepaths'], project_root,
+        config["inputs"]["filepaths"],
+        project_root,
     )
-    output_data_dir = project_root / config['outputs']['data_dir']
-    created_by = config['summary']['created_by']
-    verbose = config['runtime']['verbose']
-    stage_name = config['outputs']['stage_name']
+    output_data_dir = project_root / config["outputs"]["data_dir"]
+    created_by = config["summary"]["created_by"]
+    verbose = config["runtime"]["verbose"]
+    stage_name = config["outputs"]["stage_name"]
 
-    cache_laplacians = config['runtime']['cache_laplacians']
-    validate_laplacians = config['runtime']['validate_laplacians']
-    error_handling = config['runtime'].get('error_handling', 'skip')
-    output_retention = config['runtime'].get('output_retention', 'partial')
-    save_error_report = config['runtime'].get('save_error_report', True)
+    cache_laplacians = config["runtime"]["cache_laplacians"]
+    validate_laplacians = config["runtime"]["validate_laplacians"]
+    error_handling = config["runtime"].get("error_handling", "skip")
+    output_retention = config["runtime"].get("output_retention", "partial")
+    save_error_report = config["runtime"].get("save_error_report", True)
 
     failures: list[dict] = []
     total_succeeded = 0
@@ -722,29 +726,28 @@ def run_hodge_laplacian(
     output_filepaths: dict[str, dict[str, Path]] = {}
 
     for ptd_label, cm_files in input_filepaths.items():
-
         for cm_label, cm_filepath in cm_files.items():
-
             # Trace provenance chain for file paths
             provenance_chain = trace_provenance(cm_filepath, project_root)
-            sc_filepath = provenance_chain['topology_simplicial']
+            sc_filepath = provenance_chain["topology_simplicial"]
 
             # Output file path
             output_label = cm_label
-            output_filepath = (
-                output_data_dir / ptd_label / f"{output_label}.h5"
-            )
+            output_filepath = output_data_dir / ptd_label / f"{output_label}.h5"
 
             # Initialize file with pipeline metadata
             _initialize_pipeline_file(
-                output_filepath, created_by, cm_filepath,
-                project_root, stage_name, {},
+                output_filepath,
+                created_by,
+                cm_filepath,
+                project_root,
+                stage_name,
+                {},
             )
 
             # Discover ensemble members from input file
             member_keys = [
-                key for key in get_keys_h5(cm_filepath)
-                if key.startswith('member_')
+                key for key in get_keys_h5(cm_filepath) if key.startswith("member_")
             ]
 
             num_succeeded = 0
@@ -752,15 +755,16 @@ def run_hodge_laplacian(
 
             # Iterate computation over ensemble members
             for member_key in member_keys:
-
                 try:
                     # Load upstream objects for this member
                     sc = SimplicialComplex.load(
-                        sc_filepath, group=member_key,
+                        sc_filepath,
+                        group=member_key,
                         load_incidence=True,
                     )
                     cm = CochainMetric.load(
-                        cm_filepath, group=member_key,
+                        cm_filepath,
+                        group=member_key,
                     )
 
                     # Construct Hodge Laplacian
@@ -784,7 +788,7 @@ def run_hodge_laplacian(
                     hl.save(
                         output_filepath,
                         save_laplacians=True,
-                        mode='replace',
+                        mode="replace",
                         group=member_key,
                     )
 
@@ -793,8 +797,11 @@ def run_hodge_laplacian(
                 except Exception as exc:
                     num_failed += 1
                     failure_record = _build_failure_record(
-                        member_key, cm_filepath, output_filepath,
-                        exc, project_root,
+                        member_key,
+                        cm_filepath,
+                        output_filepath,
+                        exc,
+                        project_root,
                     )
                     failures.append(failure_record)
 
@@ -805,16 +812,14 @@ def run_hodge_laplacian(
                     print(f"    output_file: {failure_record['output_file']}")
                     print(f"    timestamp:   {failure_record['timestamp']}")
 
-                    if error_handling == 'raise':
+                    if error_handling == "raise":
                         raise
 
             # Accumulate stage-level counts
             total_succeeded += num_succeeded
 
             # Completion
-            skip_suffix = (
-                f" ({num_failed} skipped)" if num_failed > 0 else ""
-            )
+            skip_suffix = f" ({num_failed} skipped)" if num_failed > 0 else ""
             print(
                 f"Assembled {num_succeeded} Hodge Laplacians "
                 f"for {ptd_label} / {cm_label}{skip_suffix}"
@@ -826,16 +831,11 @@ def run_hodge_laplacian(
                     for comp in LAPLACIAN_COMPONENT_NAMES:
                         if (k, comp) in hl._laplacian_cache:
                             L = hl._laplacian_cache[(k, comp)]
-                            print(
-                                f"    L^{k},{comp}: "
-                                f"shape={L.shape}, nnz={L.nnz}"
-                            )
+                            print(f"    L^{k},{comp}: shape={L.shape}, nnz={L.nnz}")
                         else:
                             print(f"    L^{k},{comp}: (not cached)")
-                print(f"  file path: "
-                      f"{output_filepath.relative_to(project_root)}")
-                print(f"  file size: "
-                      f"{output_filepath.stat().st_size / 1024:.2f} KB")
+                print(f"  file path: {output_filepath.relative_to(project_root)}")
+                print(f"  file size: {output_filepath.stat().st_size / 1024:.2f} KB")
                 print()
             if num_succeeded == 0:
                 print()
@@ -845,10 +845,11 @@ def run_hodge_laplacian(
             if num_failed > 0:
                 delete_file = False
                 if num_succeeded == 0 and output_retention in (
-                    'partial', 'complete',
+                    "partial",
+                    "complete",
                 ):
                     delete_file = True
-                elif num_succeeded > 0 and output_retention == 'complete':
+                elif num_succeeded > 0 and output_retention == "complete":
                     delete_file = True
 
                 if delete_file:
@@ -916,24 +917,24 @@ def run_spectra(
     project_root = Path(project_root)
 
     input_filepaths = convert_relative_to_paths(
-        config['inputs']['filepaths'], project_root,
+        config["inputs"]["filepaths"],
+        project_root,
     )
-    output_data_dir = project_root / config['outputs']['data_dir']
-    created_by = config['summary']['created_by']
-    verbose = config['runtime']['verbose']
-    stage_name = config['outputs']['stage_name']
+    output_data_dir = project_root / config["outputs"]["data_dir"]
+    created_by = config["summary"]["created_by"]
+    verbose = config["runtime"]["verbose"]
+    stage_name = config["outputs"]["stage_name"]
 
-    compute_spectra = config['configs'].get('compute_spectra', True)
-    solver = config['configs']['solver']
-    solver_params = config['configs'].get('solver_params', None)
-    compute_eigenvectors = config['configs']['compute_eigenvectors']
-    error_handling = config['runtime'].get('error_handling', 'skip')
-    output_retention = config['runtime'].get('output_retention', 'partial')
-    save_error_report = config['runtime'].get('save_error_report', True)
+    compute_spectra = config["configs"].get("compute_spectra", True)
+    solver = config["configs"]["solver"]
+    solver_params = config["configs"].get("solver_params", None)
+    compute_eigenvectors = config["configs"]["compute_eigenvectors"]
+    error_handling = config["runtime"].get("error_handling", "skip")
+    output_retention = config["runtime"].get("output_retention", "partial")
+    save_error_report = config["runtime"].get("save_error_report", True)
 
     # Warn if compute_eigenvectors requests pairs outside compute_spectra
-    if (isinstance(compute_spectra, list)
-            and isinstance(compute_eigenvectors, list)):
+    if isinstance(compute_spectra, list) and isinstance(compute_eigenvectors, list):
         spectra_keys = {(k, comp) for k, comp in compute_spectra}
         eigenvector_keys = {(k, comp) for k, comp in compute_eigenvectors}
         unreachable = eigenvector_keys - spectra_keys
@@ -954,29 +955,29 @@ def run_spectra(
     output_filepaths: dict[str, dict[str, Path]] = {}
 
     for ptd_label, hl_files in input_filepaths.items():
-
         for hl_label, hl_filepath in hl_files.items():
-
             # Output file path
             output_label = hl_label
-            output_filepath = (
-                output_data_dir / ptd_label / f"{output_label}.h5"
-            )
+            output_filepath = output_data_dir / ptd_label / f"{output_label}.h5"
 
             # Initialize file with pipeline metadata
             _initialize_pipeline_file(
-                output_filepath, created_by, hl_filepath,
-                project_root, stage_name,
-                {'compute_spectra': compute_spectra,
-                 'solver': solver,
-                 'solver_params': solver_params,
-                 'compute_eigenvectors': compute_eigenvectors},
+                output_filepath,
+                created_by,
+                hl_filepath,
+                project_root,
+                stage_name,
+                {
+                    "compute_spectra": compute_spectra,
+                    "solver": solver,
+                    "solver_params": solver_params,
+                    "compute_eigenvectors": compute_eigenvectors,
+                },
             )
 
             # Discover ensemble members from input file
             member_keys = [
-                key for key in get_keys_h5(hl_filepath)
-                if key.startswith('member_')
+                key for key in get_keys_h5(hl_filepath) if key.startswith("member_")
             ]
 
             num_succeeded = 0
@@ -984,11 +985,12 @@ def run_spectra(
 
             # Iterate computation over ensemble members
             for member_key in member_keys:
-
                 try:
                     # Load upstream HodgeLaplacian for this member
                     hl = load_hodge_laplacian(
-                        hl_filepath, project_root, group=member_key,
+                        hl_filepath,
+                        project_root,
+                        group=member_key,
                     )
 
                     # Construct HodgeLaplacianSpectra
@@ -1012,7 +1014,7 @@ def run_spectra(
                     hlsp.save(
                         output_filepath,
                         save_eigenvectors=True,
-                        mode='replace',
+                        mode="replace",
                         group=member_key,
                     )
 
@@ -1021,8 +1023,11 @@ def run_spectra(
                 except Exception as exc:
                     num_failed += 1
                     failure_record = _build_failure_record(
-                        member_key, hl_filepath, output_filepath,
-                        exc, project_root,
+                        member_key,
+                        hl_filepath,
+                        output_filepath,
+                        exc,
+                        project_root,
                     )
                     failures.append(failure_record)
 
@@ -1033,16 +1038,14 @@ def run_spectra(
                     print(f"    output_file: {failure_record['output_file']}")
                     print(f"    timestamp:   {failure_record['timestamp']}")
 
-                    if error_handling == 'raise':
+                    if error_handling == "raise":
                         raise
 
             # Accumulate stage-level counts
             total_succeeded += num_succeeded
 
             # Completion
-            skip_suffix = (
-                f" ({num_failed} skipped)" if num_failed > 0 else ""
-            )
+            skip_suffix = f" ({num_failed} skipped)" if num_failed > 0 else ""
             print(
                 f"Computed {num_succeeded} spectra "
                 f"for {ptd_label} / {hl_label}{skip_suffix}"
@@ -1066,10 +1069,8 @@ def run_spectra(
                             )
                         else:
                             print(f"    L^{k},{comp}: (not computed)")
-                print(f"  file path: "
-                      f"{output_filepath.relative_to(project_root)}")
-                print(f"  file size: "
-                      f"{output_filepath.stat().st_size / 1024:.2f} KB")
+                print(f"  file path: {output_filepath.relative_to(project_root)}")
+                print(f"  file size: {output_filepath.stat().st_size / 1024:.2f} KB")
                 print()
             if num_succeeded == 0:
                 print()
@@ -1079,10 +1080,11 @@ def run_spectra(
             if num_failed > 0:
                 delete_file = False
                 if num_succeeded == 0 and output_retention in (
-                    'partial', 'complete',
+                    "partial",
+                    "complete",
                 ):
                     delete_file = True
-                elif num_succeeded > 0 and output_retention == 'complete':
+                elif num_succeeded > 0 and output_retention == "complete":
                     delete_file = True
 
                 if delete_file:

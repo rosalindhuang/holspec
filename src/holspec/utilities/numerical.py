@@ -22,13 +22,13 @@ def compute_content_hash(data: np.ndarray, length: int = 12) -> str:
 def add_noise(
     array: np.ndarray,
     scale: float,
-    distribution: str = 'normal',
+    distribution: str = "normal",
     axis: int | tuple | None = None,
-    seed: int | None = None
+    seed: int | None = None,
 ) -> np.ndarray:
     """
     Add random noise to an array.
-    
+
     Parameters
     ----------
     array : ndarray
@@ -44,18 +44,18 @@ def add_noise(
         If specified, noise shape will broadcast along other axes.
     seed : int, optional
         Random seed for reproducibility.
-    
+
     Returns
     -------
     noisy_array : ndarray
         Array with added noise, same shape as input.
-    
+
     Examples
     --------
     >>> x = np.array([1.0, 2.0, 3.0])
     >>> add_noise(x, scale=0.1, seed=42)
     array([1.04967142, 1.98617357, 2.86475726])
-    
+
     >>> # Add noise only along first axis of 2D array
     >>> x = np.ones((3, 4))
     >>> noisy = add_noise(x, scale=0.1, axis=0, seed=42)
@@ -63,7 +63,7 @@ def add_noise(
     array([1.04967142, 0.98617357, 0.86475726])
     """
     rng = np.random.default_rng(seed)
-    
+
     # Determine noise shape
     if axis is None:
         noise_shape = array.shape
@@ -73,32 +73,36 @@ def add_noise(
         axes = (axis,) if isinstance(axis, int) else axis
         for ax in axes:
             if ax < 0 or ax >= len(noise_shape):
-                raise ValueError(f"axis {ax} out of bounds for array of dimension {len(noise_shape)}")
+                raise ValueError(
+                    f"axis {ax} out of bounds for array of dimension {len(noise_shape)}"
+                )
         # Set non-noise axes to size 1 for broadcasting
         for i in range(len(noise_shape)):
             if i not in axes:
                 noise_shape[i] = 1
         noise_shape = tuple(noise_shape)
-    
+
     # Generate noise
-    if distribution == 'normal':
+    if distribution == "normal":
         noise = scale * rng.standard_normal(noise_shape)
-    elif distribution == 'uniform':
+    elif distribution == "uniform":
         noise = scale * (rng.random(noise_shape) - 0.5)
     else:
-        raise ValueError(f"Unknown distribution: '{distribution}'. Use 'normal' or 'uniform'.")
-    
+        raise ValueError(
+            f"Unknown distribution: '{distribution}'. Use 'normal' or 'uniform'."
+        )
+
     return array + noise
 
 
 def create_noise_label(
-    noise_config: dict, 
-    float_fmt: str | None = 'g',
+    noise_config: dict,
+    float_fmt: str | None = "g",
     strip_zeros: bool = True,
 ) -> str:
     """
     Create a unique label from noise configuration.
-    
+
     Parameters
     ----------
     noise_config : dict
@@ -106,12 +110,12 @@ def create_noise_label(
     float_fmt : str or None, optional
         Format specifier for floats (e.g., 'g', '.2e', '.0e', '.3f'). Default is 'g'.
         If None, defaults to 'g'.
-    
+
     Returns
     -------
     label : str
         Descriptive label. Format: noise_{dist}_s{scale}
-    
+
     Examples
     --------
     >>> create_noise_label({'scale': 0.1, 'distribution': 'uniform'})
@@ -120,19 +124,17 @@ def create_noise_label(
     'noise_norm_s1e-02'
     """
     # Validate noise_config
-    if 'scale' not in noise_config:
+    if "scale" not in noise_config:
         raise ValueError("noise_config must contain 'scale' key")
-    
+
     # Format scale for label
-    scale = noise_config['scale']
+    scale = noise_config["scale"]
     scale_str = format_float_str(scale, float_fmt, strip_zeros=strip_zeros)
 
     # Format distribution for label
-    dist = noise_config.get('distribution')
+    dist = noise_config.get("distribution")
     if dist is None:
         return f"noise_s{scale_str}"
     dist_str = dist[:1]
-    
+
     return f"noise_{dist_str}_s{scale_str}"
-
-

@@ -19,17 +19,18 @@ from holspec.utilities.helpers import convert_numpy_to_python
 # Saving and reading to HDF5
 # =============================================================================
 
+
 def save_h5(
     filepath: str | Path,
     datasets: Optional[dict[str, Any]] = None,
     attributes: Optional[dict[str, Any]] = None,
     group: Optional[str] = None,
-    mode: str = 'replace',
-    hdf5_options: Optional[dict] = None
+    mode: str = "replace",
+    hdf5_options: Optional[dict] = None,
 ):
     """
     Save datasets and attributes to an HDF5 file.
-    
+
     Parameters
     ----------
     filepath : str or Path
@@ -37,7 +38,7 @@ def save_h5(
     datasets : dict[str, array-like], optional
         Dictionary of (name: data) pairs to save as datasets.
     attributes : dict, optional
-        Dictionary of (name: value) pairs to save as HDF5 attributes. 
+        Dictionary of (name: value) pairs to save as HDF5 attributes.
     group : str, optional
         If specified, datasets and attributes are saved under this group.
         If None, saved at root level.
@@ -49,14 +50,14 @@ def save_h5(
     hdf5_options : dict, optional
         Additional options for dataset creation (e.g., {'compression': 'gzip'}).
         If compression is specified without chunks, chunks=True is set automatically.
-    
+
     Raises
     ------
     ValueError
         If mode is not one of {'update', 'create', 'replace'}.
     FileExistsError
         If mode='create' and the target file or group already exists.
-    
+
     Notes
     -----
     - Parent directories are created automatically if they don't exist.
@@ -64,78 +65,77 @@ def save_h5(
       a new file, and ``update`` preserves unspecified file contents.
     - For `attributes`, values are automatically converted to HDF5-compatible types.
       Dicts are automatically serialized to JSON strings. Numpy types are converted to native Python types.
-    
+
     Examples
     --------
     >>> # Save to root level
     >>> save_h5('data.h5', datasets={'x': [1, 2, 3]}, attributes={'info': 'test'})
-    
+
     >>> # Save to a group, replacing if exists
     >>> save_h5('data.h5', datasets={'x': data}, group='experiment1', mode='replace')
-    
+
     >>> # Create a new group (error if exists)
     >>> save_h5('data.h5', datasets={'x': data}, group='experiment2', mode='create')
     """
     # Validate mode
-    valid_modes = {'update', 'create', 'replace'}
+    valid_modes = {"update", "create", "replace"}
     if mode not in valid_modes:
         raise ValueError(f"mode must be one of {valid_modes}, got '{mode}'")
-    
+
     # Ensure parent directory exists
     filepath = Path(filepath)
     filepath.parent.mkdir(parents=True, exist_ok=True)
-    
+
     # Set default HDF5 options if not provided
-    if hdf5_options is None: 
+    if hdf5_options is None:
         hdf5_options = {}
-    if 'compression' in hdf5_options and 'chunks' not in hdf5_options:
-        hdf5_options['chunks'] = True
+    if "compression" in hdf5_options and "chunks" not in hdf5_options:
+        hdf5_options["chunks"] = True
 
     # File modes implement root-level semantics. Named-group operations
     # always open the containing file for update and apply mode to the group.
     if group is None:
         file_mode = {
-            'update': 'a',
-            'create': 'x',
-            'replace': 'w',
+            "update": "a",
+            "create": "x",
+            "replace": "w",
         }[mode]
     else:
-        file_mode = 'a'
-    
+        file_mode = "a"
+
     with h5py.File(str(filepath), file_mode) as f:
-        
         # Determine target location (root or group)
         if group is None:
             target = f  # Save at root level
         else:
             group_exists = group in f
-            
-            if mode == 'create':
+
+            if mode == "create":
                 if group_exists:
                     raise FileExistsError(
                         f"Group '{group}' already exists in {filepath}. "
                         f"Use mode='update' to merge or mode='replace' to overwrite."
                     )
                 target = f.create_group(group)
-            
-            elif mode == 'replace':
+
+            elif mode == "replace":
                 if group_exists:
                     del f[group]
                 target = f.create_group(group)
-            
+
             else:  # mode == 'update'
                 if group_exists:
                     target = f[group]
                 else:
                     target = f.create_group(group)
-        
+
         # Save each dataset under target (always overwrite existing datasets)
         if datasets is not None:
             for key, value in datasets.items():
                 if key in target:  # Remove existing dataset
                     del target[key]
                 target.create_dataset(key, data=np.asarray(value), **hdf5_options)
-        
+
         # Save each attribute (always overwrite existing attributes)
         if attributes is not None:
             for key, value in attributes.items():
@@ -145,11 +145,11 @@ def save_h5(
 def read_h5(
     filepath: str | Path,
     group: Optional[str] = None,
-    dataset_names: Optional[list[str]] = None
+    dataset_names: Optional[list[str]] = None,
 ) -> tuple[dict[str, np.ndarray], dict[str, Any]]:
     """
     Read datasets and attributes from an HDF5 file.
-    
+
     Parameters
     ----------
     filepath : str or Path
@@ -159,37 +159,36 @@ def read_h5(
     dataset_names : list[str], optional
         If specified, only loads these datasets by name.
         If None, loads all datasets in the group/root.
-    
+
     Returns
     -------
     datasets : dict[str, np.ndarray]
         Dictionary of loaded datasets.
     attributes : dict[str, Any]
         Dictionary of attributes.
-    
+
     Raises
     ------
     FileNotFoundError
         If the HDF5 file does not exist.
     KeyError
         If the specified group does not exist, or if a requested dataset is not found.
-    
+
     Examples
     --------
     >>> # Read all datasets and attributes from root
     >>> datasets, attrs = read_h5('data.h5')
-    
+
     >>> # Read from a specific group
     >>> datasets, attrs = read_h5('data.h5', group='experiment1')
-    
+
     >>> # Read only specific datasets
     >>> datasets, attrs = read_h5('data.h5', group='experiment1', dataset_names=['x', 'y'])
     """
     if not os.path.exists(filepath):
         raise FileNotFoundError(f"HDF5 file not found: {filepath}")
-    
-    with h5py.File(str(filepath), 'r') as f:
-        
+
+    with h5py.File(str(filepath), "r") as f:
         # Navigate to target location (root or group)
         if group is None:
             source = f
@@ -197,7 +196,7 @@ def read_h5(
             if group not in f:
                 raise KeyError(f"Group '{group}' not found in {filepath}")
             source = f[group]
-        
+
         # Load datasets
         datasets = {}
         if dataset_names is None:
@@ -209,11 +208,15 @@ def read_h5(
             # Load only specified datasets
             for key in dataset_names:
                 if key not in source:
-                    raise KeyError(f"Dataset '{key}' not found in group '{group or 'root'}'")
+                    raise KeyError(
+                        f"Dataset '{key}' not found in group '{group or 'root'}'"
+                    )
                 if not isinstance(source[key], h5py.Dataset):
-                    raise ValueError(f"'{key}' is not a dataset (it's a {type(source[key]).__name__})")
+                    raise ValueError(
+                        f"'{key}' is not a dataset (it's a {type(source[key]).__name__})"
+                    )
                 datasets[key] = source[key][...]
-        
+
         # Load attributes
         attributes = {}
         for key in source.attrs.keys():
@@ -222,16 +225,14 @@ def read_h5(
             # dicts ({...}), non-native lists ([...]), or None ('null'). Avoids
             # silently coercing plain strings that happen to parse as JSON
             # numbers (e.g. a hex hash like '28e657807056' → inf).
-            if isinstance(value, str) and (
-                value == 'null' or value[:1] in ('{', '[')
-            ):
+            if isinstance(value, str) and (value == "null" or value[:1] in ("{", "[")):
                 try:
                     attributes[key] = json.loads(value)
                 except json.JSONDecodeError:
                     attributes[key] = value
             else:
                 attributes[key] = value
-    
+
     return datasets, attributes
 
 
@@ -239,14 +240,13 @@ def read_h5(
 # Additional functions for HDF5 handling
 # =============================================================================
 
+
 def initialize_h5(
-    path: str | Path, 
-    overwrite: bool = False, 
-    verbose: bool = True
+    path: str | Path, overwrite: bool = False, verbose: bool = True
 ) -> Path:
     """
     Initialize an HDF5 file, creating parent directories if needed.
-    
+
     Parameters
     ----------
     path : str or Path
@@ -255,7 +255,7 @@ def initialize_h5(
         If True and file exists, clear all contents. If False, open for appending.
     verbose : bool, default True
         If True, print file operation message.
-    
+
     Returns
     -------
     Path
@@ -263,48 +263,46 @@ def initialize_h5(
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    
-    mode = 'w' if overwrite else 'a'
-    
+
+    mode = "w" if overwrite else "a"
+
     if verbose:
         if path.exists() and overwrite:
-            print(f'Initializing HDF5 file (overwrite): {path}')
+            print(f"Initializing HDF5 file (overwrite): {path}")
         elif path.exists():
-            print(f'Initializing HDF5 file (append): {path}')
+            print(f"Initializing HDF5 file (append): {path}")
         else:
-            print(f'Creating HDF5 file: {path}')
-    
+            print(f"Creating HDF5 file: {path}")
+
     with h5py.File(path, mode):
         pass
-    
+
     return path
 
 
 def get_keys_h5(
-    h5_path: str | Path, 
-    group: Optional[str] = None, 
-    sort: bool = True
+    h5_path: str | Path, group: Optional[str] = None, sort: bool = True
 ) -> list[str]:
     """
     Return list of dataset and group names from an HDF5 file.
     If group is specified, returns keys from that group. If sort=True, uses natural sorting.
     """
-    with h5py.File(h5_path, 'r') as f:
+    with h5py.File(h5_path, "r") as f:
         if group is None:
             keys = list(f.keys())
         else:
             if group not in f:
                 raise KeyError(f"Group '{group}' not found in {h5_path}")
             keys = list(f[group].keys())
-        
+
         return natsorted(keys) if sort else keys
 
 
 def inspect_h5(
-    filepath: str | Path, 
+    filepath: str | Path,
     relative_to: Optional[str | Path] = None,
-    prefix: str = '',
-    indent: str = '  ',
+    prefix: str = "",
+    indent: str = "  ",
     max_depth: int | None = None,
 ) -> None:
     """
@@ -328,19 +326,21 @@ def inspect_h5(
         tree. A value of 0 prints only root-level attributes.
     """
     filepath = Path(filepath)
-    display_path = filepath.relative_to(relative_to) if relative_to is not None else filepath
+    display_path = (
+        filepath.relative_to(relative_to) if relative_to is not None else filepath
+    )
 
     def summarize_value(value):
         if isinstance(value, (str, bytes)):
-            return f'(type={type(value).__name__}, len={len(value)})'
+            return f"(type={type(value).__name__}, len={len(value)})"
         elif isinstance(value, np.ndarray):
-            return f'(type=ndarray, shape={value.shape}, dtype={value.dtype})'
+            return f"(type=ndarray, shape={value.shape}, dtype={value.dtype})"
         elif isinstance(value, (int, float, bool)):
-            return f'(type={type(value).__name__}, value={value})'
-        elif hasattr(value, 'shape'):
-            return f'(type={type(value).__name__}, shape={value.shape})'
+            return f"(type={type(value).__name__}, value={value})"
+        elif hasattr(value, "shape"):
+            return f"(type={type(value).__name__}, shape={value.shape})"
         else:
-            return f'(type={type(value).__name__})'
+            return f"(type={type(value).__name__})"
 
     def print_attrs(obj, _indent):
         for key, val in obj.attrs.items():
@@ -356,10 +356,12 @@ def inspect_h5(
             for key in obj:
                 print_h5_structure(key, obj[key], _indent + indent, _depth + 1)
         elif isinstance(obj, h5py.Dataset):
-            print(f"{prefix}{_indent}{name} (type=Dataset, shape={obj.shape}, dtype={obj.dtype})")
+            print(
+                f"{prefix}{_indent}{name} (type=Dataset, shape={obj.shape}, dtype={obj.dtype})"
+            )
             print_attrs(obj, _indent + indent)
-    
-    with h5py.File(filepath, 'r') as f:
+
+    with h5py.File(filepath, "r") as f:
         print(f"{prefix}{display_path}/")
         print_attrs(f, _indent=indent)
         if max_depth is not None and max_depth <= 0:
@@ -368,10 +370,7 @@ def inspect_h5(
             print_h5_structure(key, f[key], _indent=indent)
 
 
-def repack_h5(
-    path: str | Path, 
-    output_path: Optional[str | Path] = None
-) -> Path:
+def repack_h5(path: str | Path, output_path: Optional[str | Path] = None) -> Path:
     """
     Repack an HDF5 file to optimize storage. Useful after deleting datasets/groups.
     If output_path is None, repacks in-place.
@@ -379,9 +378,9 @@ def repack_h5(
     path = Path(path)
     output_path = Path(output_path) if output_path is not None else path
     tmp = Path(f"{output_path}.tmp")
-    
+
     try:
-        with h5py.File(path, 'r') as src, h5py.File(tmp, 'w') as dst:
+        with h5py.File(path, "r") as src, h5py.File(tmp, "w") as dst:
             dst.attrs.update(src.attrs)
             for name in src:
                 src.copy(name, dst)

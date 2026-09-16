@@ -34,6 +34,7 @@ def _scaled_metric(sc: SimplicialComplex, scale: float = 2.0) -> CochainMetric:
 
 # HDF5 writer modes
 
+
 def test_save_h5_root_replace_recreates_file(tmp_path):
     path = tmp_path / "root_replace.h5"
     save_h5(
@@ -150,10 +151,7 @@ def test_save_h5_named_group_modes_are_unchanged(tmp_path):
 
 def test_replacing_ensemble_removes_stale_members_and_metadata(tmp_path):
     path = tmp_path / "ensemble_replace.h5"
-    old_members = [
-        PointData(positions=np.array([[float(i), 0.0]]))
-        for i in range(3)
-    ]
+    old_members = [PointData(positions=np.array([[float(i), 0.0]])) for i in range(3)]
     old_ensemble = PointDataEnsemble(
         old_members,
         base_config={"generator": "old"},
@@ -183,6 +181,7 @@ def test_replacing_ensemble_removes_stale_members_and_metadata(tmp_path):
 
 
 # Standalone object round trips
+
 
 def test_point_data_positions_round_trips(tmp_path):
     positions = np.array(
@@ -456,6 +455,7 @@ def test_cochain_metric_round_trips(
 
 # Grouped HDF5 round trip
 
+
 def test_point_data_round_trips_from_hdf5_group(tmp_path):
     point_data = PointData(positions=np.array([[0.0], [1.0]]))
     path = tmp_path / "grouped.h5"
@@ -468,6 +468,7 @@ def test_point_data_round_trips_from_hdf5_group(tmp_path):
 
 
 # Derived cache round trips
+
 
 def test_hodge_laplacian_cache_round_trips(
     tmp_path,

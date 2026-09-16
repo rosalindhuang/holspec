@@ -25,6 +25,7 @@ runner = CliRunner()
 
 # Help and option handling
 
+
 def test_cli_help():
     result = runner.invoke(app, ["--help"])
 
@@ -105,26 +106,17 @@ def test_cli_run_tiny_pipeline(tmp_path: Path):
     assert "holspec pipeline run complete." in result.output
     assert "config:       configs/pipeline_cli.yml" in result.output
     assert (
-        "stages:       topology_simplicial, geometry_metric, "
-        "hodge_laplacian, spectra"
+        "stages:       topology_simplicial, geometry_metric, hodge_laplacian, spectra"
     ) in result.output
     assert "output files: 4" in result.output
 
     output_root = project_root / "data" / "interim" / "cli_test"
+    assert (output_root / "topology_simplicial" / "triangle" / "delaunay.h5").exists()
     assert (
-        output_root / "topology_simplicial" / "triangle" / "delaunay.h5"
+        output_root / "geometry_metric" / "triangle" / "delaunay__combinatorial.h5"
     ).exists()
     assert (
-        output_root
-        / "geometry_metric"
-        / "triangle"
-        / "delaunay__combinatorial.h5"
-    ).exists()
-    assert (
-        output_root
-        / "hodge_laplacian"
-        / "triangle"
-        / "delaunay__combinatorial.h5"
+        output_root / "hodge_laplacian" / "triangle" / "delaunay__combinatorial.h5"
     ).exists()
     assert (
         output_root / "spectra" / "triangle" / "delaunay__combinatorial.h5"
@@ -167,6 +159,7 @@ def test_cli_run_rejects_conflicting_output_options(tmp_path: Path):
 
 
 # Tiny workflow smoke tests
+
 
 def test_cli_import_data_with_dataset_filter(tmp_path: Path):
     project_root = tmp_path
@@ -355,6 +348,7 @@ def test_cli_inspect_max_depth(tmp_path: Path):
 
 # Local fixtures and config writers
 
+
 def _save_triangle_input(input_path: Path) -> None:
     positions = np.array(
         [
@@ -384,12 +378,7 @@ def _save_triangle_input(input_path: Path) -> None:
 def _write_tiny_data_import_files(project_root: Path) -> None:
     input_dir = project_root / "inputs"
     input_dir.mkdir(parents=True, exist_ok=True)
-    (input_dir / "positions.csv").write_text(
-        "x,y\n"
-        "0.0,0.0\n"
-        "1.0,0.0\n"
-        "0.5,0.8\n"
-    )
+    (input_dir / "positions.csv").write_text("x,y\n0.0,0.0\n1.0,0.0\n0.5,0.8\n")
 
 
 def _write_tiny_data_import_config(config_path: Path) -> None:

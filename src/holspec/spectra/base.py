@@ -6,6 +6,7 @@ computation wrapper over a HodgeLaplacian that produces eigendecompositions
 per (k, component) pair on demand, caching Spectrum instances to avoid
 redundant computation.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -20,7 +21,11 @@ from holspec.utilities import save_h5, read_h5, join_h5_group
 from holspec.hodge_laplacian.base import LAPLACIAN_COMPONENT_NAMES
 
 from .spectrum import Spectrum
-from .eigensolvers import compute_eigendecomposition, VALID_SOLVER_NAMES, validate_solver_params
+from .eigensolvers import (
+    compute_eigendecomposition,
+    VALID_SOLVER_NAMES,
+    validate_solver_params,
+)
 
 if TYPE_CHECKING:
     from holspec.hodge_laplacian import HodgeLaplacian
@@ -30,6 +35,7 @@ if TYPE_CHECKING:
 # HodgeLaplacianSpectra
 # =============================================================================
 
+
 class HodgeLaplacianSpectra:
     """
     Spectra of the Hodge Laplacian operators on a simplicial complex.
@@ -37,11 +43,11 @@ class HodgeLaplacianSpectra:
     The primary output object of pipeline Stage 4. A lazy computation
     wrapper that holds a live reference to a HodgeLaplacian, producing
     Spectrum instances per (k, component) pair on demand and caching
-    results. 
+    results.
 
     For each degree k and Laplacian component (lower, upper, full), the
-    eigendecomposition is performed by symmetrizing each Laplacian matrix 
-    via the cochain metric and applying a standard symmetric eigensolver. 
+    eigendecomposition is performed by symmetrizing each Laplacian matrix
+    via the cochain metric and applying a standard symmetric eigensolver.
     Eigenvectors, if requested, are back-transformed to the cochain basis.
 
     Parameters
@@ -89,7 +95,7 @@ class HodgeLaplacianSpectra:
     def __init__(
         self,
         hl: HodgeLaplacian,
-        solver: str = 'dense',
+        solver: str = "dense",
         solver_params: dict | None = None,
         compute_eigenvectors: bool | list = False,
         metadata: dict | None = None,
@@ -97,12 +103,11 @@ class HodgeLaplacianSpectra:
         # Validate solver
         if solver not in VALID_SOLVER_NAMES:
             raise ValueError(
-                f"Unknown solver '{solver}'. "
-                f"Valid solvers: {VALID_SOLVER_NAMES}."
+                f"Unknown solver '{solver}'. Valid solvers: {VALID_SOLVER_NAMES}."
             )
 
         # Normalize and validate solver_params
-        if solver == 'dense':
+        if solver == "dense":
             self._solver_params = None
         else:
             self._solver_params = validate_solver_params(solver_params)
@@ -115,9 +120,7 @@ class HodgeLaplacianSpectra:
         if isinstance(compute_eigenvectors, bool):
             if compute_eigenvectors:
                 self._eigenvector_keys = frozenset(
-                    (k, comp)
-                    for k in hl.degrees
-                    for comp in LAPLACIAN_COMPONENT_NAMES
+                    (k, comp) for k in hl.degrees for comp in LAPLACIAN_COMPONENT_NAMES
                 )
             else:
                 self._eigenvector_keys = frozenset()
@@ -140,8 +143,8 @@ class HodgeLaplacianSpectra:
 
         # Initialize metadata
         self.metadata: dict = metadata if metadata is not None else {}
-        if 'creation_time' not in self.metadata:
-            self.metadata['creation_time'] = datetime.now().isoformat()
+        if "creation_time" not in self.metadata:
+            self.metadata["creation_time"] = datetime.now().isoformat()
 
         # Lazy cache: keyed by (k, component) tuples
         self._spectrum_cache: dict[tuple[int, str], Spectrum] = {}
@@ -157,7 +160,7 @@ class HodgeLaplacianSpectra:
         """Live reference to the source HodgeLaplacian."""
         return self._hl
 
-    hl = hodge_laplacian    # Alias
+    hl = hodge_laplacian  # Alias
 
     @property
     def max_dim(self) -> int:
@@ -218,7 +221,7 @@ class HodgeLaplacianSpectra:
     # Spectrum Access Methods
     # =========================================================================
 
-    def spectrum(self, k: int, component: str = 'full') -> Spectrum:
+    def spectrum(self, k: int, component: str = "full") -> Spectrum:
         """
         Return the spectrum at degree k for the given Laplacian component.
 
@@ -245,7 +248,7 @@ class HodgeLaplacianSpectra:
 
         return self._spectrum_cache[(k, component)]
 
-    def eigenvalues(self, k: int, component: str = 'full') -> np.ndarray:
+    def eigenvalues(self, k: int, component: str = "full") -> np.ndarray:
         """
         Return eigenvalues at degree k for the given component.
 
@@ -266,7 +269,7 @@ class HodgeLaplacianSpectra:
         """
         return self.spectrum(k, component).eigenvalues
 
-    def eigenvectors(self, k: int, component: str = 'full') -> np.ndarray | None:
+    def eigenvectors(self, k: int, component: str = "full") -> np.ndarray | None:
         """
         Return eigenvectors at degree k for the given component.
 
@@ -296,7 +299,7 @@ class HodgeLaplacianSpectra:
         self,
         filepath: str | Path,
         save_eigenvectors: bool = True,
-        mode: str = 'replace',
+        mode: str = "replace",
         group: str | None = None,
         hdf5_options: dict | None = None,
     ) -> str:
@@ -338,25 +341,23 @@ class HodgeLaplacianSpectra:
         """
         filepath = Path(filepath)
         if hdf5_options is None:
-            hdf5_options = {'compression': 'gzip', 'compression_opts': 4}
+            hdf5_options = {"compression": "gzip", "compression_opts": 4}
 
         # Serialize cached keys for metadata
-        cached_keys = [
-            f'{k}_{comp}' for k, comp in sorted(self._spectrum_cache.keys())
-        ]
+        cached_keys = [f"{k}_{comp}" for k, comp in sorted(self._spectrum_cache.keys())]
 
         # Root-level attributes
         root_attributes = {
-            'max_dim': self.max_dim,
-            'content_hash': self.content_hash,
-            'hl_content_hash': self._hl.content_hash,
-            'solver': self._solver,
-            'compute_eigenvectors': self._compute_eigenvectors,
-            'cached_keys': cached_keys,
-            'metadata': self.metadata,
+            "max_dim": self.max_dim,
+            "content_hash": self.content_hash,
+            "hl_content_hash": self._hl.content_hash,
+            "solver": self._solver,
+            "compute_eigenvectors": self._compute_eigenvectors,
+            "cached_keys": cached_keys,
+            "metadata": self.metadata,
         }
         if self._solver_params is not None:
-            root_attributes['solver_params'] = self._solver_params
+            root_attributes["solver_params"] = self._solver_params
         save_h5(
             filepath,
             datasets=None,
@@ -368,16 +369,16 @@ class HodgeLaplacianSpectra:
 
         # Per-degree, per-component subgroups
         for (k, comp), spc in self._spectrum_cache.items():
-            subgroup = join_h5_group(group, f'degree_{k}/component_{comp}')
+            subgroup = join_h5_group(group, f"degree_{k}/component_{comp}")
 
-            spc_datasets = {'eigenvalues': spc.eigenvalues}
+            spc_datasets = {"eigenvalues": spc.eigenvalues}
             spc_attributes = {
-                'dimension': spc.dimension,
-                'num_eigenvalues': spc.num_eigenvalues,
+                "dimension": spc.dimension,
+                "num_eigenvalues": spc.num_eigenvalues,
             }
 
             if spc.eigenvectors is not None and save_eigenvectors:
-                spc_datasets['eigenvectors'] = spc.eigenvectors
+                spc_datasets["eigenvectors"] = spc.eigenvectors
 
             save_h5(
                 filepath,
@@ -434,7 +435,7 @@ class HodgeLaplacianSpectra:
 
         # Hash validation
         if validate_hash:
-            stored_hl_hash = str(root_attributes.get('hl_content_hash', ''))
+            stored_hl_hash = str(root_attributes.get("hl_content_hash", ""))
             if stored_hl_hash != self._hl.content_hash:
                 raise ValueError(
                     f"HL content hash mismatch: stored {stored_hl_hash[:8]}, "
@@ -442,22 +443,24 @@ class HodgeLaplacianSpectra:
                 )
 
         # Discover and load cached spectra from the stored key list
-        cached_keys = root_attributes.get('cached_keys', [])
+        cached_keys = root_attributes.get("cached_keys", [])
         for key_str in cached_keys:
             # Parse "k_component" format
-            k_str, comp = key_str.split('_', 1)
+            k_str, comp = key_str.split("_", 1)
             k = int(k_str)
 
-            subgroup = join_h5_group(group, f'degree_{k}/component_{comp}')
+            subgroup = join_h5_group(group, f"degree_{k}/component_{comp}")
             spc_datasets, spc_attributes = read_h5(filepath, group=subgroup)
 
-            dimension = int(spc_attributes['dimension'])
-            eigenvalues = spc_datasets['eigenvalues']
+            dimension = int(spc_attributes["dimension"])
+            eigenvalues = spc_datasets["eigenvalues"]
 
-            eigenvectors = spc_datasets.get('eigenvectors', None)
+            eigenvectors = spc_datasets.get("eigenvectors", None)
 
             self._spectrum_cache[(k, comp)] = Spectrum(
-                eigenvalues, dimension, eigenvectors=eigenvectors,
+                eigenvalues,
+                dimension,
+                eigenvectors=eigenvectors,
             )
 
     # =========================================================================
@@ -493,7 +496,9 @@ class HodgeLaplacianSpectra:
     def __repr__(self) -> str:
         n_cached = len(self._spectrum_cache)
         sizes = list(self.dimensions.values())
-        params_str = f", solver_params={self._solver_params}" if self._solver_params else ""
+        params_str = (
+            f", solver_params={self._solver_params}" if self._solver_params else ""
+        )
         return (
             f"HodgeLaplacianSpectra(max_dim={self.max_dim}, "
             f"dimensions={sizes}, "
@@ -502,7 +507,7 @@ class HodgeLaplacianSpectra:
             f"hash={self.content_hash[:8]})"
         )
 
-    def summary(self, indent: str = '') -> str:
+    def summary(self, indent: str = "") -> str:
         """
         Generate human-readable summary of the spectra.
 
@@ -521,8 +526,8 @@ class HodgeLaplacianSpectra:
         """
         lines = []
 
-        lines.append('Hodge Laplacian Spectra:')
-        lines.append('-' * 60)
+        lines.append("Hodge Laplacian Spectra:")
+        lines.append("-" * 60)
         lines.append(
             f"{'':<20} (num_eig, dim_ker)\n{indent}"
             f"{'k':<4} {'N_k':<6} "
@@ -530,7 +535,7 @@ class HodgeLaplacianSpectra:
             # f"{'L^low':<12} {'L^upp':<12} {'L^full':<10}(num_eig, dim_ker)"
             # f"\n{'':<20} (num_eig, dim_ker)"
         )
-        lines.append('-' * 60)
+        lines.append("-" * 60)
 
         for k in self.degrees:
             N_k = self.dimensions[k]
@@ -541,23 +546,22 @@ class HodgeLaplacianSpectra:
                     spc = self._spectrum_cache[key]
                     parts.append(f"({spc.num_eigenvalues}, {spc.dim_ker()})")
                 else:
-                    parts.append('--')
+                    parts.append("--")
 
             lines.append(
-                f"{k:<4} {N_k:<6} "
-                f"{parts[0]:<16} {parts[1]:<16} {parts[2]:<16}"
+                f"{k:<4} {N_k:<6} {parts[0]:<16} {parts[1]:<16} {parts[2]:<16}"
             )
 
-        lines.append('-' * 60)
+        lines.append("-" * 60)
         parts = [f"solver: {self._solver}"]
         if self._solver_params:
             parts.append(f"solver_params: {self._solver_params}")
         parts.append(f"eigenvectors: {self._compute_eigenvectors}")
-        lines.append(', '.join(parts))
+        lines.append(", ".join(parts))
         lines.append(f"content_hash: {self.content_hash[:16]}")
-        lines.append('')
+        lines.append("")
 
-        return '\n'.join(indent + line for line in lines)
+        return "\n".join(indent + line for line in lines)
 
     # =========================================================================
     # Private Methods
@@ -567,8 +571,7 @@ class HodgeLaplacianSpectra:
         """Validate that k is a valid degree."""
         if k < 0 or k > self.max_dim:
             raise ValueError(
-                f"Degree k={k} out of range. "
-                f"Valid range: 0 <= k <= {self.max_dim}."
+                f"Degree k={k} out of range. Valid range: 0 <= k <= {self.max_dim}."
             )
 
     @staticmethod
@@ -586,7 +589,8 @@ class HodgeLaplacianSpectra:
         G_k = self._hl.cm[k]
 
         eigenvalues, eigenvectors = compute_eigendecomposition(
-            L, G_k,
+            L,
+            G_k,
             solver=self._solver,
             solver_params=self._solver_params,
             compute_eigenvectors=((k, component) in self._eigenvector_keys),
@@ -594,13 +598,17 @@ class HodgeLaplacianSpectra:
 
         N_k = self.dimensions[k]
         self._spectrum_cache[(k, component)] = Spectrum(
-            eigenvalues, N_k, eigenvectors=eigenvectors,
+            eigenvalues,
+            N_k,
+            eigenvectors=eigenvectors,
         )
 
     def _compute_content_hash(self) -> str:
         """Compute SHA-256 hash from the HodgeLaplacian content hash and solver params."""
         hasher = hashlib.sha256()
-        hasher.update(self._hl.content_hash.encode('utf-8'))
+        hasher.update(self._hl.content_hash.encode("utf-8"))
         if self._solver_params:
-            hasher.update(json.dumps(self._solver_params, sort_keys=True).encode('utf-8'))
+            hasher.update(
+                json.dumps(self._solver_params, sort_keys=True).encode("utf-8")
+            )
         return hasher.hexdigest()

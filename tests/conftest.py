@@ -20,6 +20,7 @@ from holspec.spectra import HodgeLaplacianSpectra
 
 # Tiny simplicial examples
 
+
 @pytest.fixture
 def edge_simplices() -> dict[int, list[tuple[int, ...]]]:
     return {
@@ -66,6 +67,7 @@ def filled_triangle_complex(
 
 # Combinatorial cochain metrics
 
+
 def _combinatorial_metric(sc: SimplicialComplex) -> CochainMetric:
     metric_tensors, _ = construct_combinatorial_cochain_metric(sc)
     return CochainMetric(metric_tensors)
@@ -89,6 +91,7 @@ def filled_triangle_metric(filled_triangle_complex: SimplicialComplex) -> Cochai
 
 
 # Hodge Laplacians
+
 
 @pytest.fixture
 def edge_hodge_laplacian(
@@ -115,6 +118,7 @@ def filled_triangle_hodge_laplacian(
 
 
 # Dense spectra
+
 
 @pytest.fixture
 def edge_spectra(edge_hodge_laplacian: HodgeLaplacian) -> HodgeLaplacianSpectra:

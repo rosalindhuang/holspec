@@ -19,6 +19,7 @@ from tests.helpers import assert_sparse_allclose
 
 # Operator dimensions
 
+
 def test_hodge_laplacian_dimensions_match_metric(
     edge_hodge_laplacian: HodgeLaplacian,
     triangle_boundary_hodge_laplacian: HodgeLaplacian,
@@ -40,6 +41,7 @@ def test_hodge_laplacian_dimensions_match_metric(
 
 
 # Differential-operator identities
+
 
 def test_coboundary_is_transposed_incidence(
     filled_triangle_complex: SimplicialComplex,
@@ -74,6 +76,7 @@ def test_full_laplacian_decomposes_into_lower_plus_upper(
 
 # Symmetrization and validation
 
+
 def test_symmetrized_full_laplacians_are_symmetric(
     filled_triangle_hodge_laplacian: HodgeLaplacian,
 ):
@@ -94,6 +97,7 @@ def test_laplacian_validation_passes_for_tiny_examples(
 
 
 # Hodge Laplacian contracts
+
 
 def test_hodge_laplacian_rejects_max_dim_mismatch(
     edge_complex: SimplicialComplex,

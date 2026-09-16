@@ -18,17 +18,18 @@ from holspec.utilities import format_float_str
 # Main Construction Functions
 # =============================================================================
 
+
 def construct_delaunay_complex(
     positions: np.ndarray,
     max_dim: int | None = None,
 ) -> dict[int, list[tuple]]:
     """
     Construct Delaunay triangulation as a simplicial complex.
-    
+
     Computes the Delaunay triangulation and extracts all simplices with their
     complete face closure to form an abstract simplicial complex. All faces of
     Delaunay simplices are included automatically.
-    
+
     Parameters
     ----------
     positions : np.ndarray, shape (N, d)
@@ -37,18 +38,18 @@ def construct_delaunay_complex(
         Maximum simplex dimension to include. If None, includes all dimensions
         up to the ambient dimension d. Use this to truncate to lower-dimensional
         skeleton (e.g., max_dim=1 for just vertices and edges).
-        
+
     Returns
     -------
     simplices : dict[int, list[tuple]]
         Dictionary mapping dimension k to list of k-simplices as sorted tuples,
         closed under taking faces, up to max_dim.
-        
+
     Raises
     ------
     ValueError
         If positions array is malformed or insufficient points for triangulation.
-        
+
     Notes
     -----
     - Requires at least d+1 points in d dimensions for non-degenerate triangulation.
@@ -56,7 +57,7 @@ def construct_delaunay_complex(
     - The Delaunay triangulation is unique (up to degeneracies) and depends only
       on point positions, not on their ordering.
     - Vertices are indexed 0 to N-1 following the order in positions array.
-      
+
     Examples
     --------
     >>> positions = np.array([[0, 0], [1, 0], [0.5, 0.5]])
@@ -67,21 +68,21 @@ def construct_delaunay_complex(
     # Validate input positions
     N, d = positions.shape
     validate_positions(positions, min_points=d + 1)
-    
+
     # Compute Delaunay triangulation
     delaunay = Delaunay(positions)
-    
+
     # Extract top-dimensional simplices from Delaunay
     # delaunay.simplices is (n_simplices, d+1) array of vertex indices
     top_simplices = {d: [tuple(row) for row in delaunay.simplices]}
-    
+
     # Compute full face closure
     simplices = compute_simplicial_closure(top_simplices)
-    
+
     # Truncate to max_dim if specified
     if max_dim is not None:
         simplices = {k: simps for k, simps in simplices.items() if k <= max_dim}
-    
+
     return simplices
 
 
@@ -92,11 +93,11 @@ def construct_alpha_complex(
 ) -> dict[int, list[tuple]]:
     """
     Construct alpha complex from point data using GUDHI.
-    
+
     The alpha complex is a subcomplex of the Delaunay triangulation containing
     only simplices whose circumradius is at most alpha. Provides a scale-dependent
     filtration of the Delaunay complex.
-    
+
     Parameters
     ----------
     positions : np.ndarray, shape (N, d)
@@ -108,18 +109,18 @@ def construct_alpha_complex(
     max_dim : int, optional
         Maximum simplex dimension to include. If None, includes all dimensions
         up to the ambient dimension d.
-        
+
     Returns
     -------
     simplices : dict[int, list[tuple]]
         Dictionary mapping dimension k to list of k-simplices as sorted tuples,
         closed under taking faces, up to max_dim.
-        
+
     Raises
     ------
     ValueError
         If positions array is malformed, insufficient points, or alpha < 0.
-        
+
     Notes
     -----
     - Uses GUDHI's AlphaComplex with precision='safe' (CGAL perturbation),
@@ -127,11 +128,11 @@ def construct_alpha_complex(
     - GUDHI's filtration values are (circumradius)^2, so alpha is squared
       internally when passed to GUDHI.
     - The alpha complex is always a subcomplex of the Delaunay triangulation,
-      and is at most d-dimensional for points in R^d. 
+      and is at most d-dimensional for points in R^d.
         - alpha = 0: only vertices
         - alpha -> infinity: recovers full Delaunay
     - Vertices are indexed 0 to N-1 following the order in positions array.
-      
+
     Examples
     --------
     >>> positions = np.array([[0, 0], [1, 0], [0.5, 0.866]])
@@ -143,26 +144,24 @@ def construct_alpha_complex(
     # Validate input positions
     N, d = positions.shape
     validate_positions(positions, min_points=d + 1)
-    
+
     # Validate alpha parameter
     if alpha is not None and alpha < 0:
-        raise ValueError(f'alpha must be non-negative, got {alpha}')
-    
+        raise ValueError(f"alpha must be non-negative, got {alpha}")
+
     # Compute max filtration value
     # Note: GUDHI uses (circumradius)^2; alpha=inf means no threshold
-    max_filtration = alpha ** 2 if alpha is not None else float('inf')
-    
+    max_filtration = alpha**2 if alpha is not None else float("inf")
+
     # Build GUDHI alpha complex and simplex tree
-    alpha_complex = gudhi.AlphaComplex(points=positions, precision='safe')
+    alpha_complex = gudhi.AlphaComplex(points=positions, precision="safe")
     simplex_tree = alpha_complex.create_simplex_tree(max_alpha_square=max_filtration)
-    
+
     # Extract simplices up to max_filtration threshold and optional max_dim
     simplices = _extract_simplices_from_gudhi_tree(
-        simplex_tree, 
-        max_filtration=max_filtration, 
-        max_dim=max_dim
+        simplex_tree, max_filtration=max_filtration, max_dim=max_dim
     )
-    
+
     return simplices
 
 
@@ -238,11 +237,11 @@ def construct_del_vr_complex(
     # Validate epsilon parameter
     if epsilon is None:
         raise ValueError(
-            'epsilon is required. '
-            'Use construct_delaunay_complex for the unfiltered Delaunay triangulation.'
+            "epsilon is required. "
+            "Use construct_delaunay_complex for the unfiltered Delaunay triangulation."
         )
     if epsilon < 0:
-        raise ValueError(f'epsilon must be non-negative, got {epsilon}')
+        raise ValueError(f"epsilon must be non-negative, got {epsilon}")
 
     # Compute full Delaunay triangulation with face closure
     delaunay = Delaunay(positions)
@@ -271,7 +270,8 @@ def construct_del_vr_complex(
                 filtered[1] = surviving
         else:
             surviving = [
-                simplex for simplex in full_delaunay[dim]
+                simplex
+                for simplex in full_delaunay[dim]
                 if all(e in passing_edges for e in get_faces(simplex, 1))
             ]
             if surviving:
@@ -293,11 +293,11 @@ def construct_vr_complex(
 ) -> dict[int, list[tuple]]:
     """
     Construct Vietoris-Rips complex from positions or distance matrix.
-    
+
     The Vietoris-Rips complex includes all simplices whose vertices are pairwise
     within distance epsilon. Defined purely from distances, independent of
     ambient geometry.
-    
+
     Parameters
     ----------
     positions : np.ndarray, shape (N, d), optional
@@ -305,29 +305,29 @@ def construct_vr_complex(
         distances are computed internally by GUDHI.
     distances : np.ndarray, shape (N, N), optional
         Pairwise distance matrix. Must be symmetric with zero diagonal.
-        Use when distances are pre-computed or come from a non-Euclidean metric. 
+        Use when distances are pre-computed or come from a non-Euclidean metric.
         Cannot be used together with positions.
     epsilon : float
-        Maximum edge length (distance threshold) for including an edge. A 
-        simplex is included if all pairwise distances between its vertices are 
+        Maximum edge length (distance threshold) for including an edge. A
+        simplex is included if all pairwise distances between its vertices are
         at most epsilon.
     max_dim : int, optional
         Maximum simplex dimension to include. If None, includes all dimensions
-        up to N-1 (clique complex). For large N, always set an explicit max_dim 
+        up to N-1 (clique complex). For large N, always set an explicit max_dim
         to avoid combinatorial explosion.
-        
+
     Returns
     -------
     simplices : dict[int, list[tuple]]
         Dictionary mapping dimension k to list of k-simplices as sorted tuples,
         closed under taking faces, up to max_dim.
-        
+
     Raises
     ------
     ValueError
         If neither or both of positions/distances provided, if inputs are
         malformed, or if epsilon is negative.
-        
+
     Notes
     -----
     - Uses GUDHI's RipsComplex, which builds the 1-skeleton then expands to
@@ -335,7 +335,7 @@ def construct_vr_complex(
     - The VR complex is in general a superset of the alpha complex for the
       same point set and comparable scale parameter.
     - Vertices are indexed 0 to N-1 following the order in positions/distances.
-    
+
     Examples
     --------
     >>> positions = np.array([[0, 0], [1, 0], [0.5, 0.866]])
@@ -351,17 +351,21 @@ def construct_vr_complex(
     """
     # Validate input combination
     if positions is None and distances is None:
-        raise ValueError('Exactly one of positions or distances must be provided, got neither.')
+        raise ValueError(
+            "Exactly one of positions or distances must be provided, got neither."
+        )
     if positions is not None and distances is not None:
-        raise ValueError('Exactly one of positions or distances must be provided, got both.')
-    
+        raise ValueError(
+            "Exactly one of positions or distances must be provided, got both."
+        )
+
     # Validate epsilon parameter
     if epsilon is None:
         raise ValueError(
-            'epsilon is required. '
-            'Set it to the maximum pairwise distance to include all edges.'
+            "epsilon is required. "
+            "Set it to the maximum pairwise distance to include all edges."
         )
-    
+
     # Build GUDHI Rips complex
     if positions is not None:
         validate_positions(positions)
@@ -371,18 +375,18 @@ def construct_vr_complex(
         validate_distances(distances)
         N = distances.shape[0]
         rips = gudhi.RipsComplex(distance_matrix=distances, max_edge_length=epsilon)
-    
+
     simplex_tree = rips.create_simplex_tree(
-        max_dimension=max_dim if max_dim is not None else N-1  # N-1 is the maximum possible dimension
+        max_dimension=max_dim
+        if max_dim is not None
+        else N - 1  # N-1 is the maximum possible dimension
     )
-    
+
     # Extract simplices up to threshold and optional max_dim
     simplices = _extract_simplices_from_gudhi_tree(
-        simplex_tree,
-        max_filtration=epsilon,
-        max_dim=max_dim
+        simplex_tree, max_filtration=epsilon, max_dim=max_dim
     )
-    
+
     return simplices
 
 
@@ -390,14 +394,13 @@ def construct_vr_complex(
 # Helper Functions
 # =============================================================================
 
+
 def _extract_simplices_from_gudhi_tree(
-    simplex_tree,
-    max_filtration: float,
-    max_dim: int | None = None
+    simplex_tree, max_filtration: float, max_dim: int | None = None
 ) -> dict[int, list[tuple]]:
     """
     Convert GUDHI simplex tree to dict[int, list[tuple]] format.
-    
+
     Parameters
     ----------
     simplex_tree : gudhi.SimplexTree
@@ -408,13 +411,13 @@ def _extract_simplices_from_gudhi_tree(
     max_dim : int, optional
         Maximum simplex dimension to include. If None, includes all dimensions
         present in the simplex tree.
-        
+
     Returns
     -------
     simplices : dict[int, list[tuple]]
         Dictionary mapping dimension k to list of k-simplices as sorted tuples.
         All simplices are in canonical form with vertices sorted.
-        
+
     Notes
     -----
     - Simplices with filtration value > max_filtration are excluded.
@@ -427,23 +430,23 @@ def _extract_simplices_from_gudhi_tree(
     - Empty dimensions are excluded from the result.
     """
     simplices: dict[int, list[tuple]] = {}
-    
+
     for simplex_list, filtration_value in simplex_tree.get_filtration():
         # Exclude simplices above the filtration threshold
         if filtration_value > max_filtration:
             continue
-        
+
         # Sort vertices for canonical form
         simplex = tuple(sorted(simplex_list))
-        
+
         # Exclude simplices above the dimension limit
         dim = len(simplex) - 1
         if max_dim is not None and dim > max_dim:
             continue
-        
+
         # Add simplex to the appropriate dimension list
         simplices.setdefault(dim, []).append(simplex)
-    
+
     # Return with dimensions and simplices in sorted order for determinism
     return {k: sorted(simplices[k]) for k in sorted(simplices)}
 
@@ -453,18 +456,18 @@ def _extract_simplices_from_gudhi_tree(
 # =============================================================================
 
 SIMPLICIAL_CONSTRUCTION_REGISTRY: dict[str, callable] = {
-    'delaunay': construct_delaunay_complex,
-    'alpha': construct_alpha_complex,
-    'del_vr': construct_del_vr_complex,
-    'vietoris_rips': construct_vr_complex,
+    "delaunay": construct_delaunay_complex,
+    "alpha": construct_alpha_complex,
+    "del_vr": construct_del_vr_complex,
+    "vietoris_rips": construct_vr_complex,
 }
 
 # Aliases for simplicial construction methods
 SIMPLICIAL_CONSTRUCTION_ALIASES: dict[str, list[str]] = {
-    'delaunay': ['del'],
-    'alpha': ['alp'],
-    'del_vr': ['dvr'],
-    'vietoris_rips': ['vr', 'rips'],
+    "delaunay": ["del"],
+    "alpha": ["alp"],
+    "del_vr": ["dvr"],
+    "vietoris_rips": ["vr", "rips"],
 }
 
 SIMPLICIAL_CONSTRUCTION_ALIAS_MAP: dict[str, str] = {
@@ -500,22 +503,22 @@ def construct_complex_from_config(
         Dictionary mapping dimension k to list of k-simplices as sorted tuples.
     """
     # Validate config
-    if 'method' not in config:
+    if "method" not in config:
         raise ValueError("config must contain a 'method' key")
 
-    method = SIMPLICIAL_CONSTRUCTION_ALIAS_MAP.get(config['method'], config['method'])
+    method = SIMPLICIAL_CONSTRUCTION_ALIAS_MAP.get(config["method"], config["method"])
     if method not in SIMPLICIAL_CONSTRUCTION_REGISTRY:
         raise ValueError(
             f"Unknown method '{config['method']}'. "
             f"Available methods: {list(SIMPLICIAL_CONSTRUCTION_REGISTRY)}"
         )
-    params = config.get('params', {})
+    params = config.get("params", {})
 
     builder = SIMPLICIAL_CONSTRUCTION_REGISTRY[method]
 
     # vietoris_rips uses keyword-only positions/distances;
     # delaunay and alpha take positions as a positional argument.
-    if method == 'vietoris_rips':
+    if method == "vietoris_rips":
         return builder(
             positions=positions,
             distances=distances,
@@ -532,7 +535,7 @@ def construct_complex_from_config(
 
 def create_simplicial_construction_label(
     config: dict,
-    float_fmt: str | None = 'g',
+    float_fmt: str | None = "g",
     strip_zeros: bool = True,
 ) -> str:
     """
@@ -569,16 +572,16 @@ def create_simplicial_construction_label(
     'vietoris_rips_ep1p2_md2'
     """
     # Validate config
-    if 'method' not in config:
+    if "method" not in config:
         raise ValueError("config must contain a 'method' key")
 
-    method = SIMPLICIAL_CONSTRUCTION_ALIAS_MAP.get(config['method'], config['method'])
+    method = SIMPLICIAL_CONSTRUCTION_ALIAS_MAP.get(config["method"], config["method"])
     if method not in SIMPLICIAL_CONSTRUCTION_REGISTRY:
         raise ValueError(
             f"Unknown method '{config['method']}'. "
             f"Available methods: {list(SIMPLICIAL_CONSTRUCTION_REGISTRY)}"
         )
-    params = config.get('params', {})
+    params = config.get("params", {})
 
     parts = [method]
 
@@ -587,17 +590,17 @@ def create_simplicial_construction_label(
         if value is None:
             continue
 
-        param_abbr = key.replace('_', '')[:2]
+        param_abbr = key.replace("_", "")[:2]
 
         if isinstance(value, bool):
-            value_str = '1' if value else '0'
+            value_str = "1" if value else "0"
         elif isinstance(value, float):
             value_str = format_float_str(value, float_fmt, strip_zeros=strip_zeros)
         elif isinstance(value, str):
-            value_str = value[:4].lower().replace('_', '')
+            value_str = value[:4].lower().replace("_", "")
         else:
-            value_str = str(value).replace('.', 'p')
+            value_str = str(value).replace(".", "p")
 
         parts.append(f"{param_abbr}{value_str}")
 
-    return '_'.join(parts)
+    return "_".join(parts)

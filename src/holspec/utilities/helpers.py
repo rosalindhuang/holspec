@@ -22,21 +22,22 @@ import subprocess
 # Type conversion
 # =============================================================================
 
+
 def convert_numpy_to_python(obj):
     """
     Recursively convert numpy and path-like types to native Python types.
-    
+
     Parameters
     ----------
     obj : any
         Object to convert. Can be a dict, list, numpy array, numpy scalar, Path,
         or any other type.
-    
+
     Returns
     -------
     any
         Object with all numpy types converted to native Python types.
-    
+
     Notes
     -----
     - numpy integers → int
@@ -47,7 +48,7 @@ def convert_numpy_to_python(obj):
     - dict values → recursively converted
     - list items → recursively converted
     - other types → unchanged
-    
+
     Examples
     --------
     >>> import numpy as np
@@ -109,7 +110,9 @@ def convert_paths_to_relative(obj, root: Path):
     {'a': 'data/a.h5', 'b': {'c': 'data/b.h5'}}
     """
     if isinstance(obj, dict):
-        return {key: convert_paths_to_relative(value, root) for key, value in obj.items()}
+        return {
+            key: convert_paths_to_relative(value, root) for key, value in obj.items()
+        }
     elif isinstance(obj, list):
         return [convert_paths_to_relative(item, root) for item in obj]
     elif isinstance(obj, Path):
@@ -117,7 +120,9 @@ def convert_paths_to_relative(obj, root: Path):
     elif isinstance(obj, str):
         return obj
     else:
-        raise TypeError(f"Expected Path, str, dict, or list; got {type(obj).__name__!r}.")
+        raise TypeError(
+            f"Expected Path, str, dict, or list; got {type(obj).__name__!r}."
+        )
 
 
 def convert_relative_to_paths(obj, root: Path):
@@ -153,7 +158,9 @@ def convert_relative_to_paths(obj, root: Path):
     {'a': PosixPath('/project/data/a.h5'), 'b': {'c': PosixPath('/project/data/b.h5')}}
     """
     if isinstance(obj, dict):
-        return {key: convert_relative_to_paths(value, root) for key, value in obj.items()}
+        return {
+            key: convert_relative_to_paths(value, root) for key, value in obj.items()
+        }
     elif isinstance(obj, list):
         return [convert_relative_to_paths(item, root) for item in obj]
     elif isinstance(obj, str):
@@ -165,6 +172,7 @@ def convert_relative_to_paths(obj, root: Path):
 # =============================================================================
 # File inspection utilities
 # =============================================================================
+
 
 def count_text_lines(paths, method="auto"):
     """
@@ -229,10 +237,13 @@ def count_text_lines(paths, method="auto"):
 # String utilities
 # =============================================================================
 
-def format_float_str(value: float, fmt: str | None = 'g', strip_zeros: bool = True) -> str:
+
+def format_float_str(
+    value: float, fmt: str | None = "g", strip_zeros: bool = True
+) -> str:
     """
     Format a float for use in labels with trailing zeros removed and dots replaced.
-    
+
     Parameters
     ----------
     value : float
@@ -243,7 +254,7 @@ def format_float_str(value: float, fmt: str | None = 'g', strip_zeros: bool = Tr
     strip_zeros : bool, default=True
         If True, trailing zeros after the decimal point are removed.
         Set to False to preserve them (e.g. '1.50' with '.2f').
-    
+
     Returns
     -------
     str
@@ -251,29 +262,31 @@ def format_float_str(value: float, fmt: str | None = 'g', strip_zeros: bool = Tr
     """
     # Handle None fmt
     if fmt is None:
-        fmt = 'g'
-    
+        fmt = "g"
+
     # Format the value
     formatted = f"{value:{fmt}}"
-    
+
     # Remove trailing zeros after decimal point
-    if '.' in formatted and strip_zeros:
-        if 'e' in formatted.lower():
+    if "." in formatted and strip_zeros:
+        if "e" in formatted.lower():
             # Handle scientific notation: split at 'e', trim mantissa, rejoin
-            parts = formatted.lower().split('e')
-            parts[0] = parts[0].rstrip('0').rstrip('.')
-            formatted = 'e'.join(parts)
+            parts = formatted.lower().split("e")
+            parts[0] = parts[0].rstrip("0").rstrip(".")
+            formatted = "e".join(parts)
         else:
             # Handle regular decimal
-            formatted = formatted.rstrip('0').rstrip('.')
-    
+            formatted = formatted.rstrip("0").rstrip(".")
+
     # Replacements decimal point with 'p'
-    formatted = formatted.replace('.', 'p')
-    
+    formatted = formatted.replace(".", "p")
+
     return formatted
 
 
-def format_text(text: str, max_width: int = 80, preserve_paragraphs: bool = True) -> str:
+def format_text(
+    text: str, max_width: int = 80, preserve_paragraphs: bool = True
+) -> str:
     """
     Format text with intelligent line wrapping that preserves indentation.
 
@@ -293,95 +306,96 @@ def format_text(text: str, max_width: int = 80, preserve_paragraphs: bool = True
     str
         Formatted text with proper line wrapping and preserved indentation.
     """
-    lines = text.split('\n')
+    lines = text.split("\n")
     formatted_lines = []
-    
+
     # Pattern to match bullet points (-, *, +, or numbered like 1., 2., etc.)
-    bullet_pattern = re.compile(r'^(\s*)([-*+]|\d+\.)\s+')
-    
+    bullet_pattern = re.compile(r"^(\s*)([-*+]|\d+\.)\s+")
+
     for line in lines:
         # Preserve empty lines if requested
         if not line.strip() and preserve_paragraphs:
-            formatted_lines.append('')
+            formatted_lines.append("")
             continue
-        
+
         # Detect basic indentation (spaces or tabs at the beginning)
-        indent = ''
+        indent = ""
         for char in line:
-            if char in ' \t':
+            if char in " \t":
                 indent += char
             else:
                 break
-        
+
         # Get the content without leading whitespace
         content = line.lstrip()
-        
+
         if not content:  # Line was only whitespace
-            formatted_lines.append('')
+            formatted_lines.append("")
             continue
-        
+
         # Check if this is a bullet point
         bullet_match = bullet_pattern.match(line)
         if bullet_match:
             # For bullet points, create hanging indentation
             bullet_indent = bullet_match.group(1)  # Initial spaces/tabs
             bullet_marker = bullet_match.group(2)  # The bullet character(s)
-            bullet_text = line[bullet_match.end():]  # Text after bullet
-            
+            bullet_text = line[bullet_match.end() :]  # Text after bullet
+
             # First line uses the original indent + bullet
-            first_line_prefix = bullet_indent + bullet_marker + ' '
+            first_line_prefix = bullet_indent + bullet_marker + " "
             # Continuation lines align with the text after the bullet
-            continuation_indent = bullet_indent + ' ' * len(bullet_marker + ' ')
-            
+            continuation_indent = bullet_indent + " " * len(bullet_marker + " ")
+
             # Calculate available width for content
             available_width = max_width - len(continuation_indent)
             if available_width < 20:
                 available_width = 20
-            
+
             # Wrap the bullet text
             if bullet_text.strip():
                 wrapped_lines = textwrap.fill(
                     bullet_text,
                     width=available_width,
                     break_long_words=False,
-                    break_on_hyphens=True
-                ).split('\n')
-                
+                    break_on_hyphens=True,
+                ).split("\n")
+
                 # Add the first line with bullet
                 formatted_lines.append(first_line_prefix + wrapped_lines[0])
-                
+
                 # Add continuation lines with hanging indent
                 for wrapped_line in wrapped_lines[1:]:
                     formatted_lines.append(continuation_indent + wrapped_line)
             else:
                 # Empty bullet point
                 formatted_lines.append(first_line_prefix)
-        
+
         else:
             # Regular line (not a bullet point)
             # Calculate available width for content (accounting for indentation)
             available_width = max_width - len(indent)
             if available_width < 20:
                 available_width = 20
-            
+
             # Wrap the content
             wrapped_lines = textwrap.fill(
-                content, 
+                content,
                 width=available_width,
                 break_long_words=False,
-                break_on_hyphens=True
-            ).split('\n')
-            
+                break_on_hyphens=True,
+            ).split("\n")
+
             # Add the original indentation to each wrapped line
             for wrapped_line in wrapped_lines:
                 formatted_lines.append(indent + wrapped_line)
-    
-    return '\n'.join(formatted_lines)
+
+    return "\n".join(formatted_lines)
 
 
 # =============================================================================
 # Printing utilities
 # =============================================================================
+
 
 def inspect_dict(
     data_dict: dict,
@@ -390,7 +404,7 @@ def inspect_dict(
     prefix: str = "",
     indent: str = "  ",
     _current_depth: int = 0,
-    _indent: str = ""
+    _indent: str = "",
 ) -> None:
     """
     Print the structure and contents of a nested dictionary.
@@ -416,7 +430,7 @@ def inspect_dict(
     -------
     None
     """
-    
+
     def summarize_value(value):
         """Summarize the type and properties of a value."""
         if isinstance(value, dict):
@@ -431,13 +445,13 @@ def inspect_dict(
             return f"(type=str, len={len(value)})"
         elif isinstance(value, (int, float, bool)):
             return f"(type={type(value).__name__}, value={value})"
-        elif hasattr(value, 'shape'):
+        elif hasattr(value, "shape"):
             return f"(type={type(value).__name__}, shape={value.shape})"
-        elif hasattr(value, '__len__'):
+        elif hasattr(value, "__len__"):
             return f"(type={type(value).__name__}, len={len(value)})"
         else:
             return f"(type={type(value).__name__})"
-    
+
     # Print root header
     if _current_depth == 0:
         print(f"{prefix}{dict_name}/")
@@ -445,7 +459,7 @@ def inspect_dict(
     # Check depth limit
     if max_depth is not None and _current_depth >= max_depth:
         return
-    
+
     # Iterate through dictionary items
     for key, value in data_dict.items():
         if isinstance(value, dict):
@@ -457,7 +471,7 @@ def inspect_dict(
                 prefix=prefix,
                 indent=indent,
                 _current_depth=_current_depth + 1,
-                _indent=_indent + indent
+                _indent=_indent + indent,
             )
         else:
             summary = summarize_value(value)
@@ -554,7 +568,7 @@ def print_pipeline_config(
     print_items : bool, default=True
         If True, print individual items within list/dict values.
     """
-    with open(config_path, 'r') as f:
+    with open(config_path, "r") as f:
         config = yaml.safe_load(f)
     print_dict(config, print_items=print_items)
 
@@ -562,6 +576,7 @@ def print_pipeline_config(
 # =============================================================================
 # Timing utilities
 # =============================================================================
+
 
 def timed(fun, args, repeats=1) -> float:
     """
@@ -591,6 +606,7 @@ def timed(fun, args, repeats=1) -> float:
 # Notebook utilities
 # =============================================================================
 
+
 def export_notebook_outputs(notebook_name: str, output_filename: str = None):
     """
     Export outputs from code cells in a Jupyter Notebook to a text file.
@@ -607,8 +623,8 @@ def export_notebook_outputs(notebook_name: str, output_filename: str = None):
     None
     """
     # Set defaults
-    if '.' in notebook_name:
-        notebook_name = notebook_name.split('.')[0]
+    if "." in notebook_name:
+        notebook_name = notebook_name.split(".")[0]
     if output_filename is None:
         output_filename = f"{notebook_name}_outputs.txt"
 
@@ -626,7 +642,9 @@ def export_notebook_outputs(notebook_name: str, output_filename: str = None):
     print(f"Notebook outputs from {notebook_name} exported to {output_filename}")
 
 
-def convert_notebook(notebook_name, output_format='html', exclude=('input',), output_name=None):
+def convert_notebook(
+    notebook_name, output_format="html", exclude=("input",), output_name=None
+):
     """
     Convert a Jupyter notebook to a specified format with exclusion options.
 
@@ -637,7 +655,7 @@ def convert_notebook(notebook_name, output_format='html', exclude=('input',), ou
     output_format : str, default='html'
         Output format (html, pdf, latex, slides, etc.).
     exclude : tuple of str, default=('input',)
-        Elements to exclude from output. Options: 'input', 'output', 
+        Elements to exclude from output. Options: 'input', 'output',
         'markdown', 'raw', 'empty', 'code_cell'.
     output_name : str, optional
         Custom output filename. If None, uses '{notebook_name}.{format}'.
@@ -647,42 +665,48 @@ def convert_notebook(notebook_name, output_format='html', exclude=('input',), ou
     str or None
         Path to converted file if successful, None if conversion failed.
     """
-    
+
     # Set defaults
-    if '.' in notebook_name:
-        notebook_name = notebook_name.split('.')[0]
+    if "." in notebook_name:
+        notebook_name = notebook_name.split(".")[0]
     if output_name is None:
         output_name = f"{notebook_name}.{output_format}"
     if exclude is None:
         exclude = ()
-    
+
     # Build the conversion command
     cmd = [
-        'jupyter', 'nbconvert', 
-        f'{notebook_name}.ipynb',
-        '--to', output_format,
-        '--output', output_name
+        "jupyter",
+        "nbconvert",
+        f"{notebook_name}.ipynb",
+        "--to",
+        output_format,
+        "--output",
+        output_name,
     ]
-    
+
     # Add exclusion options based on tuple contents
-    if 'input' in exclude:
-        cmd.extend(['--TemplateExporter.exclude_input=True'])
-    if 'output' in exclude:
-        cmd.extend(['--TemplateExporter.exclude_output=True'])
-    if 'markdown' in exclude:
-        cmd.extend(['--TemplateExporter.exclude_markdown=True'])
-    if 'raw' in exclude:
-        cmd.extend(['--TemplateExporter.exclude_raw=True'])
-    if 'empty' in exclude:
-        cmd.extend(['--TemplateExporter.exclude_empty=True'])
-    if 'code_cell' in exclude:
-        cmd.extend(['--TemplateExporter.exclude_code_cell=True'])
-    
+    if "input" in exclude:
+        cmd.extend(["--TemplateExporter.exclude_input=True"])
+    if "output" in exclude:
+        cmd.extend(["--TemplateExporter.exclude_output=True"])
+    if "markdown" in exclude:
+        cmd.extend(["--TemplateExporter.exclude_markdown=True"])
+    if "raw" in exclude:
+        cmd.extend(["--TemplateExporter.exclude_raw=True"])
+    if "empty" in exclude:
+        cmd.extend(["--TemplateExporter.exclude_empty=True"])
+    if "code_cell" in exclude:
+        cmd.extend(["--TemplateExporter.exclude_code_cell=True"])
+
     try:
         # Execute the conversion
         subprocess.run(cmd, capture_output=True, text=True, check=True)
-        print(f"Converted {notebook_name}.ipynb to {output_name}" + (f" excluding: {', '.join(exclude)}" if exclude else ""))
-        
+        print(
+            f"Converted {notebook_name}.ipynb to {output_name}"
+            + (f" excluding: {', '.join(exclude)}" if exclude else "")
+        )
+
         return str(Path(output_name).resolve())
     except subprocess.CalledProcessError as e:
         print(f"Error converting notebook: {e}")

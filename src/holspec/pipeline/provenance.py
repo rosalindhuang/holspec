@@ -6,6 +6,7 @@ files via root-level HDF5 ``input_file`` attributes, plus loaders that
 reconstruct higher-stage objects (HodgeLaplacian, HodgeLaplacianSpectra)
 by following the chain to load all required upstream objects.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -77,7 +78,7 @@ def trace_provenance(
         # Read root-level attributes only (no datasets)
         _, root_attributes = read_h5(current_filepath, dataset_names=[])
 
-        stage_name = root_attributes.get('stage_name')
+        stage_name = root_attributes.get("stage_name")
         if stage_name is None:
             break
 
@@ -92,7 +93,7 @@ def trace_provenance(
         provenance_chain[stage_name] = current_filepath
 
         # Follow the input_file link to the next file in the chain
-        input_file_relative = root_attributes.get('input_file')
+        input_file_relative = root_attributes.get("input_file")
         if input_file_relative is None:
             break
 
@@ -151,7 +152,7 @@ def load_hodge_laplacian(
     # Trace provenance to locate upstream files
     provenance_chain = trace_provenance(filepath, project_root)
 
-    required_stages = ('geometry_metric', 'topology_simplicial')
+    required_stages = ("geometry_metric", "topology_simplicial")
     missing_stages = [s for s in required_stages if s not in provenance_chain]
     if missing_stages:
         raise KeyError(
@@ -159,20 +160,25 @@ def load_hodge_laplacian(
             f"Found stages: {list(provenance_chain.keys())}"
         )
 
-    cm_filepath = provenance_chain['geometry_metric']
-    sc_filepath = provenance_chain['topology_simplicial']
+    cm_filepath = provenance_chain["geometry_metric"]
+    sc_filepath = provenance_chain["topology_simplicial"]
 
     # Load upstream objects
     sc = SimplicialComplex.load(
-        sc_filepath, group=group, validate_hash=validate_hash, load_incidence=True,
+        sc_filepath,
+        group=group,
+        validate_hash=validate_hash,
+        load_incidence=True,
     )
     cm = CochainMetric.load(
-        cm_filepath, group=group, validate_hash=validate_hash,
+        cm_filepath,
+        group=group,
+        validate_hash=validate_hash,
     )
 
     # Read group-level attributes for constructor params
     _, group_attributes = read_h5(filepath, group=group, dataset_names=[])
-    metadata = group_attributes.get('metadata', {})
+    metadata = group_attributes.get("metadata", {})
 
     # Construct HodgeLaplacian and populate cache from file
     hl = HodgeLaplacian(sc, cm, metadata=metadata)
@@ -230,30 +236,33 @@ def load_spectra(
 
     # Trace provenance to locate the upstream HodgeLaplacian file
     provenance_chain = trace_provenance(filepath, project_root)
-    if 'hodge_laplacian' not in provenance_chain:
+    if "hodge_laplacian" not in provenance_chain:
         raise KeyError(
             f"Provenance chain missing required stage 'hodge_laplacian'. "
             f"Found stages: {list(provenance_chain.keys())}"
         )
-    hl_filepath = provenance_chain['hodge_laplacian']
+    hl_filepath = provenance_chain["hodge_laplacian"]
 
     # Load upstream HodgeLaplacian object
     hl = load_hodge_laplacian(
-        hl_filepath, project_root, group=group, validate_hash=validate_hash,
+        hl_filepath,
+        project_root,
+        group=group,
+        validate_hash=validate_hash,
     )
 
     # Read group-level attributes for constructor params
     _, group_attributes = read_h5(filepath, group=group, dataset_names=[])
-    solver = str(group_attributes.get('solver', 'dense'))
-    solver_params = group_attributes.get('solver_params', None)
-    raw_eigvec = group_attributes.get('compute_eigenvectors', False)
+    solver = str(group_attributes.get("solver", "dense"))
+    solver_params = group_attributes.get("solver_params", None)
+    raw_eigvec = group_attributes.get("compute_eigenvectors", False)
     if isinstance(raw_eigvec, (bool, np.bool_)):
         compute_eigenvectors = bool(raw_eigvec)
-    elif hasattr(raw_eigvec, '__iter__'):
+    elif hasattr(raw_eigvec, "__iter__"):
         compute_eigenvectors = [(int(k), str(comp)) for k, comp in raw_eigvec]
     else:
         compute_eigenvectors = bool(raw_eigvec)
-    metadata = group_attributes.get('metadata', {})
+    metadata = group_attributes.get("metadata", {})
 
     # Construct HodgeLaplacianSpectra and populate cache from file
     hlsp = HodgeLaplacianSpectra(

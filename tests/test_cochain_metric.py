@@ -23,6 +23,7 @@ from tests.helpers import assert_sparse_allclose
 
 # Metric structure
 
+
 def test_combinatorial_metric_dimensions_match_simplices(
     edge_complex: SimplicialComplex,
     edge_metric: CochainMetric,
@@ -60,6 +61,7 @@ def test_combinatorial_metric_tensors_are_identity(
 
 # Boundary-degree behavior
 
+
 def test_cochain_metric_boundary_degree_metrics_are_zero_dimensional(
     filled_triangle_metric: CochainMetric,
 ):
@@ -76,6 +78,7 @@ def test_cochain_metric_boundary_degree_metrics_are_zero_dimensional(
 
 # Validation
 
+
 def test_combinatorial_metrics_validate_against_simplex_counts(
     edge_complex: SimplicialComplex,
     edge_metric: CochainMetric,
@@ -90,6 +93,7 @@ def test_combinatorial_metrics_validate_against_simplex_counts(
 
 
 # Metric tensor contracts
+
 
 def test_metric_tensor_accepts_positive_diagonal_metric():
     metric = construct_diagonal_metric(np.array([2.0, 4.0]))
@@ -145,6 +149,7 @@ def test_metric_tensor_rejects_non_diagonal_path_until_implemented():
 
 
 # Cochain metric contracts
+
 
 def test_cochain_metric_rejects_empty_metric_collection():
     with pytest.raises(ValueError, match="cannot be empty"):

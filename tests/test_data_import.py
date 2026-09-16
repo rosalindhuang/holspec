@@ -98,9 +98,7 @@ def test_run_data_import_files_accepts_variable_size_members(tmp_path: Path):
         select_datasets=["variable"],
     )
 
-    expected_path = (
-        tmp_path / "data" / "imported" / "variable" / "positions_csv.h5"
-    )
+    expected_path = tmp_path / "data" / "imported" / "variable" / "positions_csv.h5"
 
     assert results["variable"] == {"positions_csv": expected_path}
     assert expected_path.exists()

@@ -6,6 +6,7 @@ terminal-facing concerns such as argument parsing, config loading,
 project-root resolution, and concise status/error messages, then delegate to
 the public holspec API.
 """
+
 from __future__ import annotations
 
 from contextlib import nullcontext, redirect_stdout
@@ -39,8 +40,7 @@ def _load_yaml_config(config_path: Path) -> dict[str, Any]:
 
     if not isinstance(config, dict):
         raise ValueError(
-            f"Config must contain a YAML mapping at the top level: "
-            f"{config_path}"
+            f"Config must contain a YAML mapping at the top level: {config_path}"
         )
 
     return config
@@ -363,7 +363,9 @@ def run(
         config = _load_yaml_config(config_path)
         if verbose or quiet:
             _set_config_verbose(
-                config, verbose=verbose and not quiet, include_stages=True,
+                config,
+                verbose=verbose and not quiet,
+                include_stages=True,
             )
 
         output_context = redirect_stdout(StringIO()) if quiet else nullcontext()

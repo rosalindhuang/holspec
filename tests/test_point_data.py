@@ -20,6 +20,7 @@ from holspec.point_data import (
 
 # PointData construction and access
 
+
 def test_point_data_accepts_positions_and_computes_distances():
     positions = np.array(
         [
@@ -112,6 +113,7 @@ def test_point_data_rejects_invalid_distances(
 
 # PointData file construction
 
+
 def test_point_data_from_file_loads_positions(tmp_path: Path):
     positions = np.array(
         [
@@ -203,6 +205,7 @@ def test_point_data_from_file_uses_point_data_validation(tmp_path: Path):
 
 # PointDataEnsemble construction
 
+
 def test_point_data_ensemble_accepts_point_data_members():
     members = [
         PointData(positions=np.array([[0.0, 0.0], [1.0, 0.0]])),
@@ -247,6 +250,7 @@ def test_point_data_ensemble_rejects_non_point_data_members():
 
 
 # PointDataEnsemble file construction
+
 
 def test_point_data_ensemble_from_files_loads_positions(tmp_path: Path):
     positions_0 = np.array(
@@ -589,6 +593,7 @@ def test_point_data_ensemble_from_file_with_noise_rejects_missing_scale(
 
 
 # PointDataEnsemble reference point data
+
 
 def test_point_data_ensemble_from_base_config_reference_equals_base():
     base_config = {

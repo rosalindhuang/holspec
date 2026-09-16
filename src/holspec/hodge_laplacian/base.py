@@ -6,6 +6,7 @@ computation wrapper over SimplicialComplex and CochainMetric that produces
 Laplacian matrices and differential operators on demand, caching results
 to avoid redundant computation.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -33,12 +34,13 @@ if TYPE_CHECKING:
 
 
 # Valid component names for Laplacian access methods
-LAPLACIAN_COMPONENT_NAMES = ('lower', 'upper', 'full')
+LAPLACIAN_COMPONENT_NAMES = ("lower", "upper", "full")
 
 
 # =============================================================================
 # HodgeLaplacian
 # =============================================================================
+
 
 class HodgeLaplacian:
     """
@@ -99,8 +101,8 @@ class HodgeLaplacian:
 
         # Initialize metadata
         self.metadata: dict = metadata if metadata is not None else {}
-        if 'creation_time' not in self.metadata:
-            self.metadata['creation_time'] = datetime.now().isoformat()
+        if "creation_time" not in self.metadata:
+            self.metadata["creation_time"] = datetime.now().isoformat()
 
         # Lazy caches: keyed by (k, component) tuples
         self._laplacian_cache: dict[tuple[int, str], sparse.csr_matrix] = {}
@@ -117,14 +119,14 @@ class HodgeLaplacian:
         """Live reference to the source SimplicialComplex."""
         return self._sc
 
-    sc = simplicial_complex    # Alias
+    sc = simplicial_complex  # Alias
 
     @property
     def cochain_metric(self) -> CochainMetric:
         """Live reference to the source CochainMetric."""
         return self._cm
 
-    cm = cochain_metric    # Alias
+    cm = cochain_metric  # Alias
 
     @property
     def max_dim(self) -> int:
@@ -163,7 +165,9 @@ class HodgeLaplacian:
     # =========================================================================
 
     def to_matrix(
-        self, k: int, component: str = 'full',
+        self,
+        k: int,
+        component: str = "full",
     ) -> sparse.csr_matrix:
         """
         Return a Hodge Laplacian matrix at degree k.
@@ -186,11 +190,13 @@ class HodgeLaplacian:
             self._compute_laplacian(k, component)
 
         return self._laplacian_cache[(k, component)]
-    
-    laplacian = to_matrix    # Alias
+
+    laplacian = to_matrix  # Alias
 
     def to_symmetric_matrix(
-        self, k: int, component: str = 'full',
+        self,
+        k: int,
+        component: str = "full",
     ) -> sparse.csr_matrix:
         """
         Return a symmetrized Hodge Laplacian matrix at degree k.
@@ -219,8 +225,8 @@ class HodgeLaplacian:
 
         if (k, component) not in self._symmetric_laplacian_cache:
             L = self.to_matrix(k, component)
-            self._symmetric_laplacian_cache[(k, component)] = (
-                symmetrize_matrix(L, self._cm[k])
+            self._symmetric_laplacian_cache[(k, component)] = symmetrize_matrix(
+                L, self._cm[k]
             )
 
         return self._symmetric_laplacian_cache[(k, component)]
@@ -269,7 +275,8 @@ class HodgeLaplacian:
     # =========================================================================
 
     def validate_laplacians(
-        self, tol: float = LAPLACIAN_PROPERTY_TOL,
+        self,
+        tol: float = LAPLACIAN_PROPERTY_TOL,
     ) -> None:
         """
         Validate Hodge Laplacian properties for all degrees and components.
@@ -312,17 +319,12 @@ class HodgeLaplacian:
                 total_pairs += 1
                 L = self.to_matrix(k, comp)
                 try:
-                    validate_laplacian_properties(
-                        L, self._cm[k], tol=tol
-                    )
+                    validate_laplacian_properties(L, self._cm[k], tol=tol)
                 except ValueError as exc:
                     failures.append((k, comp, str(exc)))
 
         if failures:
-            detail = "\n  ".join(
-                f"(k={k}, {comp}): {msg}"
-                for k, comp, msg in failures
-            )
+            detail = "\n  ".join(f"(k={k}, {comp}): {msg}" for k, comp, msg in failures)
             raise ValueError(
                 f"Laplacian validation failed at {len(failures)} of "
                 f"{total_pairs} (k, component) pairs:\n  {detail}"
@@ -336,7 +338,7 @@ class HodgeLaplacian:
         self,
         filepath: str | Path,
         save_laplacians: bool = True,
-        mode: str = 'replace',
+        mode: str = "replace",
         group: str | None = None,
         hdf5_options: dict | None = None,
     ) -> str:
@@ -377,23 +379,23 @@ class HodgeLaplacian:
         """
         filepath = Path(filepath)
         if hdf5_options is None:
-            hdf5_options = {'compression': 'gzip', 'compression_opts': 4}
+            hdf5_options = {"compression": "gzip", "compression_opts": 4}
 
         # Serialize cached keys for metadata
         cached_keys = (
-            [f'{k}_{comp}' for k, comp in sorted(self._laplacian_cache.keys())]
+            [f"{k}_{comp}" for k, comp in sorted(self._laplacian_cache.keys())]
             if save_laplacians and self._laplacian_cache
             else []
         )
 
         # Root-level attributes
         root_attributes = {
-            'max_dim': self.max_dim,
-            'content_hash': self.content_hash,
-            'sc_content_hash': self._sc.content_hash,
-            'cm_content_hash': self._cm.content_hash,
-            'cached_keys': cached_keys,
-            'metadata': self.metadata,
+            "max_dim": self.max_dim,
+            "content_hash": self.content_hash,
+            "sc_content_hash": self._sc.content_hash,
+            "cm_content_hash": self._cm.content_hash,
+            "cached_keys": cached_keys,
+            "metadata": self.metadata,
         }
         save_h5(
             filepath,
@@ -409,20 +411,20 @@ class HodgeLaplacian:
             for (k, comp), L in self._laplacian_cache.items():
                 L_csr = L.tocsr()
                 csr_datasets = {
-                    'data': L_csr.data,
-                    'indices': L_csr.indices,
-                    'indptr': L_csr.indptr,
+                    "data": L_csr.data,
+                    "indices": L_csr.indices,
+                    "indptr": L_csr.indptr,
                 }
                 csr_attributes = {
-                    'shape': L_csr.shape,
-                    'nnz': L_csr.nnz,
+                    "shape": L_csr.shape,
+                    "nnz": L_csr.nnz,
                 }
                 save_h5(
                     filepath,
                     datasets=csr_datasets,
                     attributes=csr_attributes,
                     mode=mode,
-                    group=join_h5_group(group, f'degree_{k}/component_{comp}'),
+                    group=join_h5_group(group, f"degree_{k}/component_{comp}"),
                     hdf5_options=hdf5_options,
                 )
 
@@ -463,8 +465,8 @@ class HodgeLaplacian:
 
         # Hash validation
         if validate_hash:
-            stored_sc_hash = str(root_attributes.get('sc_content_hash', ''))
-            stored_cm_hash = str(root_attributes.get('cm_content_hash', ''))
+            stored_sc_hash = str(root_attributes.get("sc_content_hash", ""))
+            stored_cm_hash = str(root_attributes.get("cm_content_hash", ""))
             if stored_sc_hash != self._sc.content_hash:
                 raise ValueError(
                     f"SC content hash mismatch: stored {stored_sc_hash[:8]}, "
@@ -477,18 +479,18 @@ class HodgeLaplacian:
                 )
 
         # Discover and load cached matrices from the stored key list
-        cached_keys = root_attributes.get('cached_keys', [])
+        cached_keys = root_attributes.get("cached_keys", [])
         for key_str in cached_keys:
             # Parse "k_component" format
-            k_str, comp = key_str.split('_', 1)
+            k_str, comp = key_str.split("_", 1)
             k = int(k_str)
 
-            subgroup = join_h5_group(group, f'degree_{k}/component_{comp}')
+            subgroup = join_h5_group(group, f"degree_{k}/component_{comp}")
             csr_datasets, csr_attributes = read_h5(filepath, group=subgroup)
 
-            shape = tuple(csr_attributes['shape'])
+            shape = tuple(csr_attributes["shape"])
             L = sparse.csr_matrix(
-                (csr_datasets['data'], csr_datasets['indices'], csr_datasets['indptr']),
+                (csr_datasets["data"], csr_datasets["indices"], csr_datasets["indptr"]),
                 shape=shape,
             )
             self._laplacian_cache[(k, comp)] = L
@@ -533,7 +535,7 @@ class HodgeLaplacian:
             f"hash={self.content_hash[:8]})"
         )
 
-    def summary(self, indent: str = '') -> str:
+    def summary(self, indent: str = "") -> str:
         """
         Generate human-readable summary of the Hodge Laplacian.
 
@@ -551,13 +553,10 @@ class HodgeLaplacian:
         """
         lines = []
 
-        lines.append('Hodge Laplacian:')
-        lines.append('-' * 60)
-        lines.append(
-            f"{'k':<4} {'N_k':<6} "
-            f"{'lower':<14} {'upper':<14} {'full':<14}"
-        )
-        lines.append('-' * 60)
+        lines.append("Hodge Laplacian:")
+        lines.append("-" * 60)
+        lines.append(f"{'k':<4} {'N_k':<6} {'lower':<14} {'upper':<14} {'full':<14}")
+        lines.append("-" * 60)
 
         for k in self.degrees:
             N_k = self._sc.num_simplices[k]
@@ -567,18 +566,17 @@ class HodgeLaplacian:
                 if key in self._laplacian_cache:
                     parts.append(f"nnz={self._laplacian_cache[key].nnz}")
                 else:
-                    parts.append('--')
+                    parts.append("--")
 
             lines.append(
-                f"{k:<4} {N_k:<6} "
-                f"{parts[0]:<14} {parts[1]:<14} {parts[2]:<14}"
+                f"{k:<4} {N_k:<6} {parts[0]:<14} {parts[1]:<14} {parts[2]:<14}"
             )
 
-        lines.append('-' * 60)
+        lines.append("-" * 60)
         lines.append(f"content_hash: {self.content_hash[:16]}")
-        lines.append('')
+        lines.append("")
 
-        return '\n'.join(indent + line for line in lines)
+        return "\n".join(indent + line for line in lines)
 
     # =========================================================================
     # Private Methods
@@ -588,8 +586,7 @@ class HodgeLaplacian:
         """Validate that k is a valid degree."""
         if k < 0 or k > self.max_dim:
             raise ValueError(
-                f"Degree k={k} out of range. "
-                f"Valid range: 0 <= k <= {self.max_dim}."
+                f"Degree k={k} out of range. Valid range: 0 <= k <= {self.max_dim}."
             )
 
     @staticmethod
@@ -615,32 +612,32 @@ class HodgeLaplacian:
         G_k = self._cm[k]
         G_kp1 = self._cm[k + 1]
 
-        if component == 'lower':
-            if (k, 'lower') not in self._laplacian_cache:
-                self._laplacian_cache[(k, 'lower')] = (
-                    compute_laplacian_lower_matrix(D_k, G_km1, G_k)
+        if component == "lower":
+            if (k, "lower") not in self._laplacian_cache:
+                self._laplacian_cache[(k, "lower")] = compute_laplacian_lower_matrix(
+                    D_k, G_km1, G_k
                 )
 
-        elif component == 'upper':
-            if (k, 'upper') not in self._laplacian_cache:
-                self._laplacian_cache[(k, 'upper')] = (
-                    compute_laplacian_upper_matrix(D_kp1, G_k, G_kp1)
+        elif component == "upper":
+            if (k, "upper") not in self._laplacian_cache:
+                self._laplacian_cache[(k, "upper")] = compute_laplacian_upper_matrix(
+                    D_kp1, G_k, G_kp1
                 )
 
-        elif component == 'full':
+        elif component == "full":
             # Compute both components if not already cached
-            if (k, 'lower') not in self._laplacian_cache:
-                self._laplacian_cache[(k, 'lower')] = (
-                    compute_laplacian_lower_matrix(D_k, G_km1, G_k)
+            if (k, "lower") not in self._laplacian_cache:
+                self._laplacian_cache[(k, "lower")] = compute_laplacian_lower_matrix(
+                    D_k, G_km1, G_k
                 )
-            if (k, 'upper') not in self._laplacian_cache:
-                self._laplacian_cache[(k, 'upper')] = (
-                    compute_laplacian_upper_matrix(D_kp1, G_k, G_kp1)
+            if (k, "upper") not in self._laplacian_cache:
+                self._laplacian_cache[(k, "upper")] = compute_laplacian_upper_matrix(
+                    D_kp1, G_k, G_kp1
                 )
-            self._laplacian_cache[(k, 'full')] = (
-                (self._laplacian_cache[(k, 'lower')]
-                 + self._laplacian_cache[(k, 'upper')]).tocsr()
-            )
+            self._laplacian_cache[(k, "full")] = (
+                self._laplacian_cache[(k, "lower")]
+                + self._laplacian_cache[(k, "upper")]
+            ).tocsr()
 
     def _compute_content_hash(self) -> str:
         """
@@ -651,6 +648,6 @@ class HodgeLaplacian:
         is uniquely determined by their content hashes.
         """
         hasher = hashlib.sha256()
-        hasher.update(self._sc.content_hash.encode('utf-8'))
-        hasher.update(self._cm.content_hash.encode('utf-8'))
+        hasher.update(self._sc.content_hash.encode("utf-8"))
+        hasher.update(self._cm.content_hash.encode("utf-8"))
         return hasher.hexdigest()

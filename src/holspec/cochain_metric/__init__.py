@@ -25,19 +25,17 @@ from .validation import (
 
 __all__ = [
     # Core classes
-    'CochainMetric',
-    'MetricTensor',
-
+    "CochainMetric",
+    "MetricTensor",
     # metric_models.py
-    'construct_diagonal_metric',
-    'construct_combinatorial_cochain_metric',
-    'construct_hodge_star_cochain_metric',
-    'construct_cochain_metric_from_config',
-    'create_metric_model_label',
-    'COCHAIN_METRIC_MODEL_REGISTRY',
-
+    "construct_diagonal_metric",
+    "construct_combinatorial_cochain_metric",
+    "construct_hodge_star_cochain_metric",
+    "construct_cochain_metric_from_config",
+    "create_metric_model_label",
+    "COCHAIN_METRIC_MODEL_REGISTRY",
     # validation.py
-    'validate_metric_tensor',
-    'validate_cochain_metric',
-    'METRIC_POSITIVITY_TOL',
+    "validate_metric_tensor",
+    "validate_cochain_metric",
+    "METRIC_POSITIVITY_TOL",
 ]

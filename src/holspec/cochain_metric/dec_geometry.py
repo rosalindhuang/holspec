@@ -4,6 +4,7 @@ Discrete exterior calculus geometry computations.
 Pure mathematical routines for computing circumcenters, simplex volumes,
 signed dual volumes, and Hodge star diagonals on simplicial complexes.
 """
+
 from __future__ import annotations
 
 import itertools
@@ -26,6 +27,7 @@ VOLUME_DEGENERACY_TOL = 1e-10
 # =============================================================================
 # Per-Simplex Primitives
 # =============================================================================
+
 
 def _validate_simplex_vertices(
     vertices: np.ndarray,
@@ -61,8 +63,7 @@ def _validate_simplex_vertices(
     # Check array shape
     if vertices.ndim != 2:
         raise ValueError(
-            f"vertices must be a 2D array of shape (k+1, d), "
-            f"got shape {vertices.shape}"
+            f"vertices must be a 2D array of shape (k+1, d), got shape {vertices.shape}"
         )
 
     num_vertices, d = vertices.shape
@@ -78,9 +79,7 @@ def _validate_simplex_vertices(
 
     # Check dimension compatibility
     if k > d:
-        raise ValueError(
-            f"Simplex degree k={k} cannot exceed ambient dimension d={d}"
-        )
+        raise ValueError(f"Simplex degree k={k} cannot exceed ambient dimension d={d}")
 
     return vertices, num_vertices, k, d
 
@@ -88,45 +87,45 @@ def _validate_simplex_vertices(
 def compute_circumcenter(vertices: np.ndarray) -> np.ndarray:
     """
     Compute the circumcenter of a simplex from its vertex coordinates.
- 
+
     Parameters
     ----------
     vertices : ndarray, shape (k+1, d)
         Vertex coordinates of a k-simplex in R^d. Requires k >= 0 and
         d >= k (the vertices must be affinely independent).
- 
+
     Returns
     -------
     ndarray, shape (d,)
         Cartesian coordinates of the simplex circumcenter.
- 
+
     Notes
     -----
     This function is dimension-general: it applies to simplices of any degree
     ``k >= 0`` satisfying ``k <= d``, including lower-dimensional
-    simplices embedded in a higher-dimensional ambient space. 
+    simplices embedded in a higher-dimensional ambient space.
 
     The circumcenter is computed from the barycentric-coordinate linear system,
-    then returned in Cartesian coordinates. Following [1]_, solve the 
+    then returned in Cartesian coordinates. Following [1]_, solve the
     (k+2) x (k+2) system
- 
+
         | 2 V V^T    1 |   | b |   | diag(V V^T) |
         |              | * |   | = |             |
         |   1^T      0 |   | Q |   |      1      |
- 
-    for barycentric coordinates b then convert to Cartesian coordinates 
-    via vertices^T @ b. For low dimensions (k <= 3), the cost of the direct 
+
+    for barycentric coordinates b then convert to Cartesian coordinates
+    via vertices^T @ b. For low dimensions (k <= 3), the cost of the direct
     solve is negligible. For k=0, the circumcenter is the vertex itself.
 
     References
     ----------
-    .. [1] N. Bell and A. N. Hirani, “PyDEC: Software and Algorithms for 
-    Discretization of Exterior Calculus,” ACM Trans. Math. Softw., vol. 39, 
+    .. [1] N. Bell and A. N. Hirani, “PyDEC: Software and Algorithms for
+    Discretization of Exterior Calculus,” ACM Trans. Math. Softw., vol. 39,
     no. 1, pp. 1–41, Nov. 2012, doi: 10.1145/2382585.2382588.
 
     """
     vertices, num_vertices, k, d = _validate_simplex_vertices(vertices)
-    
+
     # Handle 0-simplex case
     if k == 0:
         return vertices[0].copy()
@@ -155,8 +154,8 @@ def compute_circumcenter(vertices: np.ndarray) -> np.ndarray:
 
     # Convert barycentric to Cartesian coordinates
     return barycentric_coords @ vertices
- 
- 
+
+
 def compute_simplex_volume(vertices: np.ndarray) -> float:
     """
     Compute the unsigned Euclidean volume of a simplex.
@@ -173,7 +172,7 @@ def compute_simplex_volume(vertices: np.ndarray) -> float:
 
     Notes
     -----
-    A 0-simplex has volume 1 by convention. For ``k >= 1``, the volume is computed 
+    A 0-simplex has volume 1 by convention. For ``k >= 1``, the volume is computed
     from the Gram determinant of the edge matrix, giving a single dimension-general
     implementation for edges, triangles, tetrahedra, and higher-dimensional
     simplices.
@@ -196,19 +195,20 @@ def compute_simplex_volume(vertices: np.ndarray) -> float:
 
     # Convert Gram determinant to simplex volume
     return float(np.sqrt(det_gram) / math.factorial(k))
- 
- 
+
+
 # =============================================================================
 # Batch Functions for Simplicial Complexes
 # =============================================================================
- 
+
+
 def compute_circumcenters(
     simplices: dict[int, list[tuple]],
     positions: np.ndarray,
 ) -> dict[int, np.ndarray]:
     """
     Compute circumcenters for all simplices at all degrees.
- 
+
     Parameters
     ----------
     simplices : dict[int, list[tuple]]
@@ -216,12 +216,12 @@ def compute_circumcenters(
         of vertex indices.
     positions : ndarray, shape (num_vertices, d)
         Vertex coordinates in R^d.
- 
+
     Returns
     -------
     dict[int, ndarray]
         Mapping from degree k to array of shape (N_k, d) containing
-        the circumcenter of each k-simplex. 
+        the circumcenter of each k-simplex.
     """
     circumcenters = {}
     for k, k_simplices in sorted(simplices.items()):
@@ -229,19 +229,19 @@ def compute_circumcenters(
             circumcenters[k] = np.empty((0, positions.shape[1]), dtype=float)
             continue
 
-        circumcenters[k] = np.array([
-            compute_circumcenter(positions[list(s)]) for s in k_simplices
-        ])
+        circumcenters[k] = np.array(
+            [compute_circumcenter(positions[list(s)]) for s in k_simplices]
+        )
     return circumcenters
- 
- 
+
+
 def compute_simplex_volumes(
     simplices: dict[int, list[tuple]],
     positions: np.ndarray,
 ) -> dict[int, np.ndarray]:
     """
     Compute unsigned volumes for all simplices at all degrees.
- 
+
     Parameters
     ----------
     simplices : dict[int, list[tuple]]
@@ -249,7 +249,7 @@ def compute_simplex_volumes(
         of vertex indices.
     positions : ndarray, shape (num_vertices, d)
         Vertex positions in R^d.
- 
+
     Returns
     -------
     dict[int, ndarray]
@@ -258,28 +258,29 @@ def compute_simplex_volumes(
     """
     volumes = {}
     for k, k_simplices in sorted(simplices.items()):
-        volumes[k] = np.array([
-            compute_simplex_volume(positions[list(s)]) for s in k_simplices
-        ])
+        volumes[k] = np.array(
+            [compute_simplex_volume(positions[list(s)]) for s in k_simplices]
+        )
     return volumes
- 
- 
+
+
 # =============================================================================
 # Dual Volume Computation
 # =============================================================================
- 
+
+
 def _build_coface_lookup(
     simplices: dict[int, list[tuple]],
     k: int,
 ) -> dict[int, list[int]]:
     """
     Build a mapping from k-simplex indices to their (k+1)-coface indices.
- 
+
     For each (k+1)-simplex, enumerates its k-faces via combinatorial
     selection and records the reverse mapping. This provides the coface
     relation needed for flag enumeration without depending on incidence
     matrices.
- 
+
     Parameters
     ----------
     simplices : dict[int, list[tuple]]
@@ -287,7 +288,7 @@ def _build_coface_lookup(
         and k+1.
     k : int
         Degree of the simplices whose cofaces are sought.
- 
+
     Returns
     -------
     dict[int, list[int]]
@@ -295,14 +296,10 @@ def _build_coface_lookup(
         indices j such that simplices[k][i] is a face of simplices[k+1][j].
     """
     # Map each k-simplex to its local index
-    simplex_to_index = {
-        simplex: i for i, simplex in enumerate(simplices[k])
-    }
+    simplex_to_index = {simplex: i for i, simplex in enumerate(simplices[k])}
 
     # Initialize lookup for all k-simplices
-    coface_lookup = {
-        i: [] for i in range(len(simplices[k]))
-    }
+    coface_lookup = {i: [] for i in range(len(simplices[k]))}
 
     # Record reverse face-to-coface relation
     for j, coface in enumerate(simplices[k + 1]):
@@ -311,8 +308,8 @@ def _build_coface_lookup(
             coface_lookup[i].append(j)
 
     return coface_lookup
- 
- 
+
+
 def _compute_halfspace_sign(
     point: np.ndarray,
     test_point: np.ndarray,
@@ -320,11 +317,11 @@ def _compute_halfspace_sign(
 ) -> int:
     """
     Determine whether two points lie on the same side of a hyperplane.
- 
+
     Given a hyperplane defined by the affine hull of hyperplane_points,
     determines whether point and test_point are on the same side (+1) or
     opposite sides (-1) of the hyperplane.
- 
+
     Parameters
     ----------
     point : ndarray, shape (d,)
@@ -334,7 +331,7 @@ def _compute_halfspace_sign(
         convention.
     hyperplane_points : ndarray, shape (m, d)
         Points defining the hyperplane.
- 
+
     Returns
     -------
     int
@@ -344,7 +341,7 @@ def _compute_halfspace_sign(
     point = np.asarray(point, dtype=float)
     test_point = np.asarray(test_point, dtype=float)
     hyperplane_points = np.asarray(hyperplane_points, dtype=float)
-    
+
     # Translate so the affine hull passes through the origin
     origin = hyperplane_points[0]
     point_vec = point - origin
@@ -365,8 +362,8 @@ def _compute_halfspace_sign(
     # Classify point by the sign of its projection onto the test point normal
     projection = np.dot(point_vec, test_vec_normal)
     return 1 if projection >= 0.0 else -1
- 
- 
+
+
 def compute_dual_volumes(
     simplices: dict[int, list[tuple]],
     positions: np.ndarray,
@@ -419,15 +416,10 @@ def compute_dual_volumes(
 
     # Precompute circumcenters and local coface relations
     circumcenters = compute_circumcenters(simplices, positions)
-    coface_lookups = {
-        k: _build_coface_lookup(simplices, k) for k in range(n)
-    }
+    coface_lookups = {k: _build_coface_lookup(simplices, k) for k in range(n)}
 
     # Precompute simplex vertex sets for opposite-vertex lookup
-    simplex_sets = {
-        k: [set(simplex) for simplex in simplices[k]]
-        for k in simplices
-    }
+    simplex_sets = {k: [set(simplex) for simplex in simplices[k]] for k in simplices}
 
     # Accumulate signed elementary dual volumes over all flags
     def accumulate_elementary_duals(
@@ -439,7 +431,7 @@ def compute_dual_volumes(
         """
         Recursively accumulate signed elementary dual volumes over all flags
         of the current simplex, where each flag is a nested sequence of
-        incident cofaces sigma^(k) < sigma^(k+1) < ... < sigma^(n) from the 
+        incident cofaces sigma^(k) < sigma^(k+1) < ... < sigma^(n) from the
         current simplex up to a top-dimensional simplex.
 
         Each recursive step extends the flag by one coface sigma^(j+1),
@@ -450,14 +442,11 @@ def compute_dual_volumes(
         of the resulting elementary dual simplex determined by the
         accumulated circumcenter sequence.
         """
-        # Reached a full chain, so the current circumcenter sequence 
+        # Reached a full chain, so the current circumcenter sequence
         # forms an elementary dual simplex; return its signed volume
         if curr_degree == n:
-            return (
-                sign_product
-                * compute_simplex_volume(
-                    np.array(dual_vertices, dtype=float)
-                )
+            return sign_product * compute_simplex_volume(
+                np.array(dual_vertices, dtype=float)
             )
 
         sigma_curr = simplices[curr_degree][curr_index]
@@ -471,9 +460,7 @@ def compute_dual_volumes(
             tau_cc = circumcenters[curr_degree + 1][next_index]
 
             # Vertex added when extending sigma_curr to tau
-            opposite_vertex = next(
-                v for v in tau if v not in sigma_curr_set
-            )
+            opposite_vertex = next(v for v in tau if v not in sigma_curr_set)
 
             # Compute the local halfspace sign for this step
             step_sign = _compute_halfspace_sign(
@@ -518,7 +505,8 @@ def compute_dual_volumes(
 # =============================================================================
 # Hodge Star Assembly
 # =============================================================================
- 
+
+
 def compute_hodge_star_diagonals(
     simplices: dict[int, list[tuple]],
     positions: np.ndarray,
@@ -537,26 +525,26 @@ def compute_hodge_star_diagonals(
     degeneracy_tol : float, default=VOLUME_DEGENERACY_TOL
         Minimum acceptable volume magnitude. Primal volumes and dual volumes
         with absolute value below this threshold raise ValueError.
- 
+
     Returns
     -------
     dict[int, ndarray]
         Mapping from degree k to array of shape (N_k,) containing the
         Hodge star diagonal entries. Entries may be negative when the dual
         volume is negative (e.g. for non-Delaunay meshes).
- 
+
     Raises
     ------
     ValueError
         If any primal volume is below degeneracy_tol, or if any absolute
-        dual volume is below degeneracy_tol. 
- 
+        dual volume is below degeneracy_tol.
+
     Notes
     -----
     Assembles the diagonal entries of the circumcentric Hodge star matrix:
- 
+
         [*^k]_{ii} = |*sigma_i^{(k)}| / |sigma_i^{(k)}|
- 
+
     where |sigma| is the unsigned primal volume and |*sigma| is the signed
     dual cell volume. Performs degeneracy checks on both primal and dual
     volumes before division.
@@ -591,8 +579,7 @@ def compute_hodge_star_diagonals(
 
     # Assemble Hodge star diagonals
     hodge_star = {
-        k: dual_volumes[k] / primal_volumes[k]
-        for k in sorted(primal_volumes)
+        k: dual_volumes[k] / primal_volumes[k] for k in sorted(primal_volumes)
     }
 
     return hodge_star

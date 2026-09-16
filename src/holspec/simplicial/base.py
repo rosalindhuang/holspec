@@ -4,6 +4,7 @@ Base simplicial complex class.
 Provides the core SimplicialComplex class for representing
 and manipulating oriented abstract simplicial complexes.
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -20,6 +21,7 @@ from .simplicial_constructions import construct_complex_from_config
 
 if TYPE_CHECKING:
     from holspec.point_data import PointData
+
 
 class SimplicialComplex:
     """
@@ -61,21 +63,21 @@ class SimplicialComplex:
         self,
         simplices: dict[int, list[tuple]],
         metadata: dict | None = None,
-        validate: bool = True
+        validate: bool = True,
     ):
         # Store simplices in native Python types (defensive copy)
         self._simplices = {k: list(simps) for k, simps in simplices.items()}
         self._simplices = convert_numpy_to_python(self._simplices)
-        
+
         # Initialize metadata
         self.metadata = metadata if metadata is not None else {}
-        if 'creation_time' not in self.metadata:
-            self.metadata['creation_time'] = datetime.now().isoformat()
-        
+        if "creation_time" not in self.metadata:
+            self.metadata["creation_time"] = datetime.now().isoformat()
+
         # Initialize caches
         self._incidence_cache = {}
         self._hash_cache = None
-        
+
         # Validate if requested
         if validate:
             self.validate()
@@ -118,8 +120,7 @@ class SimplicialComplex:
         Euler characteristic: χ = Σ (-1)^k N_k.
         Topological invariant of the simplicial complex.
         """
-        return sum((-1)**k * len(self._simplices[k]) 
-                   for k in range(self.max_dim + 1))
+        return sum((-1) ** k * len(self._simplices[k]) for k in range(self.max_dim + 1))
 
     @property
     def content_hash(self) -> str:
@@ -175,16 +176,19 @@ class SimplicialComplex:
                 )
             elif k == 0:
                 # D_0: C_0 -> C_{-1} = 0, zero map of shape (0, N_0)
-                self._incidence_cache[k] = sparse.csr_matrix((0, len(self._simplices[0])))
+                self._incidence_cache[k] = sparse.csr_matrix(
+                    (0, len(self._simplices[0]))
+                )
             elif k == self.max_dim + 1:
                 # D_{n+1}: C_{n+1} = 0 -> C_n, zero map of shape (N_n, 0)
-                self._incidence_cache[k] = sparse.csr_matrix((len(self._simplices[self.max_dim]), 0))
+                self._incidence_cache[k] = sparse.csr_matrix(
+                    (len(self._simplices[self.max_dim]), 0)
+                )
             else:
                 # D_k: C_k -> C_{k-1}, shape (N_{k-1}, N_k)
                 from .incidence import compute_incidence_matrix
-                self._incidence_cache[k] = compute_incidence_matrix(
-                    self._simplices, k
-                )
+
+                self._incidence_cache[k] = compute_incidence_matrix(self._simplices, k)
         return self._incidence_cache[k]
 
     def boundary_matrix(self, k: int) -> sparse.csr_matrix:
@@ -216,10 +220,8 @@ class SimplicialComplex:
         - Does NOT check boundary property (D_k @ D_{k+1} = 0) as that requires
           computing all incidence matrices (expensive).
         """
-        from .validation import (
-            validate_simplices_structure,
-            validate_face_closure
-        )
+        from .validation import validate_simplices_structure, validate_face_closure
+
         validate_simplices_structure(self._simplices)
         validate_face_closure(self._simplices)
 
@@ -261,14 +263,14 @@ class SimplicialComplex:
     # =========================================================================
     # I/O Methods
     # =========================================================================
-    
+
     def save(
         self,
         filepath: str | Path,
         save_incidence: bool = True,
-        mode: str = 'replace',
+        mode: str = "replace",
         group: str | None = None,
-        hdf5_options: dict | None = None
+        hdf5_options: dict | None = None,
     ) -> str:
         """
         Save simplicial complex to HDF5 file.
@@ -300,33 +302,33 @@ class SimplicialComplex:
         - /incidence/degree_{k}/: subgroups with CSR components (if save_incidence=True)
         """
         filepath = Path(filepath)
-        
+
         # Set default compression if not specified
         if hdf5_options is None:
-            hdf5_options = {'compression': 'gzip', 'compression_opts': 4}
-        
+            hdf5_options = {"compression": "gzip", "compression_opts": 4}
+
         # Serialize cached incidence keys
         incidence_keys = (
-            [f'degree_{k}' for k in sorted(self._incidence_cache.keys())]
+            [f"degree_{k}" for k in sorted(self._incidence_cache.keys())]
             if save_incidence and self._incidence_cache
             else []
         )
 
         # Prepare root-level attributes
         root_attributes = {
-            'max_dim': self.max_dim,
-            'f_vector': self.f_vector,
-            'content_hash': self.content_hash,
-            'incidence_keys': incidence_keys,
-            'metadata': self.metadata
+            "max_dim": self.max_dim,
+            "f_vector": self.f_vector,
+            "content_hash": self.content_hash,
+            "incidence_keys": incidence_keys,
+            "metadata": self.metadata,
         }
-        
+
         # Prepare simplices datasets with subgroup paths
         simplices_datasets = {
-            f'simplices/degree_{k}': np.array(simps, dtype=int)
+            f"simplices/degree_{k}": np.array(simps, dtype=int)
             for k, simps in self._simplices.items()
         }
-        
+
         # Save root attributes and simplices
         save_h5(
             filepath,
@@ -334,35 +336,32 @@ class SimplicialComplex:
             attributes=root_attributes,
             mode=mode,
             group=group,
-            hdf5_options=hdf5_options
+            hdf5_options=hdf5_options,
         )
-        
+
         # Save incidence matrices to subgroups (if requested)
         if save_incidence and self._incidence_cache:
             for k, D_k in self._incidence_cache.items():
                 # Convert to CSR format
                 D_k_csr = D_k.tocsr()
-                
+
                 # Prepare datasets and attributes for this incidence matrix
                 inc_datasets = {
-                    'data': D_k_csr.data,
-                    'indices': D_k_csr.indices,
-                    'indptr': D_k_csr.indptr
+                    "data": D_k_csr.data,
+                    "indices": D_k_csr.indices,
+                    "indptr": D_k_csr.indptr,
                 }
-                inc_attributes = {
-                    'shape': D_k_csr.shape,
-                    'nnz': D_k_csr.nnz
-                }
-                
+                inc_attributes = {"shape": D_k_csr.shape, "nnz": D_k_csr.nnz}
+
                 save_h5(
                     filepath,
                     datasets=inc_datasets,
                     attributes=inc_attributes,
                     mode=mode,
-                    group=join_h5_group(group, f'incidence/degree_{k}'),
-                    hdf5_options=hdf5_options
+                    group=join_h5_group(group, f"incidence/degree_{k}"),
+                    hdf5_options=hdf5_options,
                 )
-        
+
         return self.content_hash
 
     @classmethod
@@ -371,8 +370,8 @@ class SimplicialComplex:
         filepath: str | Path,
         group: str | None = None,
         validate_hash: bool = True,
-        load_incidence: bool = True
-    ) -> 'SimplicialComplex':
+        load_incidence: bool = True,
+    ) -> "SimplicialComplex":
         """
         Load simplicial complex from HDF5 file.
 
@@ -399,71 +398,76 @@ class SimplicialComplex:
             If file format is invalid or hash validation fails.
         """
         filepath = Path(filepath)
-        
+
         # Read root-level attributes
         _, attributes = read_h5(filepath, group=group)
-        
+
         # Extract metadata
-        metadata = attributes.get('metadata', {})
-        
-        if 'max_dim' not in attributes:
+        metadata = attributes.get("metadata", {})
+
+        if "max_dim" not in attributes:
             raise ValueError(f"Missing 'max_dim' in {filepath}")
-        
+
         # Read all simplices from /simplices group
-        datasets, _ = read_h5(filepath, group=join_h5_group(group, 'simplices'))
-        
+        datasets, _ = read_h5(filepath, group=join_h5_group(group, "simplices"))
+
         simplices = {}
         for key, data in datasets.items():
-            if key.startswith('degree_'):
-                k = int(key.split('_')[1])
+            if key.startswith("degree_"):
+                k = int(key.split("_")[1])
                 # Convert (N_k, k+1) array to list of tuples
                 simplices[k] = [tuple(row) for row in data]
-        
+
         if not simplices:
             raise ValueError(f"No simplices found in {filepath}")
-        
+
         # Create simplicial complex without validation (data already validated when saved)
         sc = cls(simplices, metadata=metadata, validate=False)
-        
+
         # Validate content hash if requested
         if validate_hash:
-            if 'content_hash' not in attributes:
-                raise ValueError(f"Missing 'content_hash' in {filepath}, cannot validate hash")
+            if "content_hash" not in attributes:
+                raise ValueError(
+                    f"Missing 'content_hash' in {filepath}, cannot validate hash"
+                )
             else:
-                stored_hash = str(attributes['content_hash'])
+                stored_hash = str(attributes["content_hash"])
                 computed_hash = sc.content_hash
                 if computed_hash != stored_hash:
                     raise ValueError(
                         f"Content hash mismatch in {filepath}: "
                         f"expected {stored_hash}, got {computed_hash}"
                     )
-        
+
         # Load incidence matrices if available and requested
-        incidence_keys = list(attributes.get('incidence_keys', []))
+        incidence_keys = list(attributes.get("incidence_keys", []))
         if incidence_keys and load_incidence:
             for key in incidence_keys:
-                k = int(key.split('_')[1])
+                k = int(key.split("_")[1])
                 inc_datasets, inc_attrs = read_h5(
-                    filepath,
-                    group=join_h5_group(group, f'incidence/{key}')
+                    filepath, group=join_h5_group(group, f"incidence/{key}")
                 )
-                shape = tuple(inc_attrs['shape'])
+                shape = tuple(inc_attrs["shape"])
                 D_k = sparse.csr_matrix(
-                    (inc_datasets['data'], inc_datasets['indices'], inc_datasets['indptr']),
+                    (
+                        inc_datasets["data"],
+                        inc_datasets["indices"],
+                        inc_datasets["indptr"],
+                    ),
                     shape=shape,
                 )
                 sc._incidence_cache[k] = D_k
-        
+
         return sc
 
     @classmethod
     def from_point_data(
         cls,
-        point_data: 'PointData',
+        point_data: "PointData",
         config: dict,
         metadata: dict | None = None,
         validate: bool = True,
-    ) -> 'SimplicialComplex':
+    ) -> "SimplicialComplex":
         """
         Construct a SimplicialComplex from a PointData object and a method config.
 
@@ -499,28 +503,30 @@ class SimplicialComplex:
         if point_data.has_positions:
             positions = point_data.get_positions()
             N, d = positions.shape
-            input_type = 'positions'
+            input_type = "positions"
             input_shape = (N, d)
             distances = None
         else:
             distances = point_data.get_distances()
             N = distances.shape[0]
-            input_type = 'distances'
+            input_type = "distances"
             input_shape = (N, N)
             positions = None
 
         # Construct raw simplices dict (pure computation, no framework objects)
-        simplices = construct_complex_from_config(config, positions=positions, distances=distances)
+        simplices = construct_complex_from_config(
+            config, positions=positions, distances=distances
+        )
 
         # Assemble metadata: caller-supplied values take precedence
         complex_metadata = {
-            'construction_method': config['method'],
-            'construction_config': {
-                'input_type': input_type,
-                'input_shape': input_shape,
-                **config.get('params', {}),
+            "construction_method": config["method"],
+            "construction_config": {
+                "input_type": input_type,
+                "input_shape": input_shape,
+                **config.get("params", {}),
             },
-            'input_hash': point_data.content_hash,
+            "input_hash": point_data.content_hash,
         }
         if metadata is not None:
             complex_metadata.update(metadata)
@@ -545,23 +551,23 @@ class SimplicialComplex:
         Hash is based on canonical string representation of all simplices,
         ensuring consistency across different orderings.
         """
-        
+
         # Build canonical string representation
         # Format: dimension -> sorted list of sorted simplices
         hash_parts = []
-        
+
         for k in sorted(self._simplices.keys()):
             # Sort simplices at this dimension for canonical ordering
             sorted_simplices = sorted(self._simplices[k])
             # Convert to string representation
             hash_parts.append(f"{k}:{sorted_simplices}")
-        
+
         # Combine into single string
         canonical_str = "|".join(hash_parts)
-        
+
         # Compute SHA-256 hash
         return hashlib.sha256(canonical_str.encode()).hexdigest()
-    
+
     def summary(self) -> str:
         """
         Generate human-readable summary of the complex.
@@ -575,8 +581,8 @@ class SimplicialComplex:
         -----
         Useful for debugging and quick inspection in notebooks.
         """
-        lines = [] 
-        
+        lines = []
+
         # Simplices summary
         simplex_names = {
             0: "vertices",
@@ -584,25 +590,25 @@ class SimplicialComplex:
             2: "triangles",
             3: "tetrahedra",
         }
-        
-        lines.append('Simplices:')
+
+        lines.append("Simplices:")
         lines.append("-" * 40)
         lines.append(f"{'k':<4} {'k-simplex':<15} {'count':<10}")
         lines.append("-" * 40)
-        
+
         for k in range(self.max_dim + 1):
             name = simplex_names.get(k, f"{k}-simplices")
             count = len(self._simplices[k])
             lines.append(f"{k:<4} {name:<15} {count:<10}")
-        
+
         lines.append("-" * 40)
 
         # Incidence matrix summary
-        lines.append('\nIncidence Matrices:')
+        lines.append("\nIncidence Matrices:")
         lines.append("-" * 40)
         lines.append(f"{'k':<4} {'D_k computed':<15} {'shape':<20}")
         lines.append("-" * 40)
-        
+
         for k in range(1, self.max_dim + 1):
             computed = k in self._incidence_cache
             if computed:
@@ -610,11 +616,11 @@ class SimplicialComplex:
                 lines.append(f"{k:<4} {str(computed):<15} {str(shape):<20}")
             else:
                 lines.append(f"{k:<4} {str(computed):<15} {'':<20}")
-        
+
         lines.append("-" * 40)
         lines.append("")
-        
-        return '\n'.join(lines)
+
+        return "\n".join(lines)
 
     def __repr__(self) -> str:
         """Concise representation for debugging."""
@@ -624,8 +630,8 @@ class SimplicialComplex:
             f"χ={self.euler_characteristic}, "
             f"hash={self.content_hash[:8]})"
         )
-    
-    def __eq__(self, other: 'SimplicialComplex') -> bool:
+
+    def __eq__(self, other: "SimplicialComplex") -> bool:
         """
         Equality comparison based on simplices.
 
@@ -634,16 +640,16 @@ class SimplicialComplex:
         """
         if not isinstance(other, SimplicialComplex):
             return False
-        
+
         # Check if dimensions match
         if self._simplices.keys() != other._simplices.keys():
             return False
-        
+
         # Check if simplices match at each dimension (order-independent)
         for k in self._simplices.keys():
             if set(self._simplices[k]) != set(other._simplices[k]):
                 return False
-        
+
         return True
 
     def __hash__(self) -> int:

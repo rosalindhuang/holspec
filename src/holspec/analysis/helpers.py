@@ -5,6 +5,7 @@ Provides entry-label utilities, provenance-based file indexing,
 experiment-series persistence, and loaders for saved
 :class:`EnsembleSpectraAnalysis` results and experiment series.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -20,6 +21,7 @@ from .spectra_analysis import EnsembleSpectraAnalysis
 # =============================================================================
 # Helpers
 # =============================================================================
+
 
 def entry_group_key(
     entry: dict,
@@ -44,13 +46,13 @@ def entry_group_key(
     -------
     tuple of str
     """
-    parts = entry['output_label'].split('__', 1)
+    parts = entry["output_label"].split("__", 1)
     sc_label = parts[0]
-    cm_label = parts[1] if len(parts) == 2 else ''
+    cm_label = parts[1] if len(parts) == 2 else ""
     field_map = {
-        'ptd_label': entry['ptd_label'],
-        'sc_label': sc_label,
-        'cm_label': cm_label,
+        "ptd_label": entry["ptd_label"],
+        "sc_label": sc_label,
+        "cm_label": cm_label,
     }
     return tuple(field_map[f] for f in group_by)
 
@@ -90,16 +92,16 @@ def entry_fixed_varying(
     ValueError
         If *group_by* does not leave exactly one varying field.
     """
-    parts = entry['output_label'].split('__', 1)
+    parts = entry["output_label"].split("__", 1)
     sc_label = parts[0]
-    cm_label = parts[1] if len(parts) == 2 else ''
+    cm_label = parts[1] if len(parts) == 2 else ""
     field_map = {
-        'ptd_label': entry['ptd_label'],
-        'sc_label': sc_label,
-        'cm_label': cm_label,
+        "ptd_label": entry["ptd_label"],
+        "sc_label": sc_label,
+        "cm_label": cm_label,
     }
 
-    all_fields = ['ptd_label', 'sc_label', 'cm_label']
+    all_fields = ["ptd_label", "sc_label", "cm_label"]
     varying = [f for f in all_fields if f not in group_by]
     if len(varying) != 1:
         raise ValueError(
@@ -140,33 +142,30 @@ def extract_exp_params(provenance: dict, exp_params: list[str]) -> dict:
     result = {name: None for name in exp_params}
 
     for name in exp_params:
-        ptd_filepath = provenance.get('point_data')
+        ptd_filepath = provenance.get("point_data")
         ptd_attrs = None
 
         if ptd_filepath is not None:
             _, ptd_attrs = read_h5(ptd_filepath, dataset_names=[])
-            metadata = ptd_attrs.get('metadata', {})
-            if (
-                isinstance(metadata, dict)
-                and metadata.get('exp_param') == name
-            ):
-                result[name] = metadata.get('exp_value')
+            metadata = ptd_attrs.get("metadata", {})
+            if isinstance(metadata, dict) and metadata.get("exp_param") == name:
+                result[name] = metadata.get("exp_value")
                 continue
 
-        if name == 'noise':
+        if name == "noise":
             if ptd_attrs is None:
                 continue
-            noise_config = ptd_attrs.get('noise_config')
+            noise_config = ptd_attrs.get("noise_config")
             if noise_config is not None:
-                result['noise'] = noise_config.get('scale')
+                result["noise"] = noise_config.get("scale")
 
-        elif name == 'alpha':
-            sc_filepath = provenance.get('topology_simplicial')
+        elif name == "alpha":
+            sc_filepath = provenance.get("topology_simplicial")
             if sc_filepath is None:
                 continue
             _, sc_attrs = read_h5(sc_filepath, dataset_names=[])
-            stage_config = sc_attrs.get('stage_config', {})
-            result['alpha'] = stage_config.get('params', {}).get('alpha')
+            stage_config = sc_attrs.get("stage_config", {})
+            result["alpha"] = stage_config.get("params", {}).get("alpha")
 
     return result
 
@@ -199,21 +198,35 @@ def build_spectra_file_records(
             provenance = trace_provenance(filepath, project_root)
             provenance = {k: Path(v).resolve() for k, v in provenance.items()}
 
-            ptd_label = provenance['point_data'].stem if 'point_data' in provenance else None
-            sc_label = provenance['topology_simplicial'].stem if 'topology_simplicial' in provenance else None
-            cm_stem = provenance['geometry_metric'].stem if 'geometry_metric' in provenance else None
-            if cm_stem is not None and sc_label is not None and cm_stem.startswith(sc_label + '__'):
-                cm_label = cm_stem[len(sc_label) + 2:]
+            ptd_label = (
+                provenance["point_data"].stem if "point_data" in provenance else None
+            )
+            sc_label = (
+                provenance["topology_simplicial"].stem
+                if "topology_simplicial" in provenance
+                else None
+            )
+            cm_stem = (
+                provenance["geometry_metric"].stem
+                if "geometry_metric" in provenance
+                else None
+            )
+            if (
+                cm_stem is not None
+                and sc_label is not None
+                and cm_stem.startswith(sc_label + "__")
+            ):
+                cm_label = cm_stem[len(sc_label) + 2 :]
             else:
                 cm_label = cm_stem
 
             records[filepath] = {
-                'filepath': filepath,
-                'ptd_label': ptd_label,
-                'sc_label': sc_label,
-                'cm_label': cm_label,
-                'output_label': output_label,
-                'provenance': provenance,
+                "filepath": filepath,
+                "ptd_label": ptd_label,
+                "sc_label": sc_label,
+                "cm_label": cm_label,
+                "output_label": output_label,
+                "provenance": provenance,
             }
 
     return records
@@ -240,9 +253,9 @@ def compute_transition_points(
     dict[tuple[int, str], float]
         Mapping ``{(k, component): transition_point}``.
     """
-    exp_values = np.asarray(series['exp_values'])
-    analysis_keys = series['analysis_keys']
-    distance_series = series['distance_series']
+    exp_values = np.asarray(series["exp_values"])
+    analysis_keys = series["analysis_keys"]
+    distance_series = series["distance_series"]
 
     midpoints = 0.5 * (exp_values[:-1] + exp_values[1:])
 
@@ -250,7 +263,7 @@ def compute_transition_points(
     for k, comp in analysis_keys:
         dists = np.asarray(distance_series[(k, comp)])
         if dists.size == 0:
-            transition_points[(k, comp)] = float('nan')
+            transition_points[(k, comp)] = float("nan")
         else:
             transition_points[(k, comp)] = float(midpoints[np.argmax(dists)])
     return transition_points
@@ -287,42 +300,69 @@ def save_exp_series(
         filepath.unlink()
 
     ac = analysis_config
-    analysis_keys = ac.get('analysis_keys',
-        [(k, comp) for k in ac['degrees'] for comp in ac['components']])
-    observable_names = ac['observable_names']
+    analysis_keys = ac.get(
+        "analysis_keys", [(k, comp) for k in ac["degrees"] for comp in ac["components"]]
+    )
+    observable_names = ac["observable_names"]
 
     root_attributes = {
-        'dataset_name': dataset_name,
-        'exp_param': series['exp_param'],
-        'group_key': group_key,
-        'group_label': '__'.join(group_key),
-        'analysis_keys': analysis_keys,
-        **{k: v for k, v in ac.items() if k != 'analysis_keys'},
+        "dataset_name": dataset_name,
+        "exp_param": series["exp_param"],
+        "group_key": group_key,
+        "group_label": "__".join(group_key),
+        "analysis_keys": analysis_keys,
+        **{k: v for k, v in ac.items() if k != "analysis_keys"},
     }
-    save_h5(filepath, datasets={'exp_values': series['exp_values']}, attributes=root_attributes, mode='create')
+    save_h5(
+        filepath,
+        datasets={"exp_values": series["exp_values"]},
+        attributes=root_attributes,
+        mode="create",
+    )
 
     for k, comp in analysis_keys:
-        obs = series['observable_series'][(k, comp)]
+        obs = series["observable_series"][(k, comp)]
         obs_datasets = {}
         for obs_name in observable_names:
-            obs_datasets[f'{obs_name}_mean'] = obs[obs_name]['mean']
-            obs_datasets[f'{obs_name}_std'] = obs[obs_name]['std']
-        save_h5(filepath, datasets=obs_datasets, group=f'observables/degree_{k}_{comp}', mode='create')
+            obs_datasets[f"{obs_name}_mean"] = obs[obs_name]["mean"]
+            obs_datasets[f"{obs_name}_std"] = obs[obs_name]["std"]
+        save_h5(
+            filepath,
+            datasets=obs_datasets,
+            group=f"observables/degree_{k}_{comp}",
+            mode="create",
+        )
 
     for k, comp in analysis_keys:
-        dist = series['distribution_series'][(k, comp)]
-        save_h5(filepath, datasets={'x': dist['x'], 'density_stack': dist['density_stack']}, group=f'distributions/degree_{k}_{comp}', mode='create')
+        dist = series["distribution_series"][(k, comp)]
+        save_h5(
+            filepath,
+            datasets={"x": dist["x"], "density_stack": dist["density_stack"]},
+            group=f"distributions/degree_{k}_{comp}",
+            mode="create",
+        )
 
     for k, comp in analysis_keys:
-        save_h5(filepath, datasets={f'degree_{k}_{comp}': series['distance_series'][(k, comp)]}, group='distances', mode='update')
+        save_h5(
+            filepath,
+            datasets={f"degree_{k}_{comp}": series["distance_series"][(k, comp)]},
+            group="distances",
+            mode="update",
+        )
 
     for k, comp in analysis_keys:
-        save_h5(filepath, datasets={f'degree_{k}_{comp}': series['transition_points'][(k, comp)]}, group='transitions', mode='update')
+        save_h5(
+            filepath,
+            datasets={f"degree_{k}_{comp}": series["transition_points"][(k, comp)]},
+            group="transitions",
+            mode="update",
+        )
 
 
 # =============================================================================
 # Loading
 # =============================================================================
+
 
 def load_spectra_analyses(
     spectra_datasets: dict,
@@ -330,7 +370,7 @@ def load_spectra_analyses(
     project_root: Path | str,
     plot_datasets: list[str] | None = None,
     verbose: bool = False,
-    float_fmt: str = '.4g',
+    float_fmt: str = ".4g",
 ) -> dict[str, dict[str, dict]]:
     """Load per-file spectra analyses from saved results.
 
@@ -379,13 +419,15 @@ def load_spectra_analyses(
         spectra_filepaths = select_stage_outputs(
             stage_num=4,
             project_root=project_root,
-            base_dir=dataset_config.get('base_dir'),
-            select_point_data=dataset_config.get('select_point_data', []),
-            select_simplicial_complex=dataset_config.get('select_simplicial_complex', []),
-            select_cochain_metric=dataset_config.get('select_cochain_metric', []),
+            base_dir=dataset_config.get("base_dir"),
+            select_point_data=dataset_config.get("select_point_data", []),
+            select_simplicial_complex=dataset_config.get(
+                "select_simplicial_complex", []
+            ),
+            select_cochain_metric=dataset_config.get("select_cochain_metric", []),
         )
 
-        exp_param = dataset_config.get('exp_param')
+        exp_param = dataset_config.get("exp_param")
         entries_list = []
 
         for ptd_dir_label, output_dict in spectra_filepaths.items():
@@ -400,13 +442,15 @@ def load_spectra_analyses(
                     continue
 
                 _, attrs = read_h5(esa_path, dataset_names=[])
-                degrees = list(attrs.get('degrees', [0, 1, 2]))
-                components = tuple(attrs.get('components', ['full']))
-                metadata = attrs.get('metadata', {})
+                degrees = list(attrs.get("degrees", [0, 1, 2]))
+                components = tuple(attrs.get("components", ["full"]))
+                metadata = attrs.get("metadata", {})
 
                 esa = EnsembleSpectraAnalysis.from_file(
-                    pipeline_filepath, project_root,
-                    degrees=degrees, components=components,
+                    pipeline_filepath,
+                    project_root,
+                    degrees=degrees,
+                    components=components,
                 )
                 esa.load_cache(esa_path)
 
@@ -418,41 +462,55 @@ def load_spectra_analyses(
                     exp_value = exp_params_dict.get(exp_param)
 
                 label = f"{subdir}/{stem}"
-                entries_list.append((label, {
-                    'esa': esa,
-                    'metadata': metadata,
-                    'esa_path': esa_path,
-                    'source_file': pipeline_filepath,
-                    'ptd_label': ptd_dir_label,
-                    'output_label': output_label,
-                    'exp_value': exp_value,
-                }))
+                entries_list.append(
+                    (
+                        label,
+                        {
+                            "esa": esa,
+                            "metadata": metadata,
+                            "esa_path": esa_path,
+                            "source_file": pipeline_filepath,
+                            "ptd_label": ptd_dir_label,
+                            "output_label": output_label,
+                            "exp_value": exp_value,
+                        },
+                    )
+                )
 
         if exp_param is not None:
-            entries_list.sort(key=lambda x: (x[1]['output_label'], x[1]['exp_value'] or 0))
+            entries_list.sort(
+                key=lambda x: (x[1]["output_label"], x[1]["exp_value"] or 0)
+            )
 
         result[dataset_name] = dict(entries_list)
 
     # Print summary
     total_files = sum(len(analyses) for analyses in result.values())
-    print(f"Loaded spectra analyses for {total_files} files "
-          f"across {len(result)} dataset(s).")
+    print(
+        f"Loaded spectra analyses for {total_files} files "
+        f"across {len(result)} dataset(s)."
+    )
 
     if verbose:
         print()
         for dataset_name, analyses in result.items():
-            print('=' * 80)
+            print("=" * 80)
             print(f"Dataset: {dataset_name} ({len(analyses)} files)")
-            print('=' * 80)
+            print("=" * 80)
             print()
             for label, entry in analyses.items():
-                esa = entry['esa']
-                exp_param = spectra_datasets[dataset_name].get('exp_param')
-                exp_str = (f" ({exp_param}={entry['exp_value']:{float_fmt}})"
-                           if entry.get('exp_value') is not None else "")
+                esa = entry["esa"]
+                exp_param = spectra_datasets[dataset_name].get("exp_param")
+                exp_str = (
+                    f" ({exp_param}={entry['exp_value']:{float_fmt}})"
+                    if entry.get("exp_value") is not None
+                    else ""
+                )
                 print(f"  {entry['ptd_label']} / {entry['output_label']}{exp_str}")
-                print(f"    EnsembleSpectraAnalysis(num_members={esa.num_members}, "
-                      f"degrees={esa.degrees}, components={esa.components})")
+                print(
+                    f"    EnsembleSpectraAnalysis(num_members={esa.num_members}, "
+                    f"degrees={esa.degrees}, components={esa.components})"
+                )
                 print(f"    source: {entry['source_file'].relative_to(project_root)}")
                 print(f"    cache:  {entry['esa_path'].relative_to(project_root)}")
             print()
@@ -496,65 +554,69 @@ def load_experiment_series(
     exp_series_dir = Path(exp_series_dir)
     result = {}
 
-    for filepath in sorted(exp_series_dir.glob('*.h5')):
-        ds_root, attrs = read_h5(filepath, dataset_names=['exp_values'])
-        exp_values = ds_root['exp_values']
-        exp_param = str(attrs['exp_param'])
-        dataset_name = str(attrs['dataset_name'])
+    for filepath in sorted(exp_series_dir.glob("*.h5")):
+        ds_root, attrs = read_h5(filepath, dataset_names=["exp_values"])
+        exp_values = ds_root["exp_values"]
+        exp_param = str(attrs["exp_param"])
+        dataset_name = str(attrs["dataset_name"])
 
         if plot_datasets is not None and dataset_name not in plot_datasets:
             continue
 
-        group_key = tuple(str(g) for g in attrs['group_key'])
-        group_label = str(attrs.get('group_label', '__'.join(group_key)))
-        analysis_keys = [tuple(ak) for ak in attrs['analysis_keys']]
-        observable_names = list(attrs['observable_names'])
+        group_key = tuple(str(g) for g in attrs["group_key"])
+        group_label = str(attrs.get("group_label", "__".join(group_key)))
+        analysis_keys = [tuple(ak) for ak in attrs["analysis_keys"]]
+        observable_names = list(attrs["observable_names"])
 
         observable_series = {}
         for k, comp in analysis_keys:
-            obs_ds, _ = read_h5(filepath, group=f'observables/degree_{k}_{comp}')
+            obs_ds, _ = read_h5(filepath, group=f"observables/degree_{k}_{comp}")
             obs_dict = {}
             for obs_name in observable_names:
                 obs_dict[obs_name] = {
-                    'mean': obs_ds[f'{obs_name}_mean'],
-                    'std': obs_ds[f'{obs_name}_std'],
+                    "mean": obs_ds[f"{obs_name}_mean"],
+                    "std": obs_ds[f"{obs_name}_std"],
                 }
             observable_series[(int(k), comp)] = obs_dict
 
         distribution_series = {}
         for k, comp in analysis_keys:
-            dist_ds, _ = read_h5(filepath, group=f'distributions/degree_{k}_{comp}')
+            dist_ds, _ = read_h5(filepath, group=f"distributions/degree_{k}_{comp}")
             distribution_series[(int(k), comp)] = {
-                'x': dist_ds['x'],
-                'density_stack': dist_ds['density_stack'],
+                "x": dist_ds["x"],
+                "density_stack": dist_ds["density_stack"],
             }
 
         distance_series = {}
         for k, comp in analysis_keys:
-            dist_ds, _ = read_h5(filepath, group='distances',
-                                 dataset_names=[f'degree_{k}_{comp}'])
-            distance_series[(int(k), comp)] = dist_ds[f'degree_{k}_{comp}']
+            dist_ds, _ = read_h5(
+                filepath, group="distances", dataset_names=[f"degree_{k}_{comp}"]
+            )
+            distance_series[(int(k), comp)] = dist_ds[f"degree_{k}_{comp}"]
 
         transition_points = {}
         try:
             for k, comp in analysis_keys:
-                trans_ds, _ = read_h5(filepath, group='transitions',
-                                      dataset_names=[f'degree_{k}_{comp}'])
-                transition_points[(int(k), comp)] = float(trans_ds[f'degree_{k}_{comp}'])
+                trans_ds, _ = read_h5(
+                    filepath, group="transitions", dataset_names=[f"degree_{k}_{comp}"]
+                )
+                transition_points[(int(k), comp)] = float(
+                    trans_ds[f"degree_{k}_{comp}"]
+                )
         except KeyError:
             transition_points = {}
 
         series_key = (dataset_name, group_key)
         result[series_key] = {
-            'exp_param': exp_param,
-            'exp_values': exp_values,
-            'group_label': group_label,
-            'observable_series': observable_series,
-            'distribution_series': distribution_series,
-            'distance_series': distance_series,
-            'transition_points': transition_points,
-            'analysis_keys': [(int(k), comp) for k, comp in analysis_keys],
-            'observable_names': observable_names,
+            "exp_param": exp_param,
+            "exp_values": exp_values,
+            "group_label": group_label,
+            "observable_series": observable_series,
+            "distribution_series": distribution_series,
+            "distance_series": distance_series,
+            "transition_points": transition_points,
+            "analysis_keys": [(int(k), comp) for k, comp in analysis_keys],
+            "observable_names": observable_names,
         }
 
     # Print summary
@@ -564,11 +626,11 @@ def load_experiment_series(
         print()
         for series_key, series in result.items():
             dataset_name, group_key = series_key
-            group_label = series['group_label']
-            fp = exp_series_dir / f'{dataset_name}__{group_label}.h5'
+            group_label = series["group_label"]
+            fp = exp_series_dir / f"{dataset_name}__{group_label}.h5"
             size_kb = fp.stat().st_size / 1024 if fp.exists() else 0
-            exp_param = series['exp_param']
-            exp_values = series['exp_values']
+            exp_param = series["exp_param"]
+            exp_values = series["exp_values"]
             print(f"  {series_key}")
             print(f"    exp_param: {exp_param}")
             print(f"    n_params: {len(exp_values)}")
