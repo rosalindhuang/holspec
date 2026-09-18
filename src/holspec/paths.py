@@ -2,8 +2,8 @@
 """
 Project path conventions and directory utilities.
 
-The local configs, data, notebooks, and outputs paths are local workspace
-conventions for development and exploratory workflows.
+The local configs, data, workflows, workbench, and outputs paths are local
+workspace conventions for development and exploratory workflows.
 """
 
 from pathlib import Path
@@ -63,7 +63,8 @@ DATA_RAW_IMPORTED_DIR = DATA_RAW_DIR / "imported"
 DATA_INTERIM_DIR = DATA_DIR / "interim"
 DATA_PROCESSED_DIR = DATA_DIR / "processed"
 
-NOTEBOOKS_DIR = LOCAL_ROOT / "notebooks"
+WORKFLOWS_DIR = LOCAL_ROOT / "workflows"
+WORKBENCH_DIR = LOCAL_ROOT / "workbench"
 OUTPUTS_DIR = LOCAL_ROOT / "outputs"
 
 
