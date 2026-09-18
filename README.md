@@ -6,19 +6,78 @@
 
 The `holspec` package supports:
 
-- **Point cloud inputs:** Represent point cloud data from coordinates or pairwise distances, supporting external data import and built-in data generation.
+- **Point cloud inputs:** Represent point cloud data from coordinates or pairwise distances, with support for external data import and built-in data generation.
 - **Configurable pipeline stages:** Construct simplicial complexes, assign cochain metrics, assemble Hodge Laplacians, and compute spectra through modular stage configurations.
 - **Reproducible workflows:** Run config-driven workflows using the Python API and `holspec` CLI, with persisted intermediate artifacts and provenance tracking.
 - **Analysis and visualization:** Analyze, compare, and visualize structural signatures across families of point cloud datasets and modeling choices.
 
-## Motivation
+## Installation and usage
+
+### Installation
+
+`holspec` requires Python 3.12 or newer.
+
+For local development, examples, notebook workflows, and visualization, the recommended setup is to create the Conda environment defined in [`environment.yml`](environment.yml) and install the package in editable mode:
+
+```bash
+git clone https://github.com/rosalindhuang/holspec.git
+cd holspec
+
+conda env create -f environment.yml
+conda activate holspec
+
+python -m pip install -e .
+```
+
+This installs the package and makes the `holspec` command available from the terminal. To confirm the installation, run:
+
+```bash
+holspec --help
+python -c "import holspec; print(holspec.__version__)"
+```
+
+For a lighter setup using an existing Python environment, install the package directly with `pip`:
+
+```bash
+python -m pip install -e .
+```
+
+Optional dependency groups are available for development, visualization, and notebooks:
+
+```bash
+python -m pip install -e ".[dev,viz,notebook]"
+```
+
+### Usage interfaces
+
+`holspec` can be used through two interfaces:
+
+| Interface  | Use it for                                                                                                      | Examples                                                                                                           |
+| ---------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| CLI        | Running reproducible data import, data generation, and pipeline workflows from YAML configuration files.        | `holspec run`, `holspec import-data`, `holspec generate-data`                                                      |
+| Python API | Analyzing and visualizing pipeline outputs, working directly with framework objects, building custom workflows. | `load_spectra`, `EnsembleSpectraAnalysis`, `PointData`, `SimplicialComplex`, `run_pipeline`, `run_data_import`     |
+
+The two interfaces are complementary and cover different needs. Typical workflows can combine them: run reproducible computations from the CLI, then use the Python API for interactive exploration, analysis, and visualization. See the **Quickstart** section for an example.
+
+The CLI is the main interface for running config-driven workflows.
+
+- `holspec run <pipeline_config.yml>`: Run the full pipeline from a YAML config.
+- `holspec import-data <data_import_config.yml>`: Import external point cloud data files specified by a YAML config.
+- `holspec generate-data <data_generation_config.yml>`: Generate point cloud data from a YAML config.
+- `holspec inspect <output_file.h5>`: Inspect the structure and attributes of an HDF5 output file.
+
+Use `holspec --help` or `holspec <command> --help` to see available options.
+
+The top-level Python API exposes the framework objects, pipeline entry points, and analysis utilities. Visualization utilities and lower-level construction, validation, and I/O helpers are available from the corresponding subpackages, including `holspec.visualization`, `holspec.simplicial`, `holspec.cochain_metric`, and `holspec.utilities`.
+
+## Scientific motivation
 
 Many datasets can be viewed as collections of points with some notion of proximity, represented by either coordinates or pairwise distances. In these settings, a natural goal is to understand the kinds of structure present in the data, and how those structures change across datasets, parameters, or experimental conditions.
 
 `holspec` is motivated by two structural questions:
 
-- **Pairwise vs. higher-order structure:** Are structural signatures of the point cloud captured at the level of pairs, triples, or larger local groups of points?
-- **Topology vs. geometry:** Which structural features are visible from connectivity information alone, and which depend on geometric information such as lengths, areas, volumes, or weights?
+1. **Pairwise vs. higher-order structure:** Are structural signatures of the point cloud captured at the level of pairs, triples, or larger local groups of points?
+2. **Topology vs. geometry:** Which structural features are visible from connectivity information alone, and which depend on geometric information such as lengths, areas, volumes, or weights?
 
 The modular pipeline in `holspec` makes these questions computationally accessible. By configuring the pipeline stages, users can choose which local group sizes to represent and what kinds of geometric information to include. The resulting Hodge Laplacian spectra encode these choices as structural signatures that can be analyzed and compared across point cloud datasets.
 
@@ -64,79 +123,20 @@ src/holspec/
 - **Ensemble-aware workflows:** Point cloud ensembles are represented explicitly through `PointDataEnsemble` and processed member-by-member through the pipeline. Spectral analysis utilities summarize eigenvalue spectra and derived quantities across ensemble members.
 - **Directed dependency graph:** The staged pipeline diagram gives the main conceptual flow, while the mathematical dependency structure is a DAG. Pipeline loading utilities resolve upstream dependencies through provenance metadata.
 
-## Installation and usage
-
-### Installation
-
-`holspec` requires Python 3.12 or newer.
-
-For local development, examples, notebook workflows, and visualization, the recommended setup is to create the Conda environment included with the repository and install the package in editable mode:
-
-```bash
-git clone https://github.com/rosalindhuang/holspec.git
-cd holspec
-
-conda env create -f environment.yml
-conda activate holspec
-
-pip install -e .
-```
-
-This installs the package and makes the `holspec` command available from the terminal. To confirm the installation, run:
-
-```bash
-holspec --help
-python -c "import holspec; print(holspec.__version__)"
-```
-
-For a lighter setup using an existing Python environment, install the package directly with `pip`:
-
-```bash
-pip install -e .
-```
-
-Optional dependency groups are available for development, visualization, and notebooks:
-
-```bash
-pip install -e ".[dev,viz,notebook]"
-```
-
-### Usage interfaces
-
-`holspec` can be used through two interfaces:
-
-| Interface  | Use it for                                                                                                      | Examples                                                                                                           |
-| ---------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| CLI        | Running reproducible data import, data generation, and pipeline workflows from YAML configuration files.        | `holspec run`, `holspec import-data`, `holspec generate-data`                                                      |
-| Python API | Analyzing and visualizing pipeline outputs, working directly with framework objects, building custom workflows. | `load_spectra`, `EnsembleSpectraAnalysis`, `PointData`, `SimplicialComplex`, `run_pipeline`, `run_data_import`     |
-
-The two interfaces are complementary and cover different needs. Typical workflows can combine them: run reproducible computations from the CLI, then use the Python API for interactive exploration, analysis, and visualization. See the **Quickstart** section for an example.
-
-The CLI is the main interface for running config-driven workflows.
-
-- `holspec run <pipeline_config.yml>`: Run the full pipeline from a YAML config.
-- `holspec import-data <data_import_config.yml>`: Import external point cloud data files specified by a YAML config.
-- `holspec generate-data <data_generation_config.yml>`: Generate point cloud data from a YAML config.
-- `holspec inspect <output_file.h5>`: Optionally inspect an HDF5 output file.
-
-Use `holspec --help` or `holspec <command> --help` to see available options.
-
-The top-level Python API exposes the framework objects, pipeline entry points, and analysis utilities. Visualization utilities and lower-level construction, validation, and I/O helpers are available from the corresponding subpackages, including `holspec.visualization`, `holspec.simplicial`, `holspec.cochain_metric`, and `holspec.utilities`.
-
 ## Quickstart
 
-The quickstart notebook is a small demo of the kinds of structural studies that the end-to-end `holspec` workflow can support. It starts from an ordered point cloud and asks: what happens to the spectral signatures of structure as noise is added?
+The quickstart notebook demonstrates a representative structural study that the end-to-end `holspec` workflow can support. It starts from an ordered point cloud and asks: what happens to the spectral signatures as noise is added?
 
 ### Running the example
 
-The notebook is found at `examples/quickstart.ipynb`. It walks through a full workflow:
+The notebook is available at [`examples/quickstart.ipynb`](examples/quickstart.ipynb). It walks through a full workflow:
 
 1. Generates point cloud ensembles at several noise levels.
 2. Runs the `holspec` pipeline on each ensemble.
 3. Analyzes their Hodge Laplacian spectra.
 4. Visualizes the structures and eigenvalue distributions.
 
-The parameters near the top of the notebook make it easy to explore different lattice sizes, noise levels, or pipeline settings. The notebook automatically writes YAML configs based on these choices, which can also be run from the CLI:
+The parameters near the top of the notebook make it easy to explore different lattice sizes, noise levels, or pipeline settings. The notebook automatically writes YAML configs based on these choices, including [`data_generation_quickstart.yml`](examples/configs/data_generation_quickstart.yml) and [`pipeline_quickstart.yml`](examples/configs/pipeline_quickstart.yml), which can also be run from the CLI:
 
 ```bash
 holspec generate-data examples/configs/data_generation_quickstart.yml
@@ -165,19 +165,21 @@ After installing the development dependencies, run:
 pytest
 ```
 
-The test suite includes:
+The full test suite includes:
 
-- **Mathematical and numerical checks:** Small hand-checkable examples to verify simplicial complex invariants, cochain metric behavior, Hodge Laplacian operator identities, eigensolver behavior, and spectra on known examples.
-- **Object contracts and validation:** Tests covering construction, access methods, validation behavior, and error handling for framework objects.
-- **Persistence and provenance:** HDF5 round-trip tests to verify framework objects can be saved, loaded, and cache-loaded consistently, with content-hash mismatch detection and provenance-based pipeline loading.
-- **Pipeline and interfaces:** End-to-end and staged pipeline execution, top-level Python API, CLI workflows, and config-driven data import and generation.
+1. **Mathematical and numerical checks:** Small hand-checkable examples to verify simplicial complex invariants, cochain metric behavior, Hodge Laplacian operator identities, eigensolver behavior, and spectra on known examples.
+2. **Object contracts and validation:** Tests covering construction, access methods, validation behavior, and error handling for framework objects.
+3. **Persistence and provenance:** HDF5 round-trip tests to verify framework objects can be saved, loaded, and cache-loaded consistently, with content-hash mismatch detection and provenance-based pipeline loading.
+4. **Pipeline and interfaces:** End-to-end and staged pipeline execution, top-level Python API, CLI workflows, and config-driven data import and generation.
 
 ## Future directions
 
-`holspec` is focused on Hodge Laplacian spectral analysis of point cloud data, with an emphasis on modular pipeline construction, reproducible computation, and analyzing spectral signatures across datasets and modeling choices.
+The `holspec` framework opens several natural directions for further work:
 
-The current framework opens several natural directions for further work:
+- **Structural transitions:** How do spectral signatures change across noise levels, length scale parameters, simplicial constructions, and metric models? How do these dimensions interact?
+- **Physical and biological applications:** Apply the framework to soft/active matter and biological systems exhibiting disorder, collective behavior, or phase transitions. What do spectral signatures reveal about structural changes and cross-system comparisons?
+- **Spectral features for downstream analysis:** Can Hodge Laplacian spectra and derived spectral quantities serve as features for classification, clustering, regression, or other data analysis workflows?
 
-- **Structural transitions:** Study how spectral signatures change across noise levels, length scale parameters, simplicial constructions, and metric models, particularly how these choices interact.
-- **Physical and biological applications:** Apply the framework to soft/active matter and biological systems exhibiting disorder, collective behavior, or phase transitions. In these settings, spectral signatures can help characterize structural changes across conditions and enable cross-system comparisons.
-- **Spectral features for downstream analysis:** Explore the use of Hodge Laplacian spectra and derived spectral quantities as features for classification, clustering, regression, or other data analysis workflows.
+## License
+
+`holspec` is available under the [MIT License](LICENSE).
