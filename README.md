@@ -159,9 +159,10 @@ The eigenvalue spectra respond to these structural changes: the distributions sh
 
 `holspec` includes a `pytest` suite covering the mathematical core, object persistence, pipeline execution, analysis utilities, and public interfaces.
 
-After installing the development dependencies, run:
+Install the development and visualization dependencies, then run the test suite:
 
 ```bash
+python -m pip install -e ".[dev,viz]"
 pytest
 ```
 

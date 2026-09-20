@@ -6,40 +6,26 @@ dependencies:
   - pip
 
   # Core package dependencies
-  - numpy
-  - scipy
-  - pandas
   - gudhi
   - h5py
   - natsort
-  - nbformat
+  - numpy
+  - pandas
   - pyyaml
+  - scipy
+  - typer
 
   # Visualization and examples
   - matplotlib
   - pillow
-  - seaborn
 
   # Notebook workflows
-  - jupyterlab
   - ipykernel
-  - ipywidgets
   - ipympl
-
-  # Data ingestion and downstream analysis
-  - pyarrow
-  - openpyxl
-  - pytables
-  - scikit-learn
-
-  # CLI and workflow utilities
-  - rich
-  - tqdm
-  - typer
+  - ipywidgets
+  - jupyterlab
+  - nbformat
 
   # Development tools
   - pytest
   - ruff
-
-  # Pip packages, if needed
-  - pip: []

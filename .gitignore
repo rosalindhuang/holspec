@@ -2,12 +2,15 @@
 __pycache__/
 *.py[cod]
 *.egg-info/
+build/
+dist/
 .pytest_cache/
 .ruff_cache/
 
 # Local environments and system files
 .venv/
 .conda/
+.vscode/
 .DS_Store
 .ipynb_checkpoints/
 

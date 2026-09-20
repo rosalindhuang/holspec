@@ -13,7 +13,6 @@ import time
 import textwrap
 import re
 import yaml
-import nbformat
 import shutil
 import subprocess
 
@@ -622,6 +621,14 @@ def export_notebook_outputs(notebook_name: str, output_filename: str = None):
     -------
     None
     """
+    try:
+        import nbformat
+    except ImportError as exc:
+        raise ImportError(
+            "export_notebook_outputs requires the notebook dependencies. "
+            'Install them with: python -m pip install "holspec[notebook]"'
+        ) from exc
+
     # Set defaults
     if "." in notebook_name:
         notebook_name = notebook_name.split(".")[0]
