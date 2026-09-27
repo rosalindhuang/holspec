@@ -10,7 +10,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 
-from holspec.visualization import format_axis, plot_point_data
+from holspec.visualization import (
+    format_axis,
+    plot_distribution_heatmap,
+    plot_point_data,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -35,6 +39,25 @@ def test_plot_point_data_accepts_scalar_radius_2d():
         [patch.radius for patch in ax.patches],
         np.full(len(positions), 0.2),
     )
+
+
+def test_plot_distribution_heatmap_uses_nonuniform_parameter_edges():
+    series = {
+        "exp_param": "size",
+        "exp_values": np.array([1.0, 2.0, 5.0]),
+        "analysis_keys": [(0, "full")],
+        "distribution_series": {
+            (0, "full"): {
+                "x": np.array([0.5, 1.5]),
+                "density_stack": np.ones((3, 2)),
+            },
+        },
+    }
+
+    _, axes = plot_distribution_heatmap(series)
+
+    coordinates = axes[0].collections[0].get_coordinates()
+    np.testing.assert_allclose(coordinates[:, 0, 1], [0.5, 1.5, 3.5, 6.5])
 
 
 def test_plot_point_data_accepts_per_point_radius_2d():

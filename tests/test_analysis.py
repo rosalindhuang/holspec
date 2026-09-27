@@ -10,7 +10,11 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from holspec.analysis import EnsembleSpectraAnalysis, extract_exp_params
+from holspec.analysis import (
+    EnsembleSpectraAnalysis,
+    extract_exp_params,
+    include_in_exp_comparisons,
+)
 from holspec.spectra import Spectrum
 from holspec.utilities import save_h5
 
@@ -184,3 +188,78 @@ def test_extract_exp_params_reads_generic_point_data_metadata(tmp_path: Path):
 
     assert exp_params["area_fraction"] == 0.74
     assert exp_params["gamma"] is None
+
+
+@pytest.mark.parametrize(
+    ("generator", "params", "expected"),
+    [
+        ("trilatthex", {"n_rings": 8}, 8),
+        ("trilattrect", {"nx": 10, "ny": 10}, 10),
+        ("bcclatt", {"nx": 4, "ny": 4, "nz": 4}, 4),
+        ("trilattrect", {"nx": 10, "ny": 12}, None),
+    ],
+)
+def test_extract_exp_params_reads_generated_lattice_size(
+    tmp_path: Path,
+    generator: str,
+    params: dict,
+    expected: int | None,
+):
+    point_data_path = tmp_path / "point_data.h5"
+    save_h5(
+        point_data_path,
+        attributes={
+            "base_config": {
+                "generator": generator,
+                "params": params,
+            },
+        },
+    )
+
+    exp_params = extract_exp_params({"point_data": point_data_path}, ["size"])
+
+    assert exp_params["size"] == expected
+
+
+def test_extract_exp_params_prefers_generic_size_metadata(tmp_path: Path):
+    point_data_path = tmp_path / "point_data.h5"
+    save_h5(
+        point_data_path,
+        attributes={
+            "metadata": {"exp_param": "size", "exp_value": 99},
+            "base_config": {
+                "generator": "trilatthex",
+                "params": {"n_rings": 8},
+            },
+        },
+    )
+
+    exp_params = extract_exp_params({"point_data": point_data_path}, ["size"])
+
+    assert exp_params["size"] == 99
+
+
+@pytest.mark.parametrize(
+    ("exp_param", "exp_value", "analysis_config", "expected"),
+    [
+        ("noise", 0.0, {"noise_exp_include_zero": False}, False),
+        ("noise", 0.0, {"noise_exp_include_zero": True}, True),
+        ("noise", 0.1, {"noise_exp_include_zero": False}, True),
+        ("noise", 0.0, {}, True),
+        ("size", 1, {"size_exp_min_size": 2}, False),
+        ("size", 2, {"size_exp_min_size": 2}, True),
+        ("size", 3, {"size_exp_min_size": 2}, True),
+        ("size", 1, {"size_exp_min_size": None}, True),
+        ("size", 1, {}, True),
+        ("alpha", 0.0, {}, True),
+        ("size", None, {"size_exp_min_size": 2}, True),
+        (None, None, {}, True),
+    ],
+)
+def test_include_in_exp_comparisons(
+    exp_param: str | None,
+    exp_value: float | int | None,
+    analysis_config: dict,
+    expected: bool,
+):
+    assert include_in_exp_comparisons(exp_param, exp_value, analysis_config) is expected

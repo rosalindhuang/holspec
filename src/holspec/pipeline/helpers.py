@@ -9,6 +9,7 @@ config dicts.
 from __future__ import annotations
 
 from fnmatch import fnmatch
+from natsort import natsorted
 from pathlib import Path
 
 from .stages import PIPELINE_STAGE_NAMES
@@ -68,7 +69,7 @@ def select_pipeline_inputs(
         ):
             continue
 
-        for filepath in sorted(dataset_dir.glob("*.h5")):
+        for filepath in natsorted(dataset_dir.glob("*.h5")):
             ptd_label = filepath.stem
 
             # Filter by point data label

@@ -1393,15 +1393,16 @@ def plot_distribution_heatmap(
         # Parameter edges from midpoints
         if len(exp_values) > 1:
             param_mids = 0.5 * (exp_values[:-1] + exp_values[1:])
-            param_step = exp_values[1] - exp_values[0]
+            first_param_step = exp_values[1] - exp_values[0]
+            last_param_step = exp_values[-1] - exp_values[-2]
         else:
             param_mids = np.array([])
-            param_step = 1.0
+            first_param_step = last_param_step = 1.0
         param_edges = np.concatenate(
             [
-                [exp_values[0] - param_step / 2],
+                [exp_values[0] - first_param_step / 2],
                 param_mids,
-                [exp_values[-1] + param_step / 2],
+                [exp_values[-1] + last_param_step / 2],
             ]
         )
 

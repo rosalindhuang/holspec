@@ -114,6 +114,48 @@ def entry_fixed_varying(
     return fixed_values, varying_value
 
 
+def include_in_exp_comparisons(
+    exp_param: str | None,
+    exp_value: float | int | None,
+    analysis_config: dict,
+) -> bool:
+    """Return whether an experiment value participates in comparisons.
+
+    Noise and size experiments have independent comparison controls in
+    *analysis_config*. Other experiment parameters, missing values, and
+    missing controls are included by default.
+
+    Parameters
+    ----------
+    exp_param : str or None
+        Name of the varying experiment parameter.
+    exp_value : float, int, or None
+        Value of the varying experiment parameter for one analysis entry.
+    analysis_config : dict
+        Per-dataset analysis configuration. Noise experiments may define
+        ``noise_exp_include_zero`` and size experiments may define
+        ``size_exp_min_size``.
+
+    Returns
+    -------
+    bool
+        Whether the entry should contribute to shared experiment-series
+        analyses and visual comparisons.
+    """
+    if exp_value is None:
+        return True
+
+    if exp_param == "noise":
+        include_zero = analysis_config.get("noise_exp_include_zero", True)
+        return include_zero or not np.isclose(exp_value, 0.0)
+
+    if exp_param == "size":
+        min_size = analysis_config.get("size_exp_min_size")
+        return min_size is None or exp_value >= min_size
+
+    return True
+
+
 def extract_exp_params(provenance: dict, exp_params: list[str]) -> dict:
     """
     Extract experimental parameters from a provenance chain.
@@ -121,8 +163,8 @@ def extract_exp_params(provenance: dict, exp_params: list[str]) -> dict:
     Reads upstream file attributes to recover parameter values. External
     imported datasets can expose arbitrary experiment parameters through
     point-data metadata fields ``exp_param`` and ``exp_value``. Built-in
-    generated-data parameters such as ``noise`` and ``alpha`` are recovered
-    from their stage-specific provenance metadata.
+    generated-data parameters such as ``noise``, ``alpha``, and ``size`` are
+    recovered from their stage-specific provenance metadata.
     Returns a dict with keys for all requested parameters; missing
     parameters are stored as None.
 
@@ -132,7 +174,7 @@ def extract_exp_params(provenance: dict, exp_params: list[str]) -> dict:
         Provenance dict mapping stage names to file paths.
     exp_params : list of str
         Names of experimental parameters to extract (e.g.
-        ``['noise', 'alpha', 'area_fraction']``).
+        ``['noise', 'alpha', 'size', 'area_fraction']``).
 
     Returns
     -------
@@ -158,6 +200,34 @@ def extract_exp_params(provenance: dict, exp_params: list[str]) -> dict:
             noise_config = ptd_attrs.get("noise_config")
             if noise_config is not None:
                 result["noise"] = noise_config.get("scale")
+
+        elif name == "size":
+            if ptd_attrs is None:
+                continue
+            base_config = ptd_attrs.get("base_config", {})
+            if not isinstance(base_config, dict):
+                continue
+            generator = base_config.get("generator")
+            params = base_config.get("params", {})
+            if not isinstance(params, dict):
+                continue
+
+            if generator == "trilatthex":
+                result["size"] = params.get("n_rings")
+            elif generator == "trilattrect":
+                axis_sizes = [params.get(axis) for axis in ("nx", "ny")]
+                if (
+                    all(value is not None for value in axis_sizes)
+                    and len(set(axis_sizes)) == 1
+                ):
+                    result["size"] = axis_sizes[0]
+            elif generator == "bcclatt":
+                axis_sizes = [params.get(axis) for axis in ("nx", "ny", "nz")]
+                if (
+                    all(value is not None for value in axis_sizes)
+                    and len(set(axis_sizes)) == 1
+                ):
+                    result["size"] = axis_sizes[0]
 
         elif name == "alpha":
             sc_filepath = provenance.get("topology_simplicial")

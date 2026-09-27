@@ -18,6 +18,7 @@ from .spectra_analysis import (
 from .helpers import (
     entry_group_key,
     entry_fixed_varying,
+    include_in_exp_comparisons,
     extract_exp_params,
     build_spectra_file_records,
     compute_transition_points,
@@ -34,6 +35,7 @@ __all__ = [
     "OBSERVABLE_LABELS",
     "entry_group_key",
     "entry_fixed_varying",
+    "include_in_exp_comparisons",
     "extract_exp_params",
     "build_spectra_file_records",
     "compute_transition_points",
