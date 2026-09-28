@@ -23,6 +23,26 @@ from .spectra_analysis import EnsembleSpectraAnalysis
 # =============================================================================
 
 
+def spectra_analysis_cache_path(
+    spectra_analysis_dir: Path | str,
+    dataset_name: str,
+    pipeline_filepath: Path | str,
+) -> Path:
+    """Return the dataset-namespaced cache path for a pipeline spectra file.
+
+    Dataset names are part of the path because distinct experiments can use
+    identical point-data directory and output labels while containing
+    different ensembles.
+    """
+    pipeline_filepath = Path(pipeline_filepath)
+    return (
+        Path(spectra_analysis_dir)
+        / dataset_name
+        / pipeline_filepath.parent.name
+        / f"{pipeline_filepath.stem}.h5"
+    )
+
+
 def entry_group_key(
     entry: dict,
     group_by: list[str],
@@ -360,7 +380,7 @@ def save_exp_series(
     series : dict
         Series data with keys: 'exp_param', 'exp_values',
         'observable_series', 'distribution_series', 'distance_series',
-        'transition_points'.
+        'transition_points', and 'eigenvalue_transform'.
     analysis_config : dict
         Analysis configuration (native Python types; HDF5 conversion
         is handled by save_h5 / to_h5_attribute).
@@ -382,6 +402,10 @@ def save_exp_series(
         "group_label": "__".join(group_key),
         "analysis_keys": analysis_keys,
         **{k: v for k, v in ac.items() if k != "analysis_keys"},
+        "eigenvalue_transform": series.get(
+            "eigenvalue_transform",
+            ac.get("eigenvalue_transform", "identity"),
+        ),
     }
     save_h5(
         filepath,
@@ -458,8 +482,8 @@ def load_spectra_analyses(
         ``select_point_data``, ``select_simplicial_complex``,
         ``select_cochain_metric``, and optionally ``exp_param``.
     spectra_analysis_dir : Path or str
-        Directory containing saved ESA HDF5 files (typically
-        ``DATA_PROCESSED_DIR / 'spectra_analysis'``).
+        Root directory containing dataset-namespaced ESA HDF5 files
+        (typically ``DATA_PROCESSED_DIR / 'spectra_analysis'``).
     project_root : Path or str
         Project root for resolving provenance paths.
     plot_datasets : list of str or None, default None
@@ -505,8 +529,11 @@ def load_spectra_analyses(
                 pipeline_filepath = Path(pipeline_filepath).resolve()
                 subdir = pipeline_filepath.parent.name
                 stem = pipeline_filepath.stem
-
-                esa_path = spectra_analysis_dir / subdir / f"{stem}.h5"
+                esa_path = spectra_analysis_cache_path(
+                    spectra_analysis_dir,
+                    dataset_name,
+                    pipeline_filepath,
+                )
                 if not esa_path.exists():
                     print(f"  WARNING: no saved ESA for {subdir}/{stem}, skipping")
                     continue
@@ -515,12 +542,16 @@ def load_spectra_analyses(
                 degrees = list(attrs.get("degrees", [0, 1, 2]))
                 components = tuple(attrs.get("components", ["full"]))
                 metadata = attrs.get("metadata", {})
+                eigenvalue_transform = str(
+                    attrs.get("eigenvalue_transform", "identity")
+                )
 
                 esa = EnsembleSpectraAnalysis.from_file(
                     pipeline_filepath,
                     project_root,
                     degrees=degrees,
                     components=components,
+                    eigenvalue_transform=eigenvalue_transform,
                 )
                 esa.load_cache(esa_path)
 
@@ -616,7 +647,7 @@ def load_experiment_series(
         ``'group_label'``, ``'observable_series'``,
         ``'distribution_series'``, ``'distance_series'``,
         ``'transition_points'``, ``'analysis_keys'``,
-        ``'observable_names'``.
+        ``'observable_names'``, ``'eigenvalue_transform'``.
 
         ``'transition_points'`` is ``{}`` for files saved before
         transition points were persisted.
@@ -637,6 +668,7 @@ def load_experiment_series(
         group_label = str(attrs.get("group_label", "__".join(group_key)))
         analysis_keys = [tuple(ak) for ak in attrs["analysis_keys"]]
         observable_names = list(attrs["observable_names"])
+        eigenvalue_transform = str(attrs.get("eigenvalue_transform", "identity"))
 
         observable_series = {}
         for k, comp in analysis_keys:
@@ -687,6 +719,7 @@ def load_experiment_series(
             "transition_points": transition_points,
             "analysis_keys": [(int(k), comp) for k, comp in analysis_keys],
             "observable_names": observable_names,
+            "eigenvalue_transform": eigenvalue_transform,
         }
 
     # Print summary

@@ -10,9 +10,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 
+from holspec.analysis import EnsembleSpectraAnalysis
+from holspec.spectra import Spectrum
 from holspec.visualization import (
     format_axis,
     plot_distribution_heatmap,
+    plot_eigval_distribution,
+    plot_observable_vs_parameter,
     plot_point_data,
 )
 
@@ -58,6 +62,57 @@ def test_plot_distribution_heatmap_uses_nonuniform_parameter_edges():
 
     coordinates = axes[0].collections[0].get_coordinates()
     np.testing.assert_allclose(coordinates[:, 0, 1], [0.5, 1.5, 3.5, 6.5])
+
+
+def test_plot_observable_uses_sqrt_coordinate_label():
+    series = {
+        "exp_param": "noise",
+        "exp_values": np.array([0.1, 0.2]),
+        "eigenvalue_transform": "sqrt",
+        "analysis_keys": [(0, "full")],
+        "observable_series": {
+            (0, "full"): {
+                "eigval_mean_nz": {
+                    "mean": np.array([1.0, 2.0]),
+                    "std": np.array([0.1, 0.2]),
+                },
+            },
+        },
+        "transition_points": {},
+    }
+
+    _, axes = plot_observable_vs_parameter(series, "eigval_mean_nz")
+
+    assert axes[0].get_ylabel() == r"$\langle\sqrt{\lambda}\rangle_\mathrm{nonzero}$"
+
+
+def test_plot_eigval_distribution_annotates_sqrt_coordinate():
+    analysis = EnsembleSpectraAnalysis(
+        {
+            (0, "full"): [
+                Spectrum(np.array([0.0, 4.0, 9.0]), dimension=3),
+            ],
+        },
+        eigenvalue_transform="sqrt",
+    )
+    analysis.eigenvalue_distribution(
+        0,
+        "full",
+        method_params={"bins": 2, "range": (0.0, 3.0)},
+    )
+
+    _, axes = plot_eigval_distribution(
+        analysis,
+        {
+            "degrees": [0],
+            "components": ("full",),
+            "nonzero": True,
+            "distribution_params": {0: {"range": (0.0, 3.0)}},
+        },
+    )
+
+    assert r"\sqrt{\lambda}_{\min}" in axes[0].texts[0].get_text()
+    assert r"\sqrt{\lambda}_{\max}" in axes[0].texts[0].get_text()
 
 
 def test_plot_point_data_accepts_per_point_radius_2d():

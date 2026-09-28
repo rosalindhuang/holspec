@@ -14,7 +14,7 @@ from matplotlib.colorbar import Colorbar
 from matplotlib.colors import LogNorm, Normalize
 from typing import Optional, Sequence, Tuple, Union, List, Dict
 
-from holspec.analysis import OBSERVABLE_LABELS
+from holspec.analysis import get_observable_label
 from holspec.visualization import (
     format_axis,
     format_cbar,
@@ -1098,6 +1098,9 @@ def plot_eigval_distribution(
     nonzero = analysis_config.get("nonzero", False)
     dstrb_params = analysis_config.get("distribution_params", {})
     dims = esa.dimensions
+    eigenvalue_symbol = (
+        r"\lambda" if esa.eigenvalue_transform == "identity" else r"\sqrt{\lambda}"
+    )
 
     margins = axis_config.get("margins", (0.05, 0.05))
     x_margin = margins[0] if isinstance(margins, (tuple, list)) else margins
@@ -1152,8 +1155,8 @@ def plot_eigval_distribution(
         ann = (
             f"$\\operatorname{{dim}} C_{{{k}}} = {N_k}$\n"
             f"$\\operatorname{{null}} {Lk} = {null_mean:{float_fmt}} \\pm {null_std:{float_fmt}}$\n"
-            f"$\\lambda_{{\\min}} = {lam_min_mean:{float_fmt}} \\pm {lam_min_std:{float_fmt}}$\n"
-            f"$\\lambda_{{\\max}} = {lam_max_mean:{float_fmt}} \\pm {lam_max_std:{float_fmt}}$"
+            f"${eigenvalue_symbol}_{{\\min}} = {lam_min_mean:{float_fmt}} \\pm {lam_min_std:{float_fmt}}$\n"
+            f"${eigenvalue_symbol}_{{\\max}} = {lam_max_mean:{float_fmt}} \\pm {lam_max_std:{float_fmt}}$"
         )
         ax.text(
             0.025,
@@ -1247,7 +1250,10 @@ def plot_observable_vs_parameter(
     exp_param = series["exp_param"]
     exp_values = series["exp_values"]
     analysis_keys = series["analysis_keys"]
-    obs_label = OBSERVABLE_LABELS.get(obs_name, obs_name)
+    obs_label = get_observable_label(
+        obs_name,
+        series.get("eigenvalue_transform", "identity"),
+    )
     n_deg = len(analysis_keys)
 
     if layout == "horizontal":

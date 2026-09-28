@@ -14,8 +14,10 @@ from .spectra_analysis import (
     EnsembleSpectraAnalysis,
     STANDARD_OBSERVABLES,
     OBSERVABLE_LABELS,
+    get_observable_label,
 )
 from .helpers import (
+    spectra_analysis_cache_path,
     entry_group_key,
     entry_fixed_varying,
     include_in_exp_comparisons,
@@ -33,6 +35,8 @@ __all__ = [
     "EnsembleSpectraAnalysis",
     "STANDARD_OBSERVABLES",
     "OBSERVABLE_LABELS",
+    "get_observable_label",
+    "spectra_analysis_cache_path",
     "entry_group_key",
     "entry_fixed_varying",
     "include_in_exp_comparisons",

@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from holspec.utilities import save_h5, read_h5, get_keys_h5, join_h5_group
-from holspec.spectra import Spectrum
+from holspec.spectra import Spectrum, ZERO_EIGENVALUE_TOL
 from holspec.hodge_laplacian import LAPLACIAN_COMPONENT_NAMES
 
 from .distributions import empirical_distribution, _HISTOGRAM_DEFAULTS
@@ -58,6 +58,63 @@ OBSERVABLE_LABELS = {
     "num_nonzero": r"$N_\mathrm{nonzero}$",
 }
 
+_EIGENVALUE_TRANSFORMS = ("identity", "sqrt")
+
+
+def _validate_eigenvalue_transform(eigenvalue_transform: str) -> str:
+    """Validate and normalize an eigenvalue-transform name."""
+    if eigenvalue_transform not in _EIGENVALUE_TRANSFORMS:
+        raise ValueError(
+            f"Unknown eigenvalue_transform {eigenvalue_transform!r}. "
+            f"Supported transforms: {_EIGENVALUE_TRANSFORMS}."
+        )
+    return eigenvalue_transform
+
+
+def _transform_spectrum(
+    spectrum: Spectrum,
+    eigenvalue_transform: str,
+) -> Spectrum:
+    """Return a spectrum expressed in the requested eigenvalue coordinate."""
+    if eigenvalue_transform == "identity":
+        return spectrum
+
+    # Preserve the original spectrum's kernel/nonzero classification.  In
+    # particular, an eigenvalue exactly at the zero tolerance is considered
+    # zero by Spectrum.dim_ker() and must not become nonzero after sqrt.
+    transformed_eigenvalues = np.zeros_like(spectrum.eigenvalues)
+    nonzero = spectrum.eigenvalues > ZERO_EIGENVALUE_TOL
+    transformed_eigenvalues[nonzero] = np.sqrt(spectrum.eigenvalues[nonzero])
+
+    return Spectrum(
+        transformed_eigenvalues,
+        spectrum.dimension,
+        eigenvectors=spectrum.eigenvectors,
+    )
+
+
+def get_observable_label(
+    observable_name: str,
+    eigenvalue_transform: str = "identity",
+) -> str:
+    """Return a coordinate-aware LaTeX label for a spectral observable."""
+    eigenvalue_transform = _validate_eigenvalue_transform(eigenvalue_transform)
+    if eigenvalue_transform == "identity":
+        return OBSERVABLE_LABELS.get(observable_name, observable_name)
+
+    sqrt_labels = {
+        "dim_ker": OBSERVABLE_LABELS["dim_ker"],
+        "eigval_min_nz": r"$\sqrt{\lambda}_{\min,\,\mathrm{nonzero}}$",
+        "eigval_max": r"$\sqrt{\lambda}_{\max}$",
+        "eigval_mean": r"$\langle\sqrt{\lambda}\rangle$",
+        "eigval_mean_nz": r"$\langle\sqrt{\lambda}\rangle_\mathrm{nonzero}$",
+        "eigval_var": r"$\mathrm{Var}(\sqrt{\lambda})$",
+        "eigval_var_nz": r"$\mathrm{Var}(\sqrt{\lambda})_\mathrm{nonzero}$",
+        "eigval_sum": r"$\sum\sqrt{\lambda}$",
+        "num_nonzero": OBSERVABLE_LABELS["num_nonzero"],
+    }
+    return sqrt_labels.get(observable_name, observable_name)
+
 
 # =============================================================================
 # EnsembleSpectraAnalysis
@@ -90,6 +147,10 @@ class EnsembleSpectraAnalysis:
         Partial spectra with eigenvectors from a sparse solver, keyed by
         (degree, component). Each list must have the same length as the
         member_spectra lists.
+    eigenvalue_transform : {'identity', 'sqrt'}, default='identity'
+        Coordinate used for all spectral observables and distributions.
+        ``'sqrt'`` analyzes square roots of the validated eigenvalues while
+        preserving the original eigenvectors; no matrix square root is built.
 
     Notes
     -----
@@ -110,7 +171,12 @@ class EnsembleSpectraAnalysis:
         member_spectra: dict[tuple[int, str], list[Spectrum]],
         metadata: dict | None = None,
         eigenvector_spectra: dict[tuple[int, str], list[Spectrum]] | None = None,
+        eigenvalue_transform: str = "identity",
     ):
+        self._eigenvalue_transform = _validate_eigenvalue_transform(
+            eigenvalue_transform
+        )
+
         # Validate member_spectra
         if not member_spectra:
             raise ValueError("member_spectra must be non-empty.")
@@ -133,7 +199,13 @@ class EnsembleSpectraAnalysis:
                     f"Valid components: {LAPLACIAN_COMPONENT_NAMES}."
                 )
 
-        self._member_spectra = member_spectra
+        self._member_spectra = {
+            key: [
+                _transform_spectrum(spectrum, self._eigenvalue_transform)
+                for spectrum in spectra
+            ]
+            for key, spectra in member_spectra.items()
+        }
         self._num_members: int = unique_lengths.pop()
 
         # Derive structural properties
@@ -184,6 +256,7 @@ class EnsembleSpectraAnalysis:
         components: tuple[str, ...] = ("full",),
         load_eigenvectors: bool = False,
         metadata: dict | None = None,
+        eigenvalue_transform: str = "identity",
     ) -> EnsembleSpectraAnalysis:
         """
         Construct from a pipeline spectra HDF5 file.
@@ -208,6 +281,8 @@ class EnsembleSpectraAnalysis:
         metadata : dict, optional
             Override metadata. If None, metadata is built from file
             attributes.
+        eigenvalue_transform : {'identity', 'sqrt'}, default='identity'
+            Coordinate used for spectral observables and distributions.
 
         Returns
         -------
@@ -272,7 +347,11 @@ class EnsembleSpectraAnalysis:
             if project_root is not None:
                 metadata["project_root"] = str(project_root)
 
-        esa = cls(member_spectra, metadata=metadata)
+        esa = cls(
+            member_spectra,
+            metadata=metadata,
+            eigenvalue_transform=eigenvalue_transform,
+        )
 
         # Load eigenvector spectra if present and requested
         if load_eigenvectors:
@@ -287,6 +366,7 @@ class EnsembleSpectraAnalysis:
         degrees: list[int] | None = None,
         components: tuple[str, ...] = ("full",),
         metadata: dict | None = None,
+        eigenvalue_transform: str = "identity",
     ) -> EnsembleSpectraAnalysis:
         """
         Construct from a list of live HodgeLaplacianSpectra objects.
@@ -302,6 +382,8 @@ class EnsembleSpectraAnalysis:
             Laplacian components to include.
         metadata : dict, optional
             Provenance metadata.
+        eigenvalue_transform : {'identity', 'sqrt'}, default='identity'
+            Coordinate used for spectral observables and distributions.
 
         Returns
         -------
@@ -328,7 +410,11 @@ class EnsembleSpectraAnalysis:
                 key = (k, comp)
                 member_spectra[key] = [hlsp.spectrum(k, comp) for hlsp in hlsp_list]
 
-        return cls(member_spectra, metadata=metadata)
+        return cls(
+            member_spectra,
+            metadata=metadata,
+            eigenvalue_transform=eigenvalue_transform,
+        )
 
     # =========================================================================
     # Properties
@@ -375,6 +461,11 @@ class EnsembleSpectraAnalysis:
         if self._eigenvector_spectra is None:
             return []
         return sorted(self._eigenvector_spectra.keys())
+
+    @property
+    def eigenvalue_transform(self) -> str:
+        """Eigenvalue coordinate used by this analysis."""
+        return self._eigenvalue_transform
 
     # =========================================================================
     # Spectrum Access
@@ -482,6 +573,8 @@ class EnsembleSpectraAnalysis:
     def _validate_and_set_eigenvector_spectra(
         self,
         eigenvector_spectra: dict[tuple[int, str], list[Spectrum | None]],
+        *,
+        apply_transform: bool = True,
     ) -> None:
         """Validate and store eigenvector spectra.
 
@@ -502,7 +595,21 @@ class EnsembleSpectraAnalysis:
                     f"Eigenvector spectrum list for ({k}, '{component}') has "
                     f"length {len(spc_list)}, expected {self._num_members}."
                 )
-        self._eigenvector_spectra = eigenvector_spectra
+        if apply_transform:
+            self._eigenvector_spectra = {
+                key: [
+                    None
+                    if spectrum is None
+                    else _transform_spectrum(
+                        spectrum,
+                        self._eigenvalue_transform,
+                    )
+                    for spectrum in spectra
+                ]
+                for key, spectra in eigenvector_spectra.items()
+            }
+        else:
+            self._eigenvector_spectra = eigenvector_spectra
 
     # =========================================================================
     # Observable Access
@@ -807,6 +914,7 @@ class EnsembleSpectraAnalysis:
             "degrees": self._degrees,
             "components": list(self._components),
             "max_dim": self._max_dim,
+            "eigenvalue_transform": self._eigenvalue_transform,
             "observable_names": sorted(
                 {
                     name
@@ -945,6 +1053,12 @@ class EnsembleSpectraAnalysis:
                 f"components mismatch: stored {stored_components}, "
                 f"live {list(self._components)}."
             )
+        stored_transform = str(root_attrs.get("eigenvalue_transform", "identity"))
+        if stored_transform != self._eigenvalue_transform:
+            raise ValueError(
+                f"eigenvalue_transform mismatch: stored {stored_transform!r}, "
+                f"live {self._eigenvalue_transform!r}."
+            )
 
         # Restore metadata
         stored_metadata = root_attrs.get("metadata")
@@ -999,12 +1113,18 @@ class EnsembleSpectraAnalysis:
                         pass
 
         # Load eigenvector spectra
-        self._load_eigenvector_spectra_from_file(filepath, group)
+        self._load_eigenvector_spectra_from_file(
+            filepath,
+            group,
+            apply_transform=False,
+        )
 
     def _load_eigenvector_spectra_from_file(
         self,
         filepath: str | Path,
         group: str | None = None,
+        *,
+        apply_transform: bool = True,
     ) -> None:
         """Load eigenvector spectra from the eigenvectors/ group if present."""
         eigvec_root = join_h5_group(group, "eigenvectors")
@@ -1061,7 +1181,10 @@ class EnsembleSpectraAnalysis:
         if any(
             any(s is not None for s in spc_list) for spc_list in eigvec_spectra.values()
         ):
-            self._eigenvector_spectra = eigvec_spectra
+            self._validate_and_set_eigenvector_spectra(
+                eigvec_spectra,
+                apply_transform=apply_transform,
+            )
 
     # =========================================================================
     # Utilities
@@ -1086,7 +1209,8 @@ class EnsembleSpectraAnalysis:
         lines.append(
             f"num_members: {self._num_members}, "
             f"degrees: {self._degrees}, "
-            f"components: {self._components}"
+            f"components: {self._components}, "
+            f"eigenvalue_transform: {self._eigenvalue_transform}"
         )
         lines.append("-" * 80)
 
@@ -1154,7 +1278,8 @@ class EnsembleSpectraAnalysis:
             f"num_members={self._num_members}, "
             f"max_dim={self._max_dim}, "
             f"degrees={self._degrees}, "
-            f"components={self._components})"
+            f"components={self._components}, "
+            f"eigenvalue_transform={self._eigenvalue_transform!r})"
         )
 
     # =========================================================================
